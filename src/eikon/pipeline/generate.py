@@ -1,4 +1,4 @@
-"""Step 3: Generate videos via Veo 3.1 Fast."""
+"""Step 3: Generate videos via Veo."""
 
 import time
 from pathlib import Path
@@ -43,20 +43,32 @@ def generate(
     )
 
     # Poll until done
-    console.print(f"  ⏳ Waiting for Veo...", style="dim")
+    console.print("  ⏳ Waiting for Veo...", style="dim")
     while not operation.done:
         time.sleep(5)
         operation = client.operations.get(operation)
+
+    # Check for errors
+    if operation.error:
+        raise RuntimeError(f"Veo error: {operation.error}")
+    if not operation.result:
+        raise RuntimeError(f"Veo returned no result. Operation: {operation}")
+    if not operation.result.generated_videos:
+        filtered = getattr(operation.result, "rai_media_filtered_count", None)
+        reasons = getattr(operation.result, "rai_media_filtered_reasons", None)
+        raise RuntimeError(
+            f"Veo generated no videos. "
+            f"RAI filtered: {filtered}, reasons: {reasons}"
+        )
 
     # Download result
     video = operation.result.generated_videos[0].video
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # The SDK returns video bytes or a URI
-    if hasattr(video, "video_bytes") and video.video_bytes:
+    if video.video_bytes:
         output_path.write_bytes(video.video_bytes)
-    elif hasattr(video, "uri") and video.uri:
-        # Download from URI
+    elif video.uri:
         import urllib.request
         urllib.request.urlretrieve(video.uri, str(output_path))
     else:

@@ -16,11 +16,9 @@ DESCRIBE_PROMPT = (
 
 def describe(client: genai.Client, image_path: Path, model: str) -> str:
     """Use Gemini vision to describe the avatar's appearance."""
-    image = types.Part.from_image(
-        types.Image(
-            image_bytes=image_path.read_bytes(),
-            mime_type=_mime(image_path),
-        )
+    image = types.Part.from_bytes(
+        data=image_path.read_bytes(),
+        mime_type=_mime(image_path),
     )
     response = client.models.generate_content(
         model=model,

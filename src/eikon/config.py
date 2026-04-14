@@ -10,13 +10,13 @@ import yaml
 DEFAULTS = {
     "output_dir": str(Path.home() / "Dev" / "eikon" / "avatars"),
     "veo": {
-        "model": "veo-3.1-fast-generate-preview",
+        "model": "veo-3.1-lite-generate-001",
         "vision_model": "gemini-2.5-flash",
     },
     "generation": {
         "aspect_ratio": "9:16",
         "resolution": "720p",
-        "duration": 8,
+        "duration": 4,
         "audio": False,
         "seed": None,
         "negative_prompt": (
@@ -33,7 +33,7 @@ DEFAULTS = {
 
 @dataclass
 class VeoConfig:
-    model: str = "veo-3.1-fast-generate-preview"
+    model: str = "veo-3.1-lite-generate-001"
     vision_model: str = "gemini-2.5-flash"
 
 
@@ -41,7 +41,7 @@ class VeoConfig:
 class GenerationConfig:
     aspect_ratio: str = "9:16"
     resolution: str = "720p"
-    duration: int = 8
+    duration: int = 4
     audio: bool = False
     seed: int | None = None
     negative_prompt: str = (
@@ -62,7 +62,6 @@ class Config:
     veo: VeoConfig = field(default_factory=VeoConfig)
     generation: GenerationConfig = field(default_factory=GenerationConfig)
     crop: CropConfig = field(default_factory=CropConfig)
-    api_key: str = ""
 
 
 CONFIG_PATH = Path.home() / ".eikon" / "config.yaml"
@@ -71,9 +70,6 @@ CONFIG_PATH = Path.home() / ".eikon" / "config.yaml"
 def load() -> Config:
     """Load config from ~/.eikon/config.yaml, falling back to defaults."""
     cfg = Config()
-
-    # API key from env
-    cfg.api_key = os.environ.get("GOOGLE_API_KEY", "")
 
     if not CONFIG_PATH.exists():
         return cfg

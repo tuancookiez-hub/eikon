@@ -53,7 +53,7 @@ def generate(image: Path, name: str, state: tuple[str, ...], seed: int | None, r
     shutil.copy2(image, avatar_dir / "source.png")
 
     # Step 1: Describe
-    client = create(cfg)
+    client = create()
     console.print("[bold cyan]Step 1:[/] Analyzing avatar image...")
     subject = describe.describe(client, image, cfg.veo.vision_model)
     console.print(f"  [green]✓[/] Subject: {subject[:80]}...")
