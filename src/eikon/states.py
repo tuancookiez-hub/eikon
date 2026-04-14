@@ -2,17 +2,20 @@
 
 STATES: dict[str, str] = {
     "idle": (
-        "Subtle breathing, micro-movements, occasional blinks. "
-        "Slight weight shifts. Relaxed neutral expression. Calm energy. "
-        "Very subtle — barely perceptible motion."
+        "Relaxed, facing camera. Gentle breathing. "
+        "Calm neutral expression, occasional slow blink. Still and centered."
     ),
     "listening": (
-        "Head slightly tilted, eyes focused forward, attentive posture. "
-        "Occasional small nods. Mouth closed. Alert but still energy."
+        "She reaches her right hand up to the side of her head and grabs "
+        "the right headphone ear cup, pulling it away from her ear. "
+        "She holds the cup out to the side with her hand raised. "
+        "Head faces camera. Attentive expression, mouth closed."
     ),
     "thinking": (
-        "Gaze drifts slightly up-right. Subtle lip compression. Slight squint. "
-        "Contemplative energy. Slower movements than idle."
+        "Hand rises into frame, index finger pointing to temple. "
+        "Head tilts to one side, gaze drifts upward. "
+        "Contemplative expression. Forearm and pointed finger visible "
+        "against the side of the head — distinct outline change from idle."
     ),
     "speaking": (
         "Mouth moves in natural talking motion. Head and eyebrow gestures "
@@ -20,12 +23,15 @@ STATES: dict[str, str] = {
         "More energetic than idle."
     ),
     "working": (
-        "Focused gaze, slightly downward. Determined expression. "
-        "Busy energy — typing or concentrating feel. More active than thinking."
+        "Head lowers down, looking downward. Chin drops below the frame. "
+        "Only the top of the head and hair visible — lofi study girl pose. "
+        "Cozy, focused, head-down. Completely different silhouette from idle."
     ),
     "error": (
-        "Slight wince, apologetic expression. One eyebrow raised. "
-        "Brief head shake. Settles back toward neutral."
+        "Head pulls back in a recoil. One hand rises into frame palm-out "
+        "in a wince/stop gesture near the face. Apologetic expression, "
+        "slight head shake. Hand lowers back out of frame, "
+        "posture settles toward neutral."
     ),
 }
 

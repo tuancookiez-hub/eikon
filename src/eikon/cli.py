@@ -28,15 +28,18 @@ def cli():
 @click.option("--state", "-s", multiple=True, type=click.Choice(ALL_STATES),
               help="Generate specific state(s). Omit for all 6.")
 @click.option("--seed", type=int, default=None, help="Seed for generation")
+@click.option("--model", "-m", type=str, default=None, help="Override Veo model (e.g. veo-3.1-generate-001)")
 @click.option("--raw-only", is_flag=True, help="Skip post-processing")
-def generate(image: Path, name: str, state: tuple[str, ...], seed: int | None, raw_only: bool):
+def generate(image: Path, name: str, state: tuple[str, ...], seed: int | None, model: str | None, raw_only: bool):
     """Generate state videos for an avatar."""
     from .client import create
-    from .pipeline import describe, prompt, generate as gen, postprocess, manifest
+    from .pipeline import prompt, generate as gen, postprocess, manifest
 
     cfg = load()
     if seed is not None:
         cfg.generation.seed = seed
+    if model is not None:
+        cfg.veo.model = model
 
     states = list(state) if state else ALL_STATES
     avatar_dir = cfg.output_dir / name
@@ -52,29 +55,23 @@ def generate(image: Path, name: str, state: tuple[str, ...], seed: int | None, r
     avatar_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(image, avatar_dir / "source.png")
 
-    # Step 1: Describe
+    # Step 1: Build prompts
     client = create()
-    console.print("[bold cyan]Step 1:[/] Analyzing avatar image...")
-    subject = describe.describe(client, image, cfg.veo.vision_model)
-    console.print(f"  [green]✓[/] Subject: {subject[:80]}...")
-    console.print()
-
-    # Step 2: Build prompts
-    console.print("[bold cyan]Step 2:[/] Building prompts...")
-    prompts = {s: prompt.build(subject, s) for s in states}
+    console.print("[bold cyan]Step 1:[/] Building prompts...")
+    prompts = {s: prompt.build(s) for s in states}
     console.print(f"  [green]✓[/] {len(prompts)} prompts ready")
     console.print()
 
-    # Step 3: Generate
-    console.print("[bold cyan]Step 3:[/] Generating videos via Veo 3.1 Fast...")
+    # Step 2: Generate
+    console.print("[bold cyan]Step 2:[/] Generating videos via Veo...")
     raw_dir = avatar_dir / "raw"
     results = gen.generate_all(client, prompts, image, raw_dir, cfg)
     console.print(f"  [green]✓[/] {len(results)} videos generated")
     console.print()
 
-    # Step 4: Post-process
+    # Step 3: Post-process
     if not raw_only:
-        console.print("[bold cyan]Step 4:[/] Post-processing (crop + thumbnails)...")
+        console.print("[bold cyan]Step 3:[/] Post-processing (crop + thumbnails)...")
         postprocess.process_all(
             raw_dir,
             avatar_dir / "states",
@@ -86,7 +83,7 @@ def generate(image: Path, name: str, state: tuple[str, ...], seed: int | None, r
         console.print()
 
     # Manifest
-    manifest.write(avatar_dir, name, subject, cfg)
+    manifest.write(avatar_dir, name, "", cfg)
     console.print(f"[bold green]Done![/] Avatar ready at {avatar_dir}")
 
 

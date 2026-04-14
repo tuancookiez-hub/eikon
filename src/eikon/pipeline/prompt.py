@@ -1,22 +1,19 @@
-"""Step 2: Build Veo prompts from subject description + state direction."""
+"""Step 2: Build Veo prompts from state direction + frame directive."""
 
 from ..states import STATES
 
 FRAME_DIRECTIVE = (
-    "Head and shoulders portrait, centered in frame. Subject fills the middle "
-    "third of the frame vertically. Clean solid neutral background. Static camera, "
-    "no pans, zooms, or camera movement. No full body shot. Subtle natural "
-    "movements only — breathing, micro-expressions, blinks. Smooth, continuous "
-    "motion suitable for seamless looping."
+    "Head and shoulders portrait, centered in frame. Static camera. "
+    "Hair has gentle, smooth bounce and sway throughout — soft natural movement "
+    "as if in a light breeze."
 )
 
 
-def build(subject: str, state: str) -> str:
+def build(state: str) -> str:
     """Build a complete Veo prompt for a given state."""
-    direction = STATES[state]
-    return f"{subject}\n\n{direction}\n\n{FRAME_DIRECTIVE}"
+    return f"{STATES[state]}\n\n{FRAME_DIRECTIVE}"
 
 
-def build_all(subject: str) -> dict[str, str]:
+def build_all() -> dict[str, str]:
     """Build prompts for all 6 states."""
-    return {state: build(subject, state) for state in STATES}
+    return {state: build(state) for state in STATES}

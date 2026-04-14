@@ -21,7 +21,8 @@ DEFAULTS = {
         "seed": None,
         "negative_prompt": (
             "camera movement, zoom, pan, tilt, background change, "
-            "full body, legs, scene transition"
+            "full body shot, legs, scene transition, "
+            "border, frame, outline around image, black border, vignette"
         ),
     },
     "crop": {
@@ -46,7 +47,8 @@ class GenerationConfig:
     seed: int | None = None
     negative_prompt: str = (
         "camera movement, zoom, pan, tilt, background change, "
-        "full body, legs, scene transition"
+        "full body shot, legs, scene transition, "
+        "border, frame, outline around image, black border, vignette"
     )
 
 
