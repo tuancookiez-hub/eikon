@@ -14,33 +14,39 @@ Create a 6-state animated ASCII avatar from a single starter image. Each state (
 A starter image is **required** before anything else.
 
 ### If the user provides an image
+
 - Use it directly. Prefer **monochrome** images (dark/black background, light foreground) for best ASCII output.
-- Portrait orientation, head-and-shoulders framing, neck + head visible, no shoulders.
 
 ### If the user does NOT have an image
+
 Ask:
+
 > Do you have a starter image for your avatar, or would you like to generate one?
 > For best ASCII results, monochrome images work best — dark/black background with a light foreground subject (think white-on-black illustration style).
 
 If the agent has image generation capabilities (DALL-E, Stable Diffusion, Flux, etc.), offer to generate one. Suggest a prompt like:
+
 > "Monochrome portrait illustration, head and shoulders, [character description], white lines on pure black background, clean lineart style, no background detail, facing camera"
 
-### Image requirements
-- Head and shoulders portrait (neck + head, no full body)
-- Clean silhouette — the final output is ~48 chars wide, fine detail is lost
+### Image suggestions
+
+- **Suggested default framing:** Head and shoulders portrait (neck + head, no full body) — but the user can choose whatever framing they want
+- Clean silhouette — fine detail is lost at ASCII resolution
 - Any props the character wears (headphones, glasses, hat) must be **visually visible** — Veo can't infer hidden items
-- PNG format preferred
+- Image format depends on what the generation tool supports
 
 ---
 
 ## Phase 1: Video Generation Setup
 
 ### Check capabilities
-Before generating video, verify the agent has access to a video generation API.
 
-**Default: Google Veo via Vertex AI**
+Before generating video, verify the agent has access to a video generation API. **If no video generation capability is available, this skill cannot proceed — do not start.**
 
-Requirements:
+Google Veo via Vertex AI is the default choice **if** the user has it configured, or if multiple options are available and the user asks the agent to choose.
+
+Requirements for Veo:
+
 - `google-genai` Python package
 - Google Cloud project with Vertex AI enabled
 - Authentication (one of):
@@ -48,15 +54,10 @@ Requirements:
   - `gcloud auth application-default login` (ADC)
   - `GOOGLE_API_KEY` env var (AI Studio path, non-Vertex)
 
-If eikon CLI is installed (`~/Dev/eikon`):
-```bash
-# Check if eikon is available
-cd ~/Dev/eikon && uv run eikon --help
-```
+### Standalone Veo generation
 
-If eikon is NOT installed, or the agent is working standalone:
 ```python
-# Minimal Veo generation (no eikon dependency)
+# Minimal Veo generation
 from google import genai
 from google.genai import types
 import base64
@@ -90,18 +91,20 @@ with open("output.mp4", "wb") as f:
 ```
 
 ### If no video generation is available
-Ask the user:
-> I don't have access to a video generation API. Options:
+
+Tell the user:
+
+> I don't have access to a video generation API. This skill requires video generation to proceed. Options:
+>
 > 1. Provide a Google Cloud API key or service account for Veo
-> 2. Use a different video gen service you have access to
-> 3. Provide pre-made state videos (one per state, ~4s loops)
+> 2. Configure a different video generation service
 
 ### Veo model tiers
 
-| Model | Speed | Quality | Use when |
-|-------|-------|---------|----------|
-| `veo-3.1-lite-generate-001` | Fast | Good for simple motion | Default — head angles, mouth, breathing |
-| `veo-3.1-generate-001` | Slower | Better prompt adherence | Complex gestures, hand movements, props |
+| Model                       | Speed  | Quality                 | Use when                                |
+| --------------------------- | ------ | ----------------------- | --------------------------------------- |
+| `veo-3.1-lite-generate-001` | Fast   | Good for simple motion  | Default — head angles, mouth, breathing |
+| `veo-3.1-generate-001`      | Slower | Better prompt adherence | Complex gestures, hand movements, props |
 
 Always use the latest version available. If newer models exist at time of invocation, prefer them. Use `lite` variant by default.
 
@@ -111,22 +114,23 @@ Always use the latest version available. If newer models exist at time of invoca
 
 ### The 6 states
 
-Every eikon has exactly 6 animation states:
+Every eikon has exactly 6 (default) animation states:
 
-| State | Purpose | Key differentiator |
-|-------|---------|-------------------|
-| `idle` | Resting/default | Baseline — still, centered, breathing |
-| `listening` | Receiving input | Distinct gesture showing attention |
-| `thinking` | Processing/reasoning | Hand or head position change |
-| `speaking` | Generating response | Mouth movement |
-| `working` | Executing tools/tasks | Head-down or focused pose |
-| `error` | Something went wrong | Recoil or defensive gesture |
+| State       | Purpose               | Key differentiator                    |
+| ----------- | --------------------- | ------------------------------------- |
+| `idle`      | Resting/default       | Baseline — still, centered, breathing |
+| `listening` | Receiving input       | Distinct gesture showing attention    |
+| `thinking`  | Processing/reasoning  | Hand or head position change          |
+| `speaking`  | Generating response   | Mouth movement                        |
+| `working`   | Executing tools/tasks | Head-down or focused pose             |
+| `error`     | Something went wrong  | Recoil or defensive gesture           |
 
 ### ASCII-first design principles
 
-The final output is **~48 characters wide**. This means:
+By default, output **3 sizes** of ASCII animations: **32, 48, and 64** characters wide. Ask the user if they want all 3 or a specific size.
 
 ✅ **Reads well at ASCII resolution:**
+
 - Head angle changes (tilted, lowered, pulled back)
 - Hand/forearm entering frame near face
 - Distinct pose silhouettes (finger to temple, palm-out)
@@ -134,8 +138,7 @@ The final output is **~48 characters wide**. This means:
 - Props being manipulated (headphones moved)
 
 ❌ **Invisible at ASCII resolution:**
-- Eye direction / gaze shifts
-- Eyebrow raises, lip compression
+
 - Micro-expressions, subtle weight shifts
 - "Determined" vs "calm" expression — indistinguishable
 
@@ -152,35 +155,32 @@ idle:
 
 listening:
   "Attention gesture — head tilts slightly, one hand rises near ear
-   or side of head. Attentive expression, mouth closed.
-   Clear silhouette difference from idle."
+   or side of head. Attentive expression, mouth closed."
 
 thinking:
-  "Hand rises into frame, index finger pointing to temple or chin.
-   Head tilts to one side, gaze drifts upward. Contemplative.
+  "Head tilts to one side, gaze drifts. Contemplative.
    Forearm visible against head — distinct outline change."
 
 speaking:
   "Mouth moves in natural talking motion. Head and eyebrow gestures
    for emphasis. More energetic than idle.
-   Direct eye contact about 60% of the time."
+   Facing camera."
 
 working:
-  "Head lowers down, looking downward. Chin drops toward or below frame.
-   Focused, head-down posture. Completely different silhouette from idle."
+  "Head lowered, looking downward or behind. Chin drops toward or below frame.
+   Focused, head-down posture."
 
 error:
-  "Head pulls back in a recoil. One hand rises into frame palm-out
-   in a wince/stop gesture near the face. Slight head shake.
-   Hand lowers back, posture settles toward neutral."
+  "Abrupt, quick, explosive motion expressing surprise.
+   Wince/stop gesture. posture settles toward neutral."
 ```
 
 ### Shared frame directive (appended to every state prompt)
 
+This is appended to every state prompt. **Present it to the user for review alongside the state prompts** — they may want to customize it for their character.
+
 ```
 "Head and shoulders portrait, centered in frame. Static camera.
- Hair has gentle, smooth bounce and sway throughout —
- soft natural movement as if in a light breeze.
  No border or frame around the image — content extends to the very edge."
 ```
 
@@ -197,7 +197,7 @@ error:
    - If character has headphones → listening state can grab a headphone cup
    - If character has glasses → thinking state can adjust glasses
    - If character has no props → use pure pose/hand gestures
-3. **Present all 6 prompts to the user for review before generating**
+3. **Present all 6 prompts AND the shared frame directive to the user for review before generating**
 
 ```
 Here are the prompts I've drafted for each state:
@@ -208,6 +208,8 @@ Here are the prompts I've drafted for each state:
 **speaking:** [prompt]
 **working:** [prompt]
 **error:** [prompt]
+
+**Shared frame directive** (appended to all): [directive]
 
 Want to adjust any of these before I start generating?
 ```
@@ -221,36 +223,24 @@ Wait for explicit approval before proceeding.
 ### Default: One at a time with review
 
 Generate states **one at a time**. After each:
+
 1. Show/share the result video
 2. Ask if it looks good
 3. If not, offer to regenerate with a modified prompt or the full (non-lite) model
 
 **Important reminder to give the user:**
-> Small details like exact finger placement or subtle expressions won't matter in the final ASCII version — the conversion is only ~48 characters wide. If you're unsure about a detail, we can convert this to ASCII first to see how it actually looks before iterating further.
+
+> Small details like exact subtle expressions won't matter in the final ASCII version — the conversion is only ~48 characters wide. If you're unsure about a detail, we can convert this to ASCII first to see how it actually looks before iterating further.
 
 If the user is iterating on small visual details after 2+ regeneration attempts on the same state, proactively suggest:
+
 > Want to see the ASCII version of this generation first? Many small details disappear in the conversion — it might already look great as ASCII.
 
 ### Batch mode
 
 If the user requests it, generate all 6 states in sequence without review:
+
 > Running all 6 states back-to-back. I'll show you the results when they're all done.
-
-### Using eikon CLI (if available)
-
-```bash
-cd ~/Dev/eikon
-set -a && source .env && set +a  # REQUIRED — uv run won't load .env
-
-# Single state
-uv run eikon generate -i faces/starter.png -n avatar-name -s idle
-
-# All states
-uv run eikon generate -i faces/starter.png -n avatar-name
-
-# With full model (for complex gestures)
-uv run eikon generate -i faces/starter.png -n avatar-name -s thinking -m veo-3.1-generate-001
-```
 
 ### Output structure
 
@@ -278,23 +268,13 @@ Convert the generated videos to the format the user needs.
 ### Determine output format
 
 If the user specifies a format, use it. Otherwise, infer from context:
+
 - Building a **Herm TUI / OpenTUI app** → TypeScript module (`states/*.ts`)
 - Building a **terminal app** → TypeScript or text frames
 - General use / preview → MP4 ASCII video or text frame files
 - Just want to see it → display in terminal
 
-### Conversion script
-
-The eikon project includes `scripts/to_ascii.py`. If available:
-
-```bash
-cd ~/Dev/eikon
-python scripts/to_ascii.py <avatar-name> [--no-invert]
-```
-
-This produces TypeScript modules at `avatars/<name>/ascii/`.
-
-### Manual conversion (no eikon dependency)
+### Manual conversion
 
 ```python
 import numpy as np
@@ -302,7 +282,7 @@ from PIL import Image
 import subprocess
 from pathlib import Path
 
-ASCII_WIDTH = 48
+ASCII_WIDTH = 48  # Default middle size; also generate 32 and 64
 ASCII_HEIGHT = 24
 FPS = 12
 CHAR_PALETTE = " .:-=+*#%@"  # space=black, @=white
@@ -316,9 +296,10 @@ def extract_frames(video: Path, out: Path, fps: int) -> list[Path]:
     ], check=True, capture_output=True)
     return sorted(out.glob("frame_*.png"))
 
-def to_ascii(path: Path, invert: bool = True) -> str:
+def to_ascii(path: Path, width: int = 48, invert: bool = True) -> str:
     img = Image.open(path).convert("L")
-    img = img.resize((ASCII_WIDTH, ASCII_HEIGHT), Image.Resampling.LANCZOS)
+    height = int(width * img.height / img.width * 0.5)  # 0.5 for char aspect ratio
+    img = img.resize((width, height), Image.Resampling.LANCZOS)
     px = np.array(img, dtype=float) / 255.0
     if invert:
         px = 1.0 - px  # Dark bg: black→space, white→@
@@ -334,7 +315,7 @@ Each state becomes a `.ts` file:
 ```typescript
 // Auto-generated ASCII avatar frames
 export const FRAMES: string[] = [
-  `line1\nline2\n...`,  // template literal per frame
+  `line1\nline2\n...`, // template literal per frame
 ];
 export const FRAME_COUNT = FRAMES.length;
 export const FPS = 12;
@@ -343,6 +324,7 @@ export const FRAME_HEIGHT = 24;
 ```
 
 Index file re-exports all states:
+
 ```typescript
 export type AvatarState = "idle" | "listening" | "thinking" | "speaking" | "working" | "error"
 export const STATE_FRAMES: Record<AvatarState, string[]> = { idle, listening, ... }
@@ -356,17 +338,3 @@ Animation plays continuous **ping-pong** (forward → reverse → repeat). State
 - **Dark subject on light background** → `invert=True` (flips so subject becomes light ASCII chars on dark terminal)
 
 Monochrome starter images with dark backgrounds need no inversion.
-
----
-
-## Pitfalls
-
-- **`uv run` won't load `.env`** — always `set -a && source .env && set +a` first
-- **Veo lite ignores complex gestures** — escalate to `veo-3.1-generate-001` before rewriting prompts
-- **Don't mention body parts not in frame** — if only head/neck visible, don't reference shoulders or arms "at sides"
-- **Props must be visible in the starter image** — Veo cannot infer hidden items
-- **Don't say "subtle"** — if it's subtle, it won't survive ASCII conversion
-- **Frame directive is sacred** — don't widen framing; write gestures that enter the existing tight frame
-- **Gemini image-gen models aren't on Vertex** — `gemini-3.1-flash-image-preview` requires AI Studio API key, not Vertex AI
-- **Border artifacts** — always include border/frame/vignette in negative prompt
-- **Test with ASCII before perfecting video** — users often iterate on video details that vanish in conversion
