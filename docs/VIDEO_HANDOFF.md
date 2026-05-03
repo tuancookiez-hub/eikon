@@ -7,7 +7,7 @@ You're generating short i2v clips from a single base portrait. Downstream, `mk_e
 ```
 avatars/<name>/states/
   idle/       loop.mp4
-  listening/  start.mp4
+  listening/  start.mp4  loop.mp4
   thinking/   start.mp4
   speaking/   start.mp4  loop.mp4
   working/    start.mp4  loop.mp4
@@ -21,8 +21,8 @@ That's it. No metadata, no json. Playback behaviour is encoded entirely by **whi
 | Files present            | Mode         | Player does                                   | Use for                 |
 |--------------------------|--------------|-----------------------------------------------|-------------------------|
 | `loop.mp4` only          | **loop**     | plays 0→N→0→N… forever                        | idle                    |
-| `start.mp4` only         | **hold**     | plays 0→N once, freezes on last frame         | listening, thinking, error |
-| `start.mp4` + `loop.mp4` | **intro→loop** | plays start once, then loops `loop.mp4`     | speaking, working       |
+| `start.mp4` only         | **hold**     | plays 0→N once, freezes on last frame         | thinking, error         |
+| `start.mp4` + `loop.mp4` | **intro→loop** | plays start once, then loops `loop.mp4`     | listening, speaking, working |
 
 A bare `<state>.mp4` at `states/` root is treated as `loop.mp4` (legacy; don't produce this).
 
@@ -53,7 +53,7 @@ The rasterizer is `chafa --symbols braille --colors none --invert` at 48×24. Th
 - **Seamless-loop rule applies only to `loop.mp4`.** Its last frame must match its first frame (or use first/last-frame conditioning so it wraps). `start.mp4` does NOT need to loop — it plays once.
 - **Intro→loop seam.** Where both exist, last frame of `start.mp4` must match first frame of `loop.mp4`. Easiest: generate one clip (neutral → action → sustained action), split it, and trim `loop.mp4` to a wrappable sub-segment.
 - **`error` returns to neutral.** It's a one-shot that falls back to idle, so its *last* frame should be near the base pose, not mid-wince. The `states.py` prompt already says "settles toward neutral."
-- **Hold states end on the pose.** `listening`/`thinking` freeze on their last frame for an unbounded time. Make the last frame a clean, readable held pose (hand at temple, headphone pulled aside), not a motion-blur in-between.
+- **Hold states end on the pose.** `thinking` freezes on its last frame for an unbounded time. Make the last frame a clean, readable held pose (hand at temple), not a motion-blur in-between.
 
 ## Clip specs
 
