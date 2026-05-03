@@ -13,7 +13,7 @@
  * Usage:
  *   bun scripts/mk_eikon.ts <src-dir> [out.eikon] \
  *     [--name N] [--width 48] [--height 24] [--fps 16] \
- *     [--symbols block] [--colors none|full] [--dither none]
+ *     [--symbols block] [--colors none|full] [--dither none] [--no-invert]
  */
 
 import { serializeEikon, type Eikon, type EikonState, type EikonFrame } from "../preview/src/eikon.ts";
@@ -35,6 +35,7 @@ type Opts = {
   src: string; out: string; name: string;
   width: number; height: number; fps: number;
   symbols: string; colors: string; dither: string;
+  invert: boolean;
 };
 
 // ── CLI ───────────────────────────────────────────────────────────────
@@ -43,9 +44,13 @@ function parseArgs(): Opts {
   const a = process.argv.slice(2);
   const pos: string[] = [];
   const kv: Record<string, string> = {};
+  const flags = new Set<string>();
   for (let i = 0; i < a.length; i++) {
-    if (a[i].startsWith("--")) kv[a[i].slice(2)] = a[++i] ?? "";
-    else pos.push(a[i]);
+    if (a[i].startsWith("--")) {
+      const k = a[i].slice(2);
+      if (a[i + 1] === undefined || a[i + 1].startsWith("--")) flags.add(k);
+      else kv[k] = a[++i];
+    } else pos.push(a[i]);
   }
   const src = resolve(pos[0] ?? die("usage: mk_eikon <src-dir> [out.eikon]"));
   const name = kv.name ?? basename(dirname(src.endsWith("/") ? src.slice(0, -1) : src));
@@ -54,6 +59,9 @@ function parseArgs(): Opts {
     src, out, name,
     width: +(kv.width ?? 48), height: +(kv.height ?? 24), fps: +(kv.fps ?? 16),
     symbols: kv.symbols ?? "block", colors: kv.colors ?? "none", dither: kv.dither ?? "none",
+    // Sources are typically dark-subject-on-light-bg; terminals are dark.
+    // Default ON so the common case needs no flag. --no-invert to opt out.
+    invert: !flags.has("no-invert"),
   };
 }
 
@@ -90,6 +98,7 @@ function rasterize(png: string, o: Opts): string {
     `--symbols=${o.symbols}`,
     `--colors=${o.colors}`,
     `--dither=${o.dither}`,
+    ...(o.invert ? ["--invert"] : []),
     png,
   ], { encoding: "utf8" });
   if (r.status !== 0) die(`chafa failed on ${png}: ${r.stderr}`);
@@ -138,7 +147,7 @@ if (!existsSync(o.src) || !statSync(o.src).isDirectory()) die(`not a directory: 
 const found = discover(o.src);
 if (found.length === 0) die(`no states under ${o.src}`);
 
-console.log(`mk_eikon: ${o.name} → ${o.width}×${o.height}@${o.fps} symbols=${o.symbols} colors=${o.colors}`);
+console.log(`mk_eikon: ${o.name} → ${o.width}×${o.height}@${o.fps} symbols=${o.symbols} colors=${o.colors}${o.invert ? " invert" : ""}`);
 
 const states: EikonState[] = [];
 for (const f of found) {
