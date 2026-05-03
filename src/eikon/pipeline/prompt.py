@@ -1,4 +1,6 @@
-"""Step 2: Build Veo prompts from state direction + frame directive."""
+"""State directions — backend-agnostic prompts for whatever
+image-to-video model you point at the starter image. See
+docs/SKILL.md for how these compose with the framing directive."""
 
 from ..states import STATES
 
@@ -10,10 +12,8 @@ FRAME_DIRECTIVE = (
 
 
 def build(state: str) -> str:
-    """Build a complete Veo prompt for a given state."""
     return f"{STATES[state]}\n\n{FRAME_DIRECTIVE}"
 
 
 def build_all() -> dict[str, str]:
-    """Build prompts for all 6 states."""
     return {state: build(state) for state in STATES}

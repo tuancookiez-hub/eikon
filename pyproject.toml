@@ -5,11 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "eikon"
 version = "0.1.0"
-description = "Video-state generation for AI avatars using Veo 3.1 Fast"
+description = "Stateful ASCII avatars for AI agents"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",
-    "google-genai>=1.0",
     "pyyaml>=6.0",
     "rich>=13.0",
 ]

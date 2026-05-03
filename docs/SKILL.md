@@ -1,8 +1,8 @@
 ---
 name: eikon-avatar-pipeline
 description: "End-to-end workflow for creating a 6-state animated ASCII avatar (herma/eikon). From a single starter image, generates state-specific videos via AI, then converts to ASCII frames. Use when: creating avatar animations, building TUI character states, or generating eikon assets."
-tags: [eikon, avatar, veo, ascii, animation, states, workflow]
-related_skills: [video-to-ascii-frames, google-genai-vertex-ai, ascii-art]
+tags: [eikon, avatar, ascii, animation, states, workflow]
+related_skills: [video-to-ascii-frames, ascii-art]
 ---
 
 # Eikon Avatar Pipeline
@@ -32,7 +32,7 @@ If the agent has image generation capabilities (DALL-E, Stable Diffusion, Flux, 
 
 - **Suggested default framing:** Head and shoulders portrait (neck + head, no full body) — but the user can choose whatever framing they want
 - Clean silhouette — fine detail is lost at ASCII resolution
-- Any props the character wears (headphones, glasses, hat) must be **visually visible** — Veo can't infer hidden items
+- Any props the character wears (headphones, glasses, hat) must be **visually visible** — video models can't infer hidden items
 - Image format depends on what the generation tool supports
 
 ---
@@ -41,72 +41,18 @@ If the agent has image generation capabilities (DALL-E, Stable Diffusion, Flux, 
 
 ### Check capabilities
 
-Before generating video, verify the agent has access to a video generation API. **If no video generation capability is available, this skill cannot proceed — do not start.**
+Before generating video, verify the agent has access to **an** image-to-video generation API. **If no video generation capability is available, this skill cannot proceed — do not start.**
 
-Google Veo via Vertex AI is the default choice **if** the user has it configured, or if multiple options are available and the user asks the agent to choose.
+The pipeline is backend-agnostic — any image-to-video model that accepts a
+still + text prompt and returns a short (2–4s) clip will do. Use whichever
+is already configured in the environment. Requirements of the output:
 
-Requirements for Veo:
+- Accepts a starter image as the first frame / identity anchor
+- Accepts a text prompt for motion direction
+- Returns 2–4 s of video, any reasonable resolution
+- Ideally supports a negative prompt (to suppress camera movement, borders)
 
-- `google-genai` Python package
-- Google Cloud project with Vertex AI enabled
-- Authentication (one of):
-  - `GOOGLE_APPLICATION_CREDENTIALS` env var pointing to service account JSON
-  - `gcloud auth application-default login` (ADC)
-  - `GOOGLE_API_KEY` env var (AI Studio path, non-Vertex)
-
-### Standalone Veo generation
-
-```python
-# Minimal Veo generation
-from google import genai
-from google.genai import types
-import base64
-
-client = genai.Client(vertexai=True, project="PROJECT", location="us-central1")
-
-# Load starter image
-with open("starter.png", "rb") as f:
-    img_bytes = f.read()
-
-response = client.models.generate_videos(
-    model="veo-3.1-lite-generate-001",
-    image=types.Image(image_bytes=img_bytes, mime_type="image/png"),
-    config=types.GenerateVideoConfig(
-        aspect_ratio="9:16",
-        resolution="720p",
-        duration_seconds=4,
-        negative_prompt="full body shot, border, frame, outline around image, black border, vignette",
-    ),
-    prompt="<state prompt here>",
-)
-# Poll for completion
-operation = response
-while not operation.done:
-    import time; time.sleep(30)
-    operation = client.operations.get(operation)
-# Save video
-video = operation.result.generated_videos[0]
-with open("output.mp4", "wb") as f:
-    f.write(video.video.video_bytes)
-```
-
-### If no video generation is available
-
-Tell the user:
-
-> I don't have access to a video generation API. This skill requires video generation to proceed. Options:
->
-> 1. Provide a Google Cloud API key or service account for Veo
-> 2. Configure a different video generation service
-
-### Veo model tiers
-
-| Model                       | Speed  | Quality                 | Use when                                |
-| --------------------------- | ------ | ----------------------- | --------------------------------------- |
-| `veo-3.1-lite-generate-001` | Fast   | Good for simple motion  | Default — head angles, mouth, breathing |
-| `veo-3.1-generate-001`      | Slower | Better prompt adherence | Complex gestures, hand movements, props |
-
-Always use the latest version available. If newer models exist at time of invocation, prefer them. Use `lite` variant by default.
+If nothing is available, tell the user and stop.
 
 ---
 
@@ -226,7 +172,7 @@ Generate states **one at a time**. After each:
 
 1. Show/share the result video
 2. Ask if it looks good
-3. If not, offer to regenerate with a modified prompt or the full (non-lite) model
+3. If not, offer to regenerate with a modified prompt or a stronger model tier
 
 **Important reminder to give the user:**
 
@@ -244,97 +190,50 @@ If the user requests it, generate all 6 states in sequence without review:
 
 ### Output structure
 
+Videos land under `avatars/<name>/states/<state>/`. The directory layout
+encodes playback intent — `mk_eikon.ts` reads it directly:
+
 ```
 avatars/<name>/
-├── manifest.yaml          # Generation metadata
-├── states/
-│   ├── idle.mp4          # Cropped 1:1 state videos
-│   ├── listening.mp4
-│   ├── thinking.mp4
-│   ├── speaking.mp4
-│   ├── working.mp4
-│   └── error.mp4
-└── raw/                   # Original 9:16 videos from Veo
-    ├── idle.mp4
-    └── ...
+├── source.png
+├── raw/                      # Un-cropped generator output (any aspect)
+│   └── ...
+└── states/
+    ├── idle/loop.mp4         # loop.mp4 only → loop whole clip
+    ├── listening/start.mp4   # start.mp4 only → play once, hold last frame
+    ├── thinking/start.mp4
+    ├── speaking/
+    │   ├── start.mp4         # both → play start once,
+    │   └── loop.mp4          #        then loop loop.mp4
+    ├── working/
+    │   ├── start.mp4
+    │   └── loop.mp4
+    └── error/start.mp4
 ```
 
 ---
 
-## Phase 4: ASCII Conversion
+## Phase 4: Pack to .eikon
 
-Convert the generated videos to the format the user needs.
+Rasterize the state clips to a single `.eikon` file. All authoring
+knobs (width, symbol set, dither, invert) live here; players are dumb
+text replay.
 
-### Determine output format
-
-If the user specifies a format, use it. Otherwise, infer from context:
-
-- Building a **Herm TUI / OpenTUI app** → TypeScript module (`states/*.ts`)
-- Building a **terminal app** → TypeScript or text frames
-- General use / preview → MP4 ASCII video or text frame files
-- Just want to see it → display in terminal
-
-### Manual conversion
-
-```python
-import numpy as np
-from PIL import Image
-import subprocess
-from pathlib import Path
-
-ASCII_WIDTH = 48  # Default middle size; also generate 32 and 64
-ASCII_HEIGHT = 24
-FPS = 12
-CHAR_PALETTE = " .:-=+*#%@"  # space=black, @=white
-
-def extract_frames(video: Path, out: Path, fps: int) -> list[Path]:
-    out.mkdir(parents=True, exist_ok=True)
-    subprocess.run([
-        "ffmpeg", "-y", "-i", str(video),
-        "-vf", f"fps={fps}", "-q:v", "2",
-        str(out / "frame_%04d.png"),
-    ], check=True, capture_output=True)
-    return sorted(out.glob("frame_*.png"))
-
-def to_ascii(path: Path, width: int = 48, invert: bool = True) -> str:
-    img = Image.open(path).convert("L")
-    height = int(width * img.height / img.width * 0.5)  # 0.5 for char aspect ratio
-    img = img.resize((width, height), Image.Resampling.LANCZOS)
-    px = np.array(img, dtype=float) / 255.0
-    if invert:
-        px = 1.0 - px  # Dark bg: black→space, white→@
-    px = np.power(px, 0.8)  # Gamma
-    idx = (px * (len(CHAR_PALETTE) - 1)).astype(int)
-    return "\n".join("".join(CHAR_PALETTE[c] for c in row) for row in idx)
+```bash
+cd ~/Dev/eikon
+bun scripts/mk_eikon.ts avatars/<name>/states avatars/<name>/<name>.eikon \
+  --name <name> --width 48 --height 24 --fps 16 \
+  --symbols block --colors none        # add --no-invert for dark-on-light sources
 ```
 
-### TypeScript module format (for Herm TUI)
+Requires `ffmpeg` and `chafa` on PATH. `--invert` is on by default
+(dark-subject-on-light-background sources → light subject on black for
+dark terminals).
 
-Each state becomes a `.ts` file:
-
-```typescript
-// Auto-generated ASCII avatar frames
-export const FRAMES: string[] = [
-  `line1\nline2\n...`, // template literal per frame
-];
-export const FRAME_COUNT = FRAMES.length;
-export const FPS = 12;
-export const FRAME_WIDTH = 48;
-export const FRAME_HEIGHT = 24;
-```
-
-Index file re-exports all states:
-
-```typescript
-export type AvatarState = "idle" | "listening" | "thinking" | "speaking" | "working" | "error"
-export const STATE_FRAMES: Record<AvatarState, string[]> = { idle, listening, ... }
-```
-
-Animation plays continuous **ping-pong** (forward → reverse → repeat). State changes interrupt immediately from frame 0.
+The `.eikon` format is NDJSON — see `docs/SPEC.md`. Each state carries
+`loop_from` derived from the directory layout above.
 
 ### Inversion guide
 
-- **Light subject on dark background** (recommended) → `invert=False`
-- **Dark subject on light background** → `invert=True` (flips so subject becomes light ASCII chars on dark terminal)
-
-Monochrome starter images with dark backgrounds need no inversion.
+- **Dark subject on light background** (typical generator output) → default (invert on)
+- **Light subject on dark background** → pass `--no-invert`

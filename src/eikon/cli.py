@@ -1,7 +1,12 @@
-"""Eikon CLI — avatar video generation."""
+"""Eikon CLI — post-process state videos and inspect avatars.
+
+Video generation is out of scope here; bring your own mp4s
+(avatars/<name>/raw/<state>.mp4) and this tool handles the
+crop → states/ → .eikon tail. See docs/SKILL.md for the
+authoring workflow.
+"""
 
 import json
-import shutil
 from pathlib import Path
 
 import click
@@ -18,73 +23,7 @@ console = Console()
 @click.group()
 @click.version_option(__version__)
 def cli():
-    """Eikon — Video-state generation for AI avatars."""
-
-
-@cli.command()
-@click.option("--input", "-i", "image", required=True, type=click.Path(exists=True, path_type=Path),
-              help="Input avatar image (PNG)")
-@click.option("--name", "-n", required=True, help="Avatar name")
-@click.option("--state", "-s", multiple=True, type=click.Choice(ALL_STATES),
-              help="Generate specific state(s). Omit for all 6.")
-@click.option("--seed", type=int, default=None, help="Seed for generation")
-@click.option("--model", "-m", type=str, default=None, help="Override Veo model (e.g. veo-3.1-generate-001)")
-@click.option("--raw-only", is_flag=True, help="Skip post-processing")
-def generate(image: Path, name: str, state: tuple[str, ...], seed: int | None, model: str | None, raw_only: bool):
-    """Generate state videos for an avatar."""
-    from .client import create
-    from .pipeline import prompt, generate as gen, postprocess, manifest
-
-    cfg = load()
-    if seed is not None:
-        cfg.generation.seed = seed
-    if model is not None:
-        cfg.veo.model = model
-
-    states = list(state) if state else ALL_STATES
-    avatar_dir = cfg.output_dir / name
-
-    console.print(f"[bold]Eikon[/] v{__version__}")
-    console.print(f"  Avatar:  {name}")
-    console.print(f"  Input:   {image}")
-    console.print(f"  States:  {', '.join(states)}")
-    console.print(f"  Output:  {avatar_dir}")
-    console.print()
-
-    # Copy source image
-    avatar_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(image, avatar_dir / "source.png")
-
-    # Step 1: Build prompts
-    client = create()
-    console.print("[bold cyan]Step 1:[/] Building prompts...")
-    prompts = {s: prompt.build(s) for s in states}
-    console.print(f"  [green]✓[/] {len(prompts)} prompts ready")
-    console.print()
-
-    # Step 2: Generate
-    console.print("[bold cyan]Step 2:[/] Generating videos via Veo...")
-    raw_dir = avatar_dir / "raw"
-    results = gen.generate_all(client, prompts, image, raw_dir, cfg)
-    console.print(f"  [green]✓[/] {len(results)} videos generated")
-    console.print()
-
-    # Step 3: Post-process
-    if not raw_only:
-        console.print("[bold cyan]Step 3:[/] Post-processing (crop + thumbnails)...")
-        postprocess.process_all(
-            raw_dir,
-            avatar_dir / "states",
-            avatar_dir / "thumbnails",
-            cfg.crop,
-            states,
-        )
-        console.print(f"  [green]✓[/] Cropped to 1:1, thumbnails extracted")
-        console.print()
-
-    # Manifest
-    manifest.write(avatar_dir, name, "", cfg)
-    console.print(f"[bold green]Done![/] Avatar ready at {avatar_dir}")
+    """Eikon — stateful ASCII avatars."""
 
 
 @cli.command("list")
@@ -130,8 +69,8 @@ def info(name: str):
 @click.argument("name")
 @click.option("--offset", "-o", type=int, help="Vertical crop offset")
 def crop(name: str, offset: int | None):
-    """Re-crop existing raw videos."""
-    from .pipeline import postprocess
+    """Crop raw/*.mp4 to 1:1 states/ + thumbnails/."""
+    from .pipeline import postprocess, manifest
 
     cfg = load()
     if offset is not None:
@@ -143,7 +82,7 @@ def crop(name: str, offset: int | None):
         console.print(f"[red]No raw videos for '{name}'.[/]")
         raise SystemExit(1)
 
-    console.print(f"Re-cropping {name} (offset_y={cfg.crop.offset_y})...")
+    console.print(f"Cropping {name} (offset_y={cfg.crop.offset_y})...")
     postprocess.process_all(
         raw_dir,
         avatar_dir / "states",
@@ -151,4 +90,5 @@ def crop(name: str, offset: int | None):
         cfg.crop,
         ALL_STATES,
     )
+    manifest.write(avatar_dir, name, cfg)
     console.print("[bold green]Done![/]")
