@@ -1,25 +1,47 @@
-# Agalma (ἄγαλμα)
+# eikon
 
-**Animated ASCII avatars for AI agents.**
+Stateful ASCII avatars for terminal agents.
 
-Agalma is a platform for creating, browsing, and using expressive ASCII avatars — called *hermai* — that reflect the emotional state of an AI agent in real time.
+An **eikon** is a single `.eikon` file containing named animation states
+(idle, thinking, speaking, working, listening, error). A host TUI —
+[herm](https://github.com/liftaris/herm) — plays the right state based on
+what the agent is doing. One portrait in, one text file out.
 
-## What It Is
+## Requirements
 
-A single image becomes a living, reactive avatar. Upload one reference image and Agalma generates a full set of emotional states (thinking, idle, surprised, speaking, etc.), animates transitions between them, and converts everything into ASCII art frames ready for terminal display.
+`bun`, `ffmpeg`, `chafa`. Python side: `uv sync`.
 
-The result is an avatar that *feels alive* — shifting expression as the conversation shifts tone.
+## Make one
 
-## What It's For
+```sh
+# 1. generate per-state mp4s (bring your own i2v) → avatars/<name>/states/
+#    layout + motion constraints: docs/VIDEO_HANDOFF.md
+# 2. crop to square
+uv run eikon crop <name>
+# 3. rasterize + pack
+bun scripts/mk_eikon.ts avatars/<name>/states avatars/<name>/<name>.eikon \
+    --name <name> --width 48 --height 24 --fps 16 \
+    --symbols braille --colors none --dither none
+```
 
-Agalma is a sister project to [Herm](https://github.com/liftaris/herm), a terminal user interface for conversing with AI agents. In Herm, avatars created through Agalma serve as the visual face of the agent — reacting, emoting, and animating in sync with the conversation.
+## Preview
 
-Users can browse existing avatars, select one for their agent, or create their own through a guided AI pipeline.
+```sh
+bun preview/src/index.tsx  avatars/<name>/<name>.eikon   # play a packed .eikon
+bun preview/src/author.tsx avatars/<name>/states          # tune knobs live against source mp4s
+```
 
-## The Name
+## Layout
 
-In ancient Greek, **agalma** (ἄγαλμα) referred to a divine statue or cult image — not merely a sculpture, but a consecrated vessel through which a god's presence was made manifest. The inhabited image.
+```
+docs/SPEC.md            .eikon NDJSON format
+docs/VIDEO_HANDOFF.md   what the video pipeline must deliver
+src/eikon/              python CLI — crop, list, info, state prompts
+scripts/mk_eikon.ts     mp4 → .eikon packer (ffmpeg + chafa)
+scripts/lib.ts          shared rasterizer (packer + author both use this)
+preview/                OpenTUI player + authoring widget
+```
 
 ---
 
-*Early stage — architecture and design in progress.*
+*εἰκών — image, likeness.*

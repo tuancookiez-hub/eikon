@@ -58,7 +58,7 @@ The rasterizer is `chafa --symbols braille --colors none --invert` at 48×24. Th
 ## Clip specs
 
 - **Duration:** ~2s for `start.mp4`, ~2–4s for `loop.mp4`. Current nous-girl is ~2s each. The packer samples at 16 fps, so 2s → 33 frames, 4s → 65.
-- **Format:** mp4/h264, any sane resolution ≥ 360p. Aspect is cropped to 2:1 (w:h) downstream by `eikon crop`, so keep the subject inside a centered 2:1 safe area of whatever you output. 9:16 portrait is fine.
+- **Format:** mp4/h264, any sane resolution ≥ 360p. `eikon crop` center-crops to 1:1 square downstream (48×24 cells ≈ square on a terminal), so keep the subject inside a centered square safe area. 9:16 portrait is fine.
 - **fps:** whatever the model emits; ffmpeg resamples.
 - **Audio:** ignored.
 
