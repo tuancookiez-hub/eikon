@@ -9,7 +9,7 @@
     "typecheck": "bunx tsc --noEmit"
   },
   "bin": {
-    "eikon": "./src/cli.ts"
+    "eikon": "./src/cli.tsx"
   },
   "dependencies": {
     "@opentui/core": "^0.1.99",

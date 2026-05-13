@@ -69,12 +69,12 @@ marker are ignored. Helpers `emit(out)` and `picks(stream)` live in
 
 | file | transport | `onPick` sink |
 |---|---|---|
-| `src/browse/main.ts` | process tty (`render(<Browser/>)`) | `process.stderr` |
-| `src/browse/sshd.ts` | `ssh2` on `127.0.0.1:2222`, no auth; per connection: `createCliRenderer({ stdin: chan, stdout: chan, remote: true })` then `createRoot().render(<Browser/>)` | `chan.stderr` |
+| `src/browse/main.tsx` | process tty (`render(<Browser/>)`). Under sshd, dims come via `EIKON_COLS/ROWS` env and resize via RS control lines on stdin. | `process.stderr` |
+| `src/browse/sshd.tsx` | `ssh2` on `127.0.0.1:2222`, no auth. Per connection: spawn `bun main.tsx` with `stdin/stdout/stderr: "pipe"`, wire to the ssh channel. OpenTUI's native `lib.render()` writes to process fd 1, so the child owns output — one child per session. | `chan.stderr` |
 
-`sshd.ts` wires `window-change` → `renderer.resize(cols, rows)` and
-destroys the renderer on channel close. Local only for now; public deploy
-is a follow-up.
+`sshd.tsx` forwards `window-change` as an RS control line on the child's
+stdin; `main.tsx`'s `prependInputHandlers` eats it and calls
+`processResize`. Channel close kills the child.
 
 ## Herm integration
 
