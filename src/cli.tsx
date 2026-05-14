@@ -7,6 +7,7 @@ import { homedir } from "node:os"
 import { mkdirSync } from "node:fs"
 import { parse, poster } from "./ui/eikon"
 import { lint } from "./ui/lint"
+import { pack } from "./pack"
 import { Browser } from "./browse/Browser"
 import { local, resolve as cat } from "./browse/catalog"
 import { createCliRenderer } from "@opentui/core"
@@ -75,6 +76,34 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     // Cheap inline preview: render poster, list states.
     console.log(poster(e))
     console.log(`\n${e.meta.glyph ?? "⬡"} ${e.meta.name} · ${e.meta.author ?? "—"} · ${[...e.clips.keys()].join(" ")}`)
+  },
+
+  async pack(argv) {
+    const pos: string[] = []
+    const kv: Record<string, string | true> = {}
+    for (let i = 0; i < argv.length; i++) {
+      const a = argv[i]!
+      if (!a.startsWith("--")) { pos.push(a); continue }
+      const next = argv[i + 1]
+      kv[a.slice(2)] = next && !next.startsWith("--") ? (i++, next) : true
+    }
+    const src = pos[0] ?? die("usage: eikon pack <image|video|dir> [out.eikon] [--name N] [--glyph G] [--author A] [--width 48] [--height 24] [--fps 16] [--symbols block|braille|ascii] [--colors none|256|full] [--no-invert]")
+
+    const str = (k: string) => typeof kv[k] === "string" ? kv[k] : undefined
+    const { doc, text } = pack(resolve(src), {
+      name: str("name"), author: str("author"), glyph: str("glyph"),
+      width: str("width") ? +str("width")! : undefined,
+      height: str("height") ? +str("height")! : undefined,
+      fps: str("fps") ? +str("fps")! : undefined,
+      symbols: str("symbols") as never, colors: str("colors") as never,
+      invert: !kv["no-invert"],
+    })
+    lint(text)
+    const out = resolve(pos[1] ?? `${doc.header.name}.eikon`)
+    await Bun.write(out, text)
+    const total = doc.states.reduce((n, s) => n + s.frame_count, 0)
+    console.log(`✓ ${out}  (${doc.header.width}×${doc.header.height}, ${total} frames, ${(text.length / 1024).toFixed(1)} KB)`)
+    console.log(`  eikon show ${out}`)
   },
 
   async browse() {
