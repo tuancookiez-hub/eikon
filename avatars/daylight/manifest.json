@@ -1,0 +1,24 @@
+{
+  "name": "daylight",
+  "version": 1,
+  "states": {
+    "idle": {
+      "file": "states/idle/loop.mp4"
+    },
+    "listening": {
+      "file": "states/listening/loop.mp4"
+    },
+    "thinking": {
+      "file": "states/thinking/start.mp4"
+    },
+    "speaking": {
+      "file": "states/speaking/loop.mp4"
+    },
+    "working": {
+      "file": "states/working/loop.mp4"
+    },
+    "error": {
+      "file": "states/error/start.mp4"
+    }
+  }
+}

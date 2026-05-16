@@ -1,7 +1,7 @@
 /**
  * Shared mp4 → chafa rasterization primitives.
- * Used by both mk_eikon.ts (batch CLI) and preview/src/author.tsx
- * (interactive knob-tuning), so what you preview is what you ship.
+ * Used by mk_eikon.ts (batch CLI). Studio in herm supersedes the old
+ * interactive knob tuner that lived under preview/.
  */
 
 import { spawnSync } from "node:child_process";

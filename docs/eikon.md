@@ -65,7 +65,7 @@ mix; each file is rasterized independently.
 ```sh
 eikon lint my-face.eikon    # header + all 6 states present
 eikon show my-face.eikon    # prints idle frame 0 + state list
-bun preview/src/index.tsx my-face.eikon   # all states playing side-by-side
+eikon browse                # local catalog browser with live playback
 ```
 
 ## Use it without publishing
@@ -91,8 +91,8 @@ branch, opens a PR. CI re-lints. When merged it shows up in `/eikons` and
 `eikon pack` is the fast path. If you're authoring per-state motion with
 intro + loop segments (`start.mp4` + `loop.mp4` per state), use
 `scripts/mk_eikon.ts` with the layout in `docs/VIDEO_HANDOFF.md` — it
-handles `loop_from` correctly and there's an interactive knob tuner at
-`bun preview/src/author.tsx <states-dir>`.
+handles `loop_from` correctly. Tune knobs interactively in herm
+Studio (Eikon tab).
 
 ## States (for reference)
 

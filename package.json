@@ -6,6 +6,7 @@
     "browse": "bun run src/browse/main.tsx",
     "sshd": "bun run src/browse/sshd.tsx",
     "index": "bun run scripts/mk_index.ts",
+    "manifest": "bun run scripts/mk_manifest.ts",
     "typecheck": "bunx tsc --noEmit"
   },
   "bin": {

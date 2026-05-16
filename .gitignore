@@ -4,6 +4,19 @@ __pycache__/
 dist/
 *.egg-info/
 .env
-avatars/
 node_modules/
 hostkey
+.pytest_cache/
+
+# avatars/ is the source-of-truth workbench. Track the clean
+# deliverable subset; ignore generator intermediates.
+avatars/*/raw/
+avatars/*/ascii/
+avatars/*/thumbnails/
+avatars/*/*tests/
+avatars/*/old_states/
+avatars/*/gen_*.py
+avatars/*/gen_log.json
+avatars/*/*.json.bak
+avatars/gen_*.py
+__pycache__/

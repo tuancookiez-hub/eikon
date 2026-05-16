@@ -8,8 +8,8 @@
  * `loop_from` set to the intro length.
  *
  * Authoring knobs (symbols, colors, dither, width, invert) live here.
- * Players are dumb: they just replay the baked text. Use
- * `bun preview/src/author.tsx <src>` to tune knobs interactively.
+ * Players are dumb: they just replay the baked text. Tune knobs
+ * interactively in herm Studio (Eikon tab).
  *
  * Usage:
  *   bun scripts/mk_eikon.ts <src-dir> [out.eikon] \
@@ -17,8 +17,8 @@
  *     [--symbols block] [--colors none|full] [--dither none] [--no-invert]
  */
 
-import { serializeEikon, type Eikon, type EikonState, type EikonFrame } from "../preview/src/eikon.ts";
-import { discover, renderState, PngCache, which, DEFAULT_KNOBS, type Knobs } from "./lib.ts";
+import { serialize, type Doc, type StateDecl, type Frame } from "../src/ui/format";
+import { discover, renderState, PngCache, which, DEFAULT_KNOBS, type Knobs } from "./lib";
 import { existsSync, writeFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
@@ -68,10 +68,10 @@ if (found.length === 0) die(`no states under ${o.src}`);
 console.log(`mk_eikon: ${o.name} → ${o.width}×${o.height}@${o.fps} symbols=${o.symbols} colors=${o.colors}${o.invert ? " invert" : ""}`);
 
 const cache = new PngCache();
-const states: EikonState[] = [];
+const states: StateDecl[] = [];
 for (const f of found) {
   const { frames, loopFrom } = renderState(f, o, cache);
-  const fs: EikonFrame[] = frames.map((data, i) => ({ f: i, data }));
+  const fs: Frame[] = frames.map((data, i) => ({ f: i, data }));
   states.push({
     state: f.state, fps: o.fps, color: STATE_COLORS[f.state], frame_count: fs.length,
     loop_from: loopFrom, frames: fs,
@@ -81,7 +81,7 @@ for (const f of found) {
 }
 cache.dispose();
 
-const doc: Eikon = {
+const doc: Doc = {
   header: {
     eikon: 1, name: o.name, width: o.width, height: o.height,
     author: process.env.USER ?? "unknown", created: new Date().toISOString(),
@@ -89,7 +89,7 @@ const doc: Eikon = {
   states,
 };
 
-const text = serializeEikon(doc);
+const text = serialize(doc);
 writeFileSync(o.out, text, "utf8");
 const total = states.reduce((s, st) => s + st.frame_count, 0);
 console.log(`\nwrote ${o.out}  (${states.length} states, ${total} frames, ${(text.length / 1024).toFixed(1)} KB)`);

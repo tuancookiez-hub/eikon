@@ -6,7 +6,7 @@ import { resolve, basename, join } from "node:path"
 import { homedir } from "node:os"
 import { mkdirSync } from "node:fs"
 import { parse, poster } from "./ui/eikon"
-import { lint } from "./ui/lint"
+import { lint, lintManifest } from "./ui/lint"
 import { pack } from "./pack"
 import { Browser } from "./browse/Browser"
 import { local, resolve as cat } from "./browse/catalog"
@@ -26,8 +26,14 @@ async function gh(args: string[], input?: string) {
 
 const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async lint(argv) {
-    const path = argv[0] ?? die("usage: eikon lint <file>")
-    const e = lint(await Bun.file(resolve(path)).text())
+    const path = argv[0] ?? die("usage: eikon lint <file.eikon|manifest.json>")
+    const raw = await Bun.file(resolve(path)).text()
+    if (basename(path) === "manifest.json") {
+      const m = lintManifest(resolve(path), raw)
+      console.log(`✓ ${m.name} · ${Object.keys(m.states).length} states${m.source ? ` · ${m.source}` : ""}`)
+      return
+    }
+    const e = lint(raw)
     console.log(`✓ ${e.meta.name} · ${e.meta.width}×${e.meta.height} · ${e.clips.size} states`)
   },
 
