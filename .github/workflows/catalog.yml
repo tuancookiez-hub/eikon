@@ -1,0 +1,39 @@
+name: catalog
+
+on:
+  push:
+    branches: [main]
+    paths: ["catalog/**", "avatars/**", "scripts/mk_index.ts", "src/ui/**"]
+  pull_request:
+    paths: ["catalog/**", "avatars/**"]
+
+jobs:
+  lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: |
+          set -e
+          for f in $(git diff --name-only origin/main...HEAD -- 'catalog/*.eikon' 'avatars/*/manifest.json'); do
+            bun src/cli.tsx lint "$f"
+          done
+
+  index:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun scripts/mk_index.ts
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add catalog/
+          git diff --cached --quiet || git commit -m "chore(catalog): regenerate index + source_url"
+          git push

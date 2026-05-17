@@ -1,47 +1,59 @@
 # eikon
 
-Stateful ASCII avatars for terminal agents.
+Stateful terminal avatars. An `.eikon` is a single NDJSON file packing six
+named animation states (idle · listening · thinking · speaking · working ·
+error). A host TUI plays the right state based on what the agent is doing.
 
-An **eikon** is a single `.eikon` file containing named animation states
-(idle, thinking, speaking, working, listening, error). A host TUI —
-[herm](https://github.com/liftaris/herm) — plays the right state based on
-what the agent is doing. One portrait in, one text file out.
+This repo is both the **format** (`docs/SPEC.md`) and the **registry**.
 
-## Requirements
+```
+catalog/                packed .eikon files + index.json  — what plays
+  <name>.eikon          header carries source_url → avatars/<name>/
+  index.json            generated: {name, author, glyph, w, h, source, poster}
+avatars/                source media                       — what Studio edits
+  <name>/
+    manifest.json       {name, source, states:{<k>:{file}}}
+    base.png            still portrait
+    states/<k>/*.mp4    per-state clips (loop.mp4 preferred over start.mp4)
+faces/                  512² portraits used to generate the above
+src/                    bun CLI + OpenTUI browser + ssh front door
+scripts/                mk_eikon, mk_index, mk_manifest
+docs/                   SPEC, VIDEO_HANDOFF, PLATFORM
+```
 
-`bun`, `ffmpeg`, `chafa`. Python side: `uv sync`.
+## Use one
+
+```sh
+bunx eikon add ares          # → ~/.hermes/eikons/ares.eikon
+bunx eikon show ares         # poster + state list
+bunx eikon browse            # full-screen catalog browser
+ssh eikon.sh                 # same, no install (when deployed)
+```
+
+The host fetches **source media** on demand from the `source_url` baked
+into the header (`<raw>/avatars/<name>/manifest.json` + referenced files).
 
 ## Make one
 
+Author in herm Studio (Eikon tab → `n`). Or by hand:
+
 ```sh
-# 1. generate per-state mp4s (bring your own i2v) → avatars/<name>/states/
+# 1. per-state mp4s → avatars/<name>/states/<state>/{loop,start}.mp4
 #    layout + motion constraints: docs/VIDEO_HANDOFF.md
-# 2. crop to square
-uv run eikon crop <name>
-# 3. rasterize + pack
-bun scripts/mk_eikon.ts avatars/<name>/states avatars/<name>/<name>.eikon \
-    --name <name> --width 48 --height 24 --fps 16 \
-    --symbols braille --colors none --dither none
+# 2. pack
+bun src/cli.tsx pack avatars/<name>/states <name>.eikon --name <name> --glyph ◆
+# 3. lint + publish (opens a PR against catalog/)
+bun src/cli.tsx lint <name>.eikon
+bun src/cli.tsx publish <name>.eikon
 ```
 
-## Preview
+## Contribute source media
 
-```sh
-bun preview/src/index.tsx  avatars/<name>/<name>.eikon   # play a packed .eikon
-bun preview/src/author.tsx avatars/<name>/states          # tune knobs live against source mp4s
-```
+PR to `avatars/<name>/`. CI runs `eikon lint` on both the manifest and any
+touched `.eikon`. `bun scripts/mk_manifest.ts` regenerates all manifests from
+the `states/` tree; `bun scripts/mk_index.ts` regenerates `catalog/index.json`
+and stamps `source_url` into catalog headers.
 
-## Layout
+## Requirements
 
-```
-docs/SPEC.md            .eikon NDJSON format
-docs/VIDEO_HANDOFF.md   what the video pipeline must deliver
-src/eikon/              python CLI — crop, list, info, state prompts
-scripts/mk_eikon.ts     mp4 → .eikon packer (ffmpeg + chafa)
-scripts/lib.ts          shared rasterizer (packer + author both use this)
-preview/                OpenTUI player + authoring widget
-```
-
----
-
-*εἰκών — image, likeness.*
+`bun`, `ffmpeg`, `chafa`. Python authoring pipeline: `uv sync`.

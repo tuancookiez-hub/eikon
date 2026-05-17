@@ -69,7 +69,7 @@ eikon crop avatars/<name>/states            # ffmpeg center-crop to 2:1
 bun scripts/mk_eikon.ts avatars/<name>/states avatars/<name>/<name>.eikon \
     --name <name> --width 48 --height 24 --fps 16 \
     --symbols braille --colors none --dither none
-bun preview/src/author.tsx avatars/<name>/states   # interactive knob check
+# tune knobs interactively: herm → Eikon tab → Studio
 ```
 
 If a state reads badly in `author.tsx`, the fix is almost always "regenerate that clip with a bigger silhouette change," not "tweak chafa knobs." The knobs above are locked for the hackathon build.

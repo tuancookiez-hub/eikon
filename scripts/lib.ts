@@ -1,7 +1,7 @@
 /**
  * Shared mp4 → chafa rasterization primitives.
- * Used by both mk_eikon.ts (batch CLI) and preview/src/author.tsx
- * (interactive knob-tuning), so what you preview is what you ship.
+ * Used by mk_eikon.ts (batch CLI). Studio in herm supersedes the old
+ * interactive knob tuner that lived under preview/.
  */
 
 import { spawnSync } from "node:child_process";
@@ -28,13 +28,17 @@ export const DEFAULT_KNOBS: Knobs = {
   symbols: "block", colors: "none", dither: "none", invert: true,
 };
 
-export type Found = { state: string; start?: string; loop?: string };
+export type Found = { state: string; start?: string; loop?: string; still?: string };
+
+const IMG = /\.(png|jpe?g|webp|gif|bmp)$/i;
+const VID = /\.(mp4|webm|mov)$/i;
 
 /** Discover states under <src>. Directory form encodes playback intent:
  *    start.mp4 only → play once, hold last frame
  *    loop.mp4  only → loop whole sequence
  *    both           → intro (start) then loop
- *  Flat <state>.mp4 → loop whole sequence (legacy). */
+ *  Flat <state>.mp4  → loop whole sequence.
+ *  Flat <state>.png  → single held frame. */
 export function discover(src: string): Found[] {
   const entries = readdirSync(src, { withFileTypes: true });
   const out: Found[] = [];
@@ -44,9 +48,13 @@ export function discover(src: string): Found[] {
       const start = existsSync(join(d, "start.mp4")) ? join(d, "start.mp4") : undefined;
       const loop = existsSync(join(d, "loop.mp4")) ? join(d, "loop.mp4") : undefined;
       if (start || loop) out.push({ state: e.name, start, loop });
-    } else if (e.isFile() && e.name.endsWith(".mp4")) {
-      out.push({ state: e.name.slice(0, -4), loop: join(src, e.name) });
+      continue;
     }
+    if (!e.isFile()) continue;
+    const path = join(src, e.name);
+    const stem = e.name.replace(/\.[^.]+$/, "");
+    if (VID.test(e.name)) out.push({ state: stem, loop: path });
+    else if (IMG.test(e.name)) out.push({ state: stem, still: path });
   }
   const rank = (s: string) => { const i = STATE_ORDER.indexOf(s); return i < 0 ? 99 : i; };
   return out.sort((a, b) => rank(a.state) - rank(b.state) || a.state.localeCompare(b.state));
@@ -95,6 +103,10 @@ export type Clip = { frames: string[]; loopFrom: number };
 
 /** Rasterize one discovered state at the given knobs. */
 export function renderState(f: Found, k: Knobs, pngs: PngCache): Clip {
+  if (f.still) {
+    const frame = rasterize(f.still, k);
+    return { frames: [frame], loopFrom: 1 };
+  }
   const intro = f.start ? pngs.get(f.start, k.fps).map(p => rasterize(p, k)) : [];
   const loop = f.loop ? pngs.get(f.loop, k.fps).map(p => rasterize(p, k)) : [];
   const frames = [...intro, ...loop];
