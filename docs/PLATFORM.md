@@ -1,5 +1,12 @@
 # eikon platform — MVP
 
+> **Status: design history.** This document was the build plan for the
+> browse/publish/ssh surfaces. What shipped: `src/browse/` (Browser +
+> sshd + ipc), `src/cli.tsx` (install/publish/lint/pack), `src/install.ts`
+> (shared resolver herm imports). The `preview/` tree and in-process herm
+> tab mount described below did not ship; herm's Eikon tab supersedes them.
+> See README.md and docs/MANIFEST.md for the current layout.
+
 Browse, preview, install, and publish `.eikon` avatars. One OpenTUI
 component, three front doors, a static registry, and a `gh`-driven publish
 loop. Custom states, triggers, and fragments are out of scope for this cut.

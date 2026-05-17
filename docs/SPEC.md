@@ -32,7 +32,7 @@ States appear in the recommended display order.
 ## Header (line 1)
 
 ```json
-{"eikon":1,"name":"nous-girl","width":50,"height":24,"author":"kaio","license":"MIT","created":"2026-04-14T23:02:15Z"}
+{"eikon":1,"name":"nous","width":48,"height":24,"author":"kaio","license":"MIT","created":"2026-04-14T23:02:15Z"}
 ```
 
 | Field      | Type   | Required | Description                          |

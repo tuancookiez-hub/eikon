@@ -6,6 +6,7 @@ dist/
 .env
 node_modules/
 hostkey
+hostkey.pub
 .pytest_cache/
 
 # eikons/ is the source-of-truth workbench. Track the clean

@@ -7,7 +7,6 @@ authoring workflow.
 """
 
 import json
-from pathlib import Path
 
 import click
 from rich.console import Console
@@ -90,5 +89,5 @@ def crop(name: str, offset: int | None):
         cfg.crop,
         ALL_STATES,
     )
-    manifest.write(avatar_dir, name, cfg)
+    manifest.write(avatar_dir, name)
     console.print("[bold green]Done![/]")
