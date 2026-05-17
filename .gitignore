@@ -1,23 +1,13 @@
-__pycache__/
-*.pyc
-.venv/
-dist/
-*.egg-info/
-.env
 node_modules/
+dist/
+.ignore/
+__pycache__/
 hostkey
 hostkey.pub
-.pytest_cache/
 
-# eikons/ is the source-of-truth workbench. Track the clean
-# deliverable subset; ignore generator intermediates.
+# eikons/ holds tracked source media; intermediates from any local
+# generator stay out.
 eikons/*/raw/
-eikons/*/ascii/
 eikons/*/thumbnails/
 eikons/*/*tests/
-eikons/*/old_states/
-eikons/*/gen_*.py
-eikons/*/gen_log.json
-eikons/*/*.json.bak
-eikons/gen_*.py
-__pycache__/
+eikons/*/gen_*
