@@ -6,7 +6,7 @@ import { Browser } from "./Browser"
 import { resolve } from "./catalog"
 import { emit } from "./ipc"
 
-const dir = path(process.argv[2] ?? path(import.meta.dir, "../../catalog"))
+const dir = path(process.argv[2] ?? path(import.meta.dir, "../../eikons"))
 const catalog = resolve(dir)
 
 // When spawned under sshd there's no real tty; dims come via env and

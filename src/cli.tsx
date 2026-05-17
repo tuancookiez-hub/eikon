@@ -65,13 +65,13 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     // Create branch ref off upstream main, then PUT the file.
     const main = await gh(["api", `repos/${REPO}/git/ref/heads/main`, "-q", ".object.sha"])
     await gh(["api", "-X", "POST", `repos/${fork}/git/refs`, "-f", `ref=refs/heads/${branch}`, "-f", `sha=${main}`]).catch(() => {})
-    await gh(["api", "-X", "PUT", `repos/${fork}/contents/catalog/${name}.eikon`,
-      "-f", `message=catalog: add ${name}`,
+    await gh(["api", "-X", "PUT", `repos/${fork}/contents/eikons/${name}/${name}.eikon`,
+      "-f", `message=eikons: add ${name}`,
       "-f", `branch=${branch}`,
       "-f", `content=${Buffer.from(raw).toString("base64")}`])
 
     const url = await gh(["pr", "create", "-R", REPO, "-H", `${user}:${branch}`, "-B", "main",
-      "-t", `catalog: add ${name}`,
+      "-t", `eikons: add ${name}`,
       "-b", `Adds \`${name}\` by ${e.meta.author}. ${e.meta.width}×${e.meta.height}, ${e.clips.size} states.`])
     console.log(url)
   },
@@ -119,7 +119,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     const src = argv[0] ?? die("usage: eikon show <name|file>")
     const catalog = src.endsWith(".eikon")
       ? local(resolve(src, ".."))
-      : cat(resolve(import.meta.dir, "../catalog"))
+      : cat(resolve(import.meta.dir, "../eikons"))
     const raw = src.endsWith(".eikon") ? await Bun.file(resolve(src)).text() : await catalog.load(src)
     const e = parse(raw)
     // Cheap inline preview: render poster, list states.
@@ -148,12 +148,12 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async browse() {
     const r = await createCliRenderer({ exitOnCtrlC: true })
-    createRoot(r).render(<Browser catalog={cat(resolve(import.meta.dir, "../catalog"))} />)
+    createRoot(r).render(<Browser catalog={cat(resolve(import.meta.dir, "../eikons"))} />)
   },
 
   async index(argv) {
     const n = await reg.index(argv[0])
-    console.log(`wrote ${n} entries → catalog/index.json`)
+    console.log(`wrote ${n} entries → eikons/index.json`)
   },
 
   async manifest() {

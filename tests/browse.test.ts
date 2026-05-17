@@ -4,7 +4,7 @@ import { parse, poster, list, STATES } from "../src/ui/eikon"
 import { local } from "../src/browse/catalog"
 import { emit, picks, MARK } from "../src/browse/ipc"
 
-const dir = resolve(import.meta.dir, "../catalog")
+const dir = resolve(import.meta.dir, "../eikons")
 
 test("parse: real catalog files round-trip via list+parse", () => {
   const found = list([dir])
@@ -16,7 +16,7 @@ test("parse: real catalog files round-trip via list+parse", () => {
 })
 
 test("parse: ares has 6 canonical states and a poster", async () => {
-  const raw = await Bun.file(resolve(dir, "ares.eikon")).text()
+  const raw = await Bun.file(resolve(dir, "ares/ares.eikon")).text()
   const e = parse(raw)
   for (const s of STATES) expect(e.clips.has(s)).toBe(true)
   expect(poster(e).split("\n").length).toBe(24)

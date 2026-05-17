@@ -9,8 +9,11 @@ library** herm and other consumers import, the **`eikon` CLI**, and the
 **registry** of published eikons.
 
 ```
-catalog/          packed .eikon files + index.json       — what plays
-eikons/<name>/    manifest.json + base.png + states/**   — what Studio edits
+eikons/
+  index.json                              — listing with posters
+  <name>/
+    <name>.eikon                          — packed; what plays
+    manifest.json  base.png  states/**    — source; what Studio edits
 src/              library (parse/serialize/lint/install) + CLI + browser
 docs/             SPEC.md, MANIFEST.md
 ```
@@ -18,7 +21,7 @@ docs/             SPEC.md, MANIFEST.md
 ## Install one
 
 ```sh
-bunx eikon install ares              # from the default catalog
+bunx eikon install ares              # from the default registry
 bunx eikon install github.com/you/x  # from any git repo with a manifest.json
 bunx eikon install ./my-eikon/       # from a local dir
 bunx eikon info ares                 # what's installed, where it came from
@@ -62,12 +65,12 @@ Studio tab.
 ## Publish one
 
 ```sh
-eikon publish mine.eikon   # opens a PR against catalog/
+eikon publish mine.eikon   # opens a PR: eikons/mine/mine.eikon
 ```
 
-Or PR source media directly to `eikons/<name>/`. CI lints both; on merge,
-`eikon index` regenerates `catalog/index.json` and stamps `source_url` into
-the catalog header.
+PR source media to `eikons/<name>/` alongside it. CI lints both; on merge,
+`eikon index` regenerates `eikons/index.json` and stamps `source_url` into
+the header.
 
 ## States
 
