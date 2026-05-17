@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
-// Regenerate catalog/index.json from catalog/*.eikon + avatars/*/manifest.json.
+// Regenerate catalog/index.json from catalog/*.eikon + eikons/*/manifest.json.
 // Each entry carries header fields + idle frame 0 (poster) so Browser can draw
-// the grid without fetching bodies. When avatars/<name>/manifest.json exists,
-// the entry gets `source: "avatars/<name>/"` and the catalog .eikon header is
-// re-stamped with `source_url: <RAW>/avatars/<name>/` so every consumer —
+// the grid without fetching bodies. When eikons/<name>/manifest.json exists,
+// the entry gets `source: "eikons/<name>/"` and the catalog .eikon header is
+// re-stamped with `source_url: <RAW>/eikons/<name>/` so every consumer —
 // herm bundled, `eikon add`, catalog fetch — learns where the media lives.
 
 import { resolve, join } from "node:path"
@@ -18,8 +18,8 @@ const RAW = process.env.EIKON_RAW
 const entries = []
 for (const f of list([dir])) {
   const e = parse(readFileSync(f.path, "utf8"))
-  const src = existsSync(join(root, "avatars", e.meta.name, "manifest.json"))
-    ? `avatars/${e.meta.name}/` : undefined
+  const src = existsSync(join(root, "eikons", e.meta.name, "manifest.json"))
+    ? `eikons/${e.meta.name}/` : undefined
   if (src) {
     const raw = readFileSync(f.path, "utf8")
     const nl = raw.indexOf("\n")

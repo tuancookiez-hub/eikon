@@ -96,7 +96,7 @@ async function catalog(name: string, url: string): Promise<string> {
   const idx = await res.json() as IndexEntry[]
   const hit = idx.find(e => e.name === name)
   if (!hit) throw new Error(`catalog: no eikon named "${name}"`)
-  // index[].source is a repo-relative path ("avatars/ares/"); resolve
+  // index[].source is a repo-relative path ("eikons/ares/"); resolve
   // against the catalog URL's parent so raw.githubusercontent works.
   if (hit.source) return new URL(hit.source, url.replace(/\/?$/, "/../")).href
   // No source media → synthesize a manifest-only staged dir from the

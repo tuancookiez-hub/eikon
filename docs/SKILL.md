@@ -190,11 +190,11 @@ If the user requests it, generate all 6 states in sequence without review:
 
 ### Output structure
 
-Videos land under `avatars/<name>/states/<state>/`. The directory layout
+Videos land under `eikons/<name>/states/<state>/`. The directory layout
 encodes playback intent — `mk_eikon.ts` reads it directly:
 
 ```
-avatars/<name>/
+eikons/<name>/
 ├── source.png
 ├── raw/                      # Un-cropped generator output (any aspect)
 │   └── ...
@@ -221,7 +221,7 @@ text replay.
 
 ```bash
 cd ~/Dev/eikon
-bun scripts/mk_eikon.ts avatars/<name>/states avatars/<name>/<name>.eikon \
+bun scripts/mk_eikon.ts eikons/<name>/states eikons/<name>/<name>.eikon \
   --name <name> --width 48 --height 24 --fps 16 \
   --symbols block --colors none        # add --no-invert for dark-on-light sources
 ```

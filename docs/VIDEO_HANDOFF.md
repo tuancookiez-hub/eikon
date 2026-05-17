@@ -5,7 +5,7 @@ You're generating short i2v clips from a single base portrait. Downstream, `mk_e
 ## Deliverable
 
 ```
-avatars/<name>/states/
+eikons/<name>/states/
   idle/       loop.mp4
   listening/  start.mp4  loop.mp4
   thinking/   start.mp4
@@ -65,8 +65,8 @@ The rasterizer is `chafa --symbols braille --colors none --invert` at 48×24. Th
 ## Post-gen steps (not yours, but so you know the chain)
 
 ```
-eikon crop avatars/<name>/states            # ffmpeg center-crop to 2:1
-bun scripts/mk_eikon.ts avatars/<name>/states avatars/<name>/<name>.eikon \
+eikon crop eikons/<name>/states            # ffmpeg center-crop to 2:1
+bun scripts/mk_eikon.ts eikons/<name>/states eikons/<name>/<name>.eikon \
     --name <name> --width 48 --height 24 --fps 16 \
     --symbols braille --colors none --dither none
 # tune knobs interactively: herm → Eikon tab → Studio
@@ -79,4 +79,4 @@ If a state reads badly in `author.tsx`, the fix is almost always "regenerate tha
 - State prompts: `src/eikon/states.py`
 - Packer: `scripts/mk_eikon.ts`, shared rasterizer `scripts/lib.ts`
 - Format: `docs/SPEC.md`
-- Worked example: `avatars/nous-girl/states/` (gitignored — ask for the tarball)
+- Worked example: `eikons/nous-girl/states/` (gitignored — ask for the tarball)

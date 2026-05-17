@@ -28,7 +28,7 @@ export type Manifest = {
   origin?: Origin
 }
 
-/** Validate an avatars/<name>/manifest.json: schema + referenced files
+/** Validate an eikons/<name>/manifest.json: schema + referenced files
  *  exist relative to its directory + name matches its folder. */
 export function lintManifest(path: string, raw: string): Manifest {
   const man = JSON.parse(raw) as Manifest

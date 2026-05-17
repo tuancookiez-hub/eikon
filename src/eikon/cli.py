@@ -1,7 +1,7 @@
 """Eikon CLI — post-process state videos and inspect avatars.
 
 Video generation is out of scope here; bring your own mp4s
-(avatars/<name>/raw/<state>.mp4) and this tool handles the
+(eikons/<name>/raw/<state>.mp4) and this tool handles the
 crop → states/ → .eikon tail. See docs/SKILL.md for the
 authoring workflow.
 """
