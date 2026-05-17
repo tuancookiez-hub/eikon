@@ -2,6 +2,7 @@
   "name": "eikon",
   "type": "module",
   "private": true,
+  "exports": { ".": "./src/index.ts" },
   "scripts": {
     "browse": "bun run src/browse/main.tsx",
     "sshd": "bun run src/browse/sshd.tsx",

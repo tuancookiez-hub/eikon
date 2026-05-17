@@ -41,10 +41,11 @@ States appear in the recommended display order.
 | `name`     | string | yes      | Avatar/animation name.               |
 | `width`    | int    | yes      | Frame width in columns.              |
 | `height`   | int    | yes      | Frame height in rows.                |
+| `glyph`    | string | no       | Single grapheme; inline stand-in.    |
 | `author`   | string | no       | Creator name or handle.              |
 | `license`  | string | no       | License identifier (SPDX).           |
 | `created`  | string | no       | ISO 8601 creation timestamp.         |
-| `url`      | string | no       | Source URL or registry link.          |
+| `source_url` | string | no     | Base URL of this eikon's `manifest.json` + media. See `docs/MANIFEST.md`. Absent ⇒ no editable source. |
 | `description` | string | no   | Human-readable description.          |
 
 ## State Declaration
@@ -87,8 +88,8 @@ intro's frame count.
 |-----------|--------|----------|--------------------------------------------------|
 | `f`       | int    | yes      | Frame index (0-based, sequential).               |
 | `data`    | string | yes      | Frame content. Lines joined by `\n`.             |
-| `pause`   | number | no       | Pause after this frame, in seconds.              |
-| `color`   | string | no       | Override color for this frame only.              |
+| `pause`   | number | no       | Reserved. Players MAY ignore.                    |
+| `color`   | string | no       | Reserved. Players MAY ignore.                    |
 
 ### Frame Ordering
 
@@ -99,12 +100,12 @@ of frame lines that follow.
 ## Example
 
 ```jsonl
-{"eikon":1,"name":"nous-girl","width":50,"height":24,"author":"kaio"}
-{"state":"idle","fps":8,"color":"#7aa2f7","frame_count":3,"loop":true}
+{"eikon":1,"name":"nous","width":48,"height":24,"author":"kaio","glyph":"⬡"}
+{"state":"idle","fps":16,"frame_count":3,"loop_from":0}
 {"f":0,"data":"     .---.\n    ( o.o )\n     |   |\n     '---'"}
 {"f":1,"data":"     .---.\n    ( o.o )\n     | - |\n     '---'"}
-{"f":2,"data":"     .---.\n    ( o.o )\n     |   |\n     '---'","pause":0.5}
-{"state":"error","fps":12,"color":"#f7768e","frame_count":2,"loop":true}
+{"f":2,"data":"     .---.\n    ( o.o )\n     |   |\n     '---'"}
+{"state":"error","fps":12,"frame_count":2,"loop_from":0}
 {"f":0,"data":"     .---.\n    ( x.x )\n     |   |\n     '---'"}
 {"f":1,"data":"     .---.\n    ( X.X )\n     | ! |\n     '---'"}
 ```

@@ -4,9 +4,10 @@
 
 import { resolve, basename, join } from "node:path"
 import { homedir } from "node:os"
-import { mkdirSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { parse, poster } from "./ui/eikon"
-import { lint, lintManifest } from "./ui/lint"
+import { lint, lintManifest, type Manifest } from "./ui/lint"
+import { install, dirty, type Origin } from "./install"
 import { pack } from "./pack"
 import { Browser } from "./browse/Browser"
 import { local, resolve as cat } from "./browse/catalog"
@@ -14,8 +15,21 @@ import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
 
 const REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
+const root = () => join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "eikons")
+const mb = (n: number) => n < 1 << 20 ? `${(n / 1024).toFixed(0)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`
 
 const die = (msg: string): never => { console.error(`eikon: ${msg}`); process.exit(1) }
+
+function args(argv: string[]) {
+  const pos: string[] = [], kv: Record<string, string | true> = {}
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!
+    if (!a.startsWith("--")) { pos.push(a); continue }
+    const next = argv[i + 1]
+    kv[a.slice(2)] = next && !next.startsWith("--") ? (i++, next) : true
+  }
+  return { pos, kv, str: (k: string) => typeof kv[k] === "string" ? kv[k] as string : undefined }
+}
 
 async function gh(args: string[], input?: string) {
   const p = Bun.spawn(["gh", ...args], { stdin: input ? new TextEncoder().encode(input) : undefined, stdout: "pipe", stderr: "pipe" })
@@ -62,15 +76,44 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     console.log(url)
   },
 
-  async add(argv) {
-    const name = argv[0] ?? die("usage: eikon add <name>")
-    const raw = await cat(resolve(import.meta.dir, "../catalog")).load(name)
-    const dir = join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "eikons")
-    mkdirSync(dir, { recursive: true })
-    const dst = join(dir, `${name}.eikon`)
-    await Bun.write(dst, raw)
-    console.log(dst)
+  async install(argv) {
+    const a = args(argv)
+    const src = a.pos[0] ?? die("usage: eikon install <name|url|dir> [--name N] [--no-source] [--catalog URL]")
+    const out = await install(src, root(), {
+      name: a.str("name"), media: !a.kv["no-source"], catalog: a.str("catalog"),
+      progress: (d, t) => process.stderr.write(`\r  ${d}/${t}`),
+    })
+    process.stderr.write("\r")
+    console.log(`✓ ${out.name}  ${out.n} files  ${mb(out.bytes)}  → ${out.dir}`)
   },
+
+  async update(argv) {
+    const name = argv[0] ?? die("usage: eikon update <name> [--force]")
+    const dir = join(root(), name)
+    const mf = join(dir, "manifest.json")
+    if (!existsSync(mf)) die(`${name}: not installed (no manifest.json)`)
+    const man = JSON.parse(readFileSync(mf, "utf8")) as Manifest & { origin?: Origin }
+    const origin = man.origin
+    if (!origin?.source) die(`${name}: no origin recorded; reinstall with a source`)
+    if (dirty(dir) && !argv.includes("--force"))
+      die(`${name}: locally modified since install; pass --force to overwrite`)
+    const out = await install(origin!.source, root(), { name })
+    console.log(`✓ ${out.name}  ${out.n} files  ${mb(out.bytes)}  (${origin!.source})`)
+  },
+
+  async info(argv) {
+    const name = argv[0] ?? die("usage: eikon info <name>")
+    const mf = join(root(), name, "manifest.json")
+    if (!existsSync(mf)) die(`${name}: not installed`)
+    const m = JSON.parse(readFileSync(mf, "utf8")) as Manifest & { origin?: Origin }
+    console.log(`${m.name}  v${m.version ?? 1}${m.eikon_requires ? `  (requires ${m.eikon_requires})` : ""}`)
+    console.log(`  states: ${Object.keys(m.states ?? {}).join(" ")}`)
+    if (m.source) console.log(`  base:   ${m.source}`)
+    if (m.origin) console.log(`  from:   ${m.origin.source}\n  at:     ${m.origin.at}${m.origin.sha ? `  (${m.origin.sha.slice(0, 7)})` : ""}`)
+    console.log(`  dir:    ${join(root(), name)}`)
+  },
+
+  add: (argv) => cmds.install!(argv),
 
   async show(argv) {
     const src = argv[0] ?? die("usage: eikon show <name|file>")
@@ -85,27 +128,18 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   },
 
   async pack(argv) {
-    const pos: string[] = []
-    const kv: Record<string, string | true> = {}
-    for (let i = 0; i < argv.length; i++) {
-      const a = argv[i]!
-      if (!a.startsWith("--")) { pos.push(a); continue }
-      const next = argv[i + 1]
-      kv[a.slice(2)] = next && !next.startsWith("--") ? (i++, next) : true
-    }
-    const src = pos[0] ?? die("usage: eikon pack <image|video|dir> [out.eikon] [--name N] [--glyph G] [--author A] [--width 48] [--height 24] [--fps 16] [--symbols block|braille|ascii] [--colors none|256|full] [--no-invert]")
-
-    const str = (k: string) => typeof kv[k] === "string" ? kv[k] : undefined
+    const a = args(argv)
+    const src = a.pos[0] ?? die("usage: eikon pack <image|video|dir> [out.eikon] [--name N] [--glyph G] [--author A] [--width 48] [--height 24] [--fps 16] [--symbols block|braille|ascii] [--colors none|256|full] [--no-invert]")
     const { doc, text } = pack(resolve(src), {
-      name: str("name"), author: str("author"), glyph: str("glyph"),
-      width: str("width") ? +str("width")! : undefined,
-      height: str("height") ? +str("height")! : undefined,
-      fps: str("fps") ? +str("fps")! : undefined,
-      symbols: str("symbols") as never, colors: str("colors") as never,
-      invert: !kv["no-invert"],
+      name: a.str("name"), author: a.str("author"), glyph: a.str("glyph"),
+      width: a.str("width") ? +a.str("width")! : undefined,
+      height: a.str("height") ? +a.str("height")! : undefined,
+      fps: a.str("fps") ? +a.str("fps")! : undefined,
+      symbols: a.str("symbols") as never, colors: a.str("colors") as never,
+      invert: !a.kv["no-invert"],
     })
     lint(text)
-    const out = resolve(pos[1] ?? `${doc.header.name}.eikon`)
+    const out = resolve(a.pos[1] ?? `${doc.header.name}.eikon`)
     await Bun.write(out, text)
     const total = doc.states.reduce((n, s) => n + s.frame_count, 0)
     console.log(`✓ ${out}  (${doc.header.width}×${doc.header.height}, ${total} frames, ${(text.length / 1024).toFixed(1)} KB)`)

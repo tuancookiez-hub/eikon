@@ -11,9 +11,9 @@
 
 import { readdirSync, openSync, readSync, closeSync } from "node:fs"
 import { join } from "node:path"
+import { STATES, type State } from "./spec"
 
-export const STATES = ["idle", "listening", "thinking", "speaking", "working", "error"] as const
-export type State = typeof STATES[number]
+export { STATES, type State }
 
 export type Meta = {
   version: number

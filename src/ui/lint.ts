@@ -1,6 +1,7 @@
-import { parse, STATES, type Eikon } from "./eikon"
+import { parse, STATES, type Eikon, type State } from "./eikon"
 import { existsSync } from "node:fs"
 import { join, dirname, basename } from "node:path"
+import type { Origin } from "../install"
 
 export const NAME_RE = /^[a-z0-9-]{2,32}$/
 
@@ -21,8 +22,10 @@ export function lint(raw: string): Eikon {
 export type Manifest = {
   name: string
   version: number
+  eikon_requires?: string
   source?: string
-  states: Partial<Record<typeof STATES[number], { file: string }>>
+  states: Partial<Record<State, { file: string }>>
+  origin?: Origin
 }
 
 /** Validate an avatars/<name>/manifest.json: schema + referenced files
