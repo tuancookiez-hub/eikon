@@ -47,7 +47,7 @@ export function remote(base: string): Catalog {
   const url = base.replace(/\/$/, "")
   return {
     list: () => fetch(`${url}/index.json`).then(r => r.json() as Promise<Entry[]>),
-    load: (name) => fetch(`${url}/${name}.eikon`).then(r => r.text()),
+    load: (name) => fetch(`${url}/${name}/${name}.eikon`).then(r => r.text()),
   }
 }
 

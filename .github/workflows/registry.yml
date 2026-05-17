@@ -1,11 +1,11 @@
-name: catalog
+name: registry
 
 on:
   push:
     branches: [main]
-    paths: ["catalog/**", "eikons/**", "src/registry.ts", "src/ui/**"]
+    paths: ["eikons/**", "src/registry.ts", "src/ui/**"]
   pull_request:
-    paths: ["catalog/**", "eikons/**"]
+    paths: ["eikons/**"]
 
 jobs:
   lint:
@@ -17,7 +17,7 @@ jobs:
       - run: bun install
       - run: |
           set -e
-          for f in $(git diff --name-only origin/main...HEAD -- 'catalog/*.eikon' 'eikons/*/manifest.json'); do
+          for f in $(git diff --name-only origin/main...HEAD -- 'eikons/*/*.eikon' 'eikons/*/manifest.json'); do
             bun src/cli.tsx lint "$f"
           done
 
@@ -34,6 +34,6 @@ jobs:
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add catalog/
-          git diff --cached --quiet || git commit -m "chore(catalog): regenerate index + source_url"
+          git add eikons/
+          git diff --cached --quiet || git commit -m "chore(eikons): regenerate index + source_url"
           git push

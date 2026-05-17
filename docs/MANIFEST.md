@@ -1,10 +1,10 @@
 # Source manifest — `manifest.json`
 
 Describes the **editable source media** for an eikon: one base still +
-per-state clips. Lives beside the media (`eikons/<name>/manifest.json`
-in this repo, or at the root of a standalone eikon repo). The packed
-`.eikon`'s header carries `source_url` pointing at the directory that
-holds this file.
+per-state clips. Lives beside the media and the packed `.eikon`
+(`eikons/<name>/manifest.json` in this repo, or at the root of a
+standalone eikon repo). The packed `.eikon`'s header carries
+`source_url` pointing at this directory.
 
 ```json
 {

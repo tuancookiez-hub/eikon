@@ -91,17 +91,14 @@ function checkRequires(spec: string | undefined): void {
 type IndexEntry = { name: string; source?: string; [k: string]: unknown }
 
 async function catalog(name: string, url: string): Promise<string> {
-  const res = await fetch(`${url.replace(/\/$/, "")}/index.json`)
+  const base = url.replace(/\/?$/, "/")
+  const res = await fetch(base + "index.json")
   if (!res.ok) throw new Error(`catalog: HTTP ${res.status}`)
   const idx = await res.json() as IndexEntry[]
   const hit = idx.find(e => e.name === name)
   if (!hit) throw new Error(`catalog: no eikon named "${name}"`)
-  // index[].source is a repo-relative path ("eikons/ares/"); resolve
-  // against the catalog URL's parent so raw.githubusercontent works.
-  if (hit.source) return new URL(hit.source, url.replace(/\/?$/, "/../")).href
-  // No source media → synthesize a manifest-only staged dir from the
-  // packed .eikon so install can still land the playable artifact.
-  throw new Error(`catalog: "${name}" has no source media (packed-only; use \`eikon add\`)`)
+  // Entry dir sits beside index.json; manifest.json is inside it.
+  return base + (hit.source ?? `${name}/`)
 }
 
 export async function resolve(src: string, opts?: Pick<Opts, "catalog">): Promise<Resolved> {
@@ -172,10 +169,13 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
   const srcd = join(dst, "source")
   mkdirSync(srcd, { recursive: true })
 
-  // Packed .eikon travels when the staged tree has one.
-  if (r.staged) {
-    const packed = join(r.staged, `${r.name}.eikon`)
-    if (existsSync(packed)) copyFileSync(packed, join(dst, `${name}.eikon`))
+  // The packed .eikon travels when present in the source.
+  const packed = `${r.name}.eikon`
+  if (r.staged && existsSync(join(r.staged, packed)))
+    copyFileSync(join(r.staged, packed), join(dst, `${name}.eikon`))
+  else if (r.base) {
+    const res = await fetch(r.base + packed)
+    if (res.ok) await Bun.write(join(dst, `${name}.eikon`), new Uint8Array(await res.arrayBuffer()))
   }
 
   const xs = entries(r.manifest)

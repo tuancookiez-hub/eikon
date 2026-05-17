@@ -3,7 +3,7 @@ import { resolve } from "node:path"
 import { remote } from "../src/browse/catalog"
 import { lint } from "../src/ui/lint"
 
-const dir = resolve(import.meta.dir, "../catalog")
+const dir = resolve(import.meta.dir, "../eikons")
 let srv: ReturnType<typeof Bun.serve>
 
 beforeAll(() => {
@@ -24,7 +24,7 @@ test("remote catalog: index + load round-trip over http", async () => {
 })
 
 test("lint: accepts valid, rejects missing glyph", async () => {
-  const good = await Bun.file(resolve(dir, "ares.eikon")).text()
+  const good = await Bun.file(resolve(dir, "ares/ares.eikon")).text()
   expect(lint(good).meta.name).toBe("ares")
 
   const bad = good.replace('"glyph":"⚔"', '"x":1')

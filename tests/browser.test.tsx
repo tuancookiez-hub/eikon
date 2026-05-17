@@ -5,7 +5,7 @@ import { resolve } from "node:path"
 import { Browser } from "../src/browse/Browser"
 import { local } from "../src/browse/catalog"
 
-const dir = resolve(import.meta.dir, "../catalog")
+const dir = resolve(import.meta.dir, "../eikons")
 
 async function mount() {
   const calls: { name: string; raw: string }[] = []
