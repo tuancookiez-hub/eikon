@@ -147,9 +147,9 @@ describe("resolve: catalog name", () => {
     srv = Bun.serve({ port: 0, fetch(req) {
       const p = new URL(req.url).pathname
       if (p === "/catalog/index.json")
-        return Response.json([{ name: "ares", source: "avatars/ares/" }])
-      if (p === "/avatars/ares/manifest.json") return new Response(man("ares"))
-      if (p.startsWith("/avatars/ares/")) return new Response(new Uint8Array(100), { headers: { "content-length": "100" } })
+        return Response.json([{ name: "ares", source: "eikons/ares/" }])
+      if (p === "/eikons/ares/manifest.json") return new Response(man("ares"))
+      if (p.startsWith("/eikons/ares/")) return new Response(new Uint8Array(100), { headers: { "content-length": "100" } })
       return new Response("404", { status: 404 })
     }})
     base = `http://localhost:${srv.port}/catalog`
@@ -159,7 +159,7 @@ describe("resolve: catalog name", () => {
   test("bare name → catalog → source URL → install", async () => {
     const out = await install("ares", dest, { name: "ares-cat", catalog: base })
     expect(out.n).toBe(3)
-    expect(out.origin.source).toContain("/avatars/ares/")
+    expect(out.origin.source).toContain("/eikons/ares/")
   })
 
   test("unknown name throws", async () => {

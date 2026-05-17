@@ -6,7 +6,7 @@
 import { readdirSync, existsSync, writeFileSync, copyFileSync } from "node:fs"
 import { join } from "node:path"
 
-const root = join(import.meta.dir, "..", "avatars")
+const root = join(import.meta.dir, "..", "eikons")
 const faces = join(import.meta.dir, "..", "faces")
 const STATES = ["idle", "listening", "thinking", "speaking", "working", "error"]
 

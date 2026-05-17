@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "eikon"
 version = "0.1.0"
 description = "Stateful ASCII avatars for AI agents"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

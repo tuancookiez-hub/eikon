@@ -3,9 +3,9 @@ name: catalog
 on:
   push:
     branches: [main]
-    paths: ["catalog/**", "avatars/**", "scripts/mk_index.ts", "src/ui/**"]
+    paths: ["catalog/**", "eikons/**", "scripts/mk_index.ts", "src/ui/**"]
   pull_request:
-    paths: ["catalog/**", "avatars/**"]
+    paths: ["catalog/**", "eikons/**"]
 
 jobs:
   lint:
@@ -17,7 +17,7 @@ jobs:
       - run: bun install
       - run: |
           set -e
-          for f in $(git diff --name-only origin/main...HEAD -- 'catalog/*.eikon' 'avatars/*/manifest.json'); do
+          for f in $(git diff --name-only origin/main...HEAD -- 'catalog/*.eikon' 'eikons/*/manifest.json'); do
             bun src/cli.tsx lint "$f"
           done
 

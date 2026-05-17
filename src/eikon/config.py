@@ -14,7 +14,7 @@ class CropConfig:
 
 @dataclass
 class Config:
-    output_dir: Path = field(default_factory=lambda: Path.home() / "Dev" / "eikon" / "avatars")
+    output_dir: Path = field(default_factory=lambda: Path.home() / "Dev" / "eikon" / "eikons")
     crop: CropConfig = field(default_factory=CropConfig)
 
 

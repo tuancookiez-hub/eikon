@@ -6,17 +6,18 @@ dist/
 .env
 node_modules/
 hostkey
+hostkey.pub
 .pytest_cache/
 
-# avatars/ is the source-of-truth workbench. Track the clean
+# eikons/ is the source-of-truth workbench. Track the clean
 # deliverable subset; ignore generator intermediates.
-avatars/*/raw/
-avatars/*/ascii/
-avatars/*/thumbnails/
-avatars/*/*tests/
-avatars/*/old_states/
-avatars/*/gen_*.py
-avatars/*/gen_log.json
-avatars/*/*.json.bak
-avatars/gen_*.py
+eikons/*/raw/
+eikons/*/ascii/
+eikons/*/thumbnails/
+eikons/*/*tests/
+eikons/*/old_states/
+eikons/*/gen_*.py
+eikons/*/gen_log.json
+eikons/*/*.json.bak
+eikons/gen_*.py
 __pycache__/

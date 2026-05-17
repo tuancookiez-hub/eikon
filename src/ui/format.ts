@@ -1,6 +1,6 @@
 // .eikon NDJSON writer — sibling of src/ui/eikon.ts (the tolerant reader).
-// Used by mk_eikon.ts and preview/author.tsx. These types mirror the wire
-// format exactly; the reader (eikon.ts) derives its own shapes.
+// Used by pack.ts and mk_eikon.ts. These types mirror the wire format
+// exactly; the reader (eikon.ts) derives its own shapes.
 
 export interface Header {
   eikon: 1
