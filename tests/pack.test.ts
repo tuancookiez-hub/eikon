@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, cpSync, existsSync } from "node:fs"
+import { mkdtempSync, mkdirSync, cpSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -69,4 +69,24 @@ test.skipIf(skip)("pack: name sanitized, rejects unsupported ext", () => {
   expect(doc.header.name).toBe("my-cat")
   const bad = join(tmp, "nope.txt"); cpSync(PNG_FIX, bad)
   expect(() => pack(bad)).toThrow()
+})
+
+test.skipIf(skip)("pack: <state>/{start,loop}.mp4 → loop_from = intro length", () => {
+  const dir = join(tmp, "sl"); mkdirSync(join(dir, "idle"), { recursive: true })
+  const vid = (p: string, frames: number) => spawnSync("ffmpeg", ["-hide_banner",
+    "-loglevel", "error", "-f", "lavfi", "-i", `color=c=gray:s=32x32:d=${frames / 8}:r=8`,
+    "-y", p])
+  vid(join(dir, "idle", "start.mp4"), 4)
+  vid(join(dir, "idle", "loop.mp4"), 8)
+  mkdirSync(join(dir, "error")); vid(join(dir, "error", "start.mp4"), 3)
+  const { doc } = pack(dir, { name: "sl", author: "t", fps: 8 })
+  const idle = doc.states.find(s => s.state === "idle")!
+  // intro (4) + loop (8) → 12 frames, loop_from = 4
+  expect(idle.frame_count).toBe(12)
+  expect(idle.loop_from).toBe(4)
+  // start-only → play-once-hold (loop_from == frame_count)
+  const err = doc.states.find(s => s.state === "error")!
+  expect(err.loop_from).toBe(err.frame_count)
+  // thinking falls back to idle
+  expect(doc.states.find(s => s.state === "thinking")!.loop_from).toBe(4)
 })

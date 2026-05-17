@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
-// eikon {publish, add, show, lint} — bun CLI. Python authoring stays under
-// `uv run eikon`; this owns the bare `eikon` name.
+// eikon CLI — install/pack/lint/show/publish/browse + registry maint.
 
 import { resolve, basename, join } from "node:path"
 import { homedir } from "node:os"
@@ -9,6 +8,7 @@ import { parse, poster } from "./ui/eikon"
 import { lint, lintManifest, type Manifest } from "./ui/lint"
 import { install, dirty, type Origin } from "./install"
 import { pack } from "./pack"
+import * as reg from "./registry"
 import { Browser } from "./browse/Browser"
 import { local, resolve as cat } from "./browse/catalog"
 import { createCliRenderer } from "@opentui/core"
@@ -149,6 +149,15 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async browse() {
     const r = await createCliRenderer({ exitOnCtrlC: true })
     createRoot(r).render(<Browser catalog={cat(resolve(import.meta.dir, "../catalog"))} />)
+  },
+
+  async index(argv) {
+    const n = await reg.index(argv[0])
+    console.log(`wrote ${n} entries → catalog/index.json`)
+  },
+
+  async manifest() {
+    console.log(`wrote ${reg.manifest()} manifests`)
   },
 }
 
