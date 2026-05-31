@@ -35,7 +35,7 @@ const defaults: WebPolicy = { maxBytes: 5_000_000, timeoutMs: 8_000, concurrency
 const dangerous = /\b(publish|auth|login|token)\b|\buse\s+/i
 
 export function AsciiPreview(props: { lines: string[] }) {
-  return <pre className="ascii" aria-label="Eikon ASCII preview">{props.lines.join("\n")}</pre>
+  return <pre className="ascii" aria-label="Eikon ASCII preview"><span className="asciiArt">{props.lines.join("\n")}</span></pre>
 }
 
 export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPick: () => void }) {

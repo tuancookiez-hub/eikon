@@ -35,6 +35,7 @@ main { width: min(1440px, calc(100% - 32px)); min-width: 0; margin: 0 auto; padd
 .cardPreview,
 .cardPoster,
 .ascii,
+.asciiArt,
 code { min-width: 0; }
 
 .pageHeader {
@@ -108,7 +109,8 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   container-type: inline-size;
 }
 .cardPoster,
-.ascii {
+.ascii,
+.asciiArt {
   margin: 0;
   white-space: pre;
   font-family: var(--terminal-font);
@@ -127,6 +129,13 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   color: #c8c8c8;
   font-size: clamp(7.5px, 2.7cqw, 12px);
 }
+.asciiArt {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
 .name { color: var(--text); font-size: 17px; }
 .meta { color: var(--muted); }
 .detail { position: sticky; top: 14px; align-self: start; border: 1px solid var(--line); background: var(--panel); padding: 14px; }
@@ -135,11 +144,13 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
 .previewHead { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
 .previewHead h2 { margin-bottom: 2px; }
 .ascii {
+  display: grid;
+  place-items: center;
   width: 100%;
   max-width: 100%;
-  min-height: 340px;
-  max-height: 60vh;
-  overflow: auto;
+  aspect-ratio: 1 / 1;
+  justify-self: center;
+  overflow: hidden;
   padding: 12px;
   background: #020202;
   border: 1px solid var(--line);
@@ -213,9 +224,7 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .detail.drawer-peek .previewOptions,
   .detail.drawer-peek .previewStatus { display: none; }
   .previewHead { display: none; }
-  .ascii { min-height: min(36dvh, 330px); max-height: min(40dvh, 360px); font-size: clamp(8px, 2.15vw, 11px); }
-  .detail.drawer-peek .ascii { min-height: min(39dvh, 350px); max-height: min(39dvh, 350px); }
-  .detail.drawer-expanded .ascii { max-height: 46dvh; }
+  .ascii { font-size: clamp(8px, 2.15vw, 11px); }
   .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .states button { padding-left: 8px; padding-right: 8px; }
 }
