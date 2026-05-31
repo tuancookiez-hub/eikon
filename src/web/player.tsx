@@ -41,7 +41,9 @@ export function AsciiPreview(props: { lines: string[] }) {
 export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPick: () => void }) {
   return (
     <button type="button" className={props.selected ? "card selected" : "card"} onClick={props.onPick}>
-      <pre aria-hidden="true">{props.entry.poster}</pre>
+      <span className="cardPreview" aria-hidden="true">
+        <span className="cardPoster">{props.entry.poster}</span>
+      </span>
       <span className="name">{props.entry.glyph ?? "⬡"} {props.entry.name}</span>
       <span className="meta">{props.entry.author ?? "unknown"} · {props.entry.width}×{props.entry.height}</span>
     </button>

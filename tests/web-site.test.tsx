@@ -13,6 +13,9 @@ test("public page copy stays gallery-focused and avoids placeholder names", () =
   expect(html).toContain("A terminal avatar format for Herm")
   expect(html).toContain("Search by name or author")
   expect(html).toContain("Search catalog")
+  expect(html).toContain("drawer-collapsed")
+  expect(html).not.toContain("Reload preview")
+  expect(html).not.toContain("Load preview")
   expect(html).not.toMatch(/\bmirror\b/i)
   expect(html).not.toContain("eikon.liftaris.dev")
   expect(html).not.toMatch(/ares,\s*kaio|kaio,\s*nous|nous…/i)
@@ -36,7 +39,7 @@ test("web build publishes catalog assets and lets eikon paths hit the filesystem
   expect(vercel.rewrites).toBeUndefined()
 })
 
-test("web preview uses terminal-like cells, mobile bottom stickiness, and smooth timing", async () => {
+test("web preview uses terminal-like cells, square cards, mobile drawer, and smooth timing", async () => {
   const css = await Bun.file(join(repo, "src/web/style.css")).text()
 
   expect(WEB_PREVIEW_FPS).toBeGreaterThanOrEqual(16)
@@ -44,9 +47,14 @@ test("web preview uses terminal-like cells, mobile bottom stickiness, and smooth
   expect(css).toContain("--terminal-line-height: 1.18")
   expect(css).toContain("line-height: var(--terminal-line-height)")
   expect(css).toContain("overflow-x: clip")
+  expect(css).toContain("aspect-ratio: 1 / 1")
+  expect(css).toContain("place-items: center")
   expect(css).toContain("grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr))")
-  expect(css).toContain("bottom: 0")
-  expect(css).toContain("max-height: min(72dvh, 620px)")
+  expect(css).toContain("position: fixed")
+  expect(css).toContain(".detail.drawer-collapsed { height: 48px; }")
+  expect(css).toContain(".detail.drawer-peek { height: min(58dvh, 500px); }")
+  expect(css).toContain(".detail.drawer-expanded { height: calc(100dvh - 10px - env(safe-area-inset-top)); }")
+  expect(css).toContain(".detail.drawer-peek .drawerExtras")
   expect(css).not.toMatch(/\.ascii\s*\{[^}]*line-height:\s*1[;}]/)
-  expect(css).not.toMatch(/\.card pre\s*\{[^}]*line-height:\s*1[;}]/)
+  expect(css).not.toMatch(/\.cardPoster\s*\{[^}]*line-height:\s*1[;}]/)
 })
