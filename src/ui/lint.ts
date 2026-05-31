@@ -43,9 +43,60 @@ function safeUrl(key: string, val: unknown, errs: string[]) {
   catch { errs.push(`header.${key} must be a valid URL`); return }
   if (url.protocol !== "https:") errs.push(`header.${key} must use https`)
   if (url.username || url.password) errs.push(`header.${key} must not include credentials`)
-  const host = url.hostname.toLowerCase()
-  if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1") errs.push(`header.${key} must not point at a local host`)
-  if (/^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) errs.push(`header.${key} must not point at a private host`)
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "")
+  if (host === "localhost" || nonPublicHost(host)) errs.push(`header.${key} must point at a public host`)
+}
+
+function nonPublicHost(host: string) {
+  const v4 = parseIpv4(host)
+  if (v4) return nonPublicIpv4(v4)
+  const v6 = parseIpv6(host)
+  if (!v6) return false
+  const mapped = mappedIpv4(v6)
+  if (mapped) return nonPublicIpv4(mapped)
+  return v6.every(x => x === 0)
+    || v6.slice(0, 7).every(x => x === 0) && v6[7] === 1
+    || (v6[0]! & 0xfe00) === 0xfc00
+    || (v6[0]! & 0xffc0) === 0xfe80
+}
+
+function parseIpv4(host: string) {
+  const parts = host.split(".")
+  if (parts.length !== 4) return null
+  const nums = parts.map(x => /^\d+$/.test(x) ? Number(x) : NaN)
+  return nums.every(x => Number.isInteger(x) && x >= 0 && x <= 255) ? nums : null
+}
+
+function nonPublicIpv4(ip: number[]) {
+  return ip[0] === 0
+    || ip[0] === 10
+    || ip[0] === 127
+    || ip[0] === 169 && ip[1] === 254
+    || ip[0] === 172 && ip[1]! >= 16 && ip[1]! <= 31
+    || ip[0] === 192 && ip[1] === 168
+}
+
+function parseIpv6(host: string) {
+  if (!host.includes(":")) return null
+  const [addr] = host.split("%", 1)
+  const dot = addr!.lastIndexOf(":")
+  const tail = dot === -1 ? "" : addr!.slice(dot + 1)
+  const v4 = parseIpv4(tail)
+  const text = v4 ? `${addr!.slice(0, dot)}:${((v4[0]! << 8) | v4[1]!).toString(16)}:${((v4[2]! << 8) | v4[3]!).toString(16)}` : addr!
+  if ((text.match(/::/g) ?? []).length > 1) return null
+  const sides = text.split("::")
+  const left = sides[0] ? sides[0].split(":") : []
+  const right = sides[1] ? sides[1].split(":") : []
+  const fill = sides.length === 2 ? Array(8 - left.length - right.length).fill("0") : []
+  const parts = [...left, ...fill, ...right]
+  if (parts.length !== 8) return null
+  const nums = parts.map(x => /^[0-9a-f]{1,4}$/i.test(x) ? parseInt(x, 16) : NaN)
+  return nums.every(x => Number.isInteger(x) && x >= 0 && x <= 0xffff) ? nums : null
+}
+
+function mappedIpv4(ip: number[]) {
+  if (!ip.slice(0, 5).every(x => x === 0) || ip[5] !== 0xffff) return null
+  return [ip[6]! >> 8, ip[6]! & 0xff, ip[7]! >> 8, ip[7]! & 0xff]
 }
 
 function text(val: unknown) {
@@ -54,6 +105,13 @@ function text(val: unknown) {
 
 function hasControl(s: string) {
   return /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x1b]/.test(s)
+}
+
+function hasControlValue(val: unknown): boolean {
+  if (typeof val === "string") return hasControl(val)
+  if (Array.isArray(val)) return val.some(hasControlValue)
+  if (val && typeof val === "object") return Object.values(val).some(hasControlValue)
+  return false
 }
 
 /** Registry-only validation for public marketplace entries. */
@@ -65,7 +123,7 @@ export function lintRegistry(raw: string): Eikon {
     if (!text(e.meta[k]).trim()) errs.push(`header.${k} required for registry entries`)
   for (const k of URL_FIELDS) safeUrl(k, e.meta[k], errs)
   if (e.meta.width > PUBLIC_LIMITS.maxWidth || e.meta.height > PUBLIC_LIMITS.maxHeight) errs.push(`dims ${e.meta.width}×${e.meta.height} exceed ${PUBLIC_LIMITS.maxWidth}×${PUBLIC_LIMITS.maxHeight}`)
-  if (hasControl(JSON.stringify(e.meta))) errs.push("header metadata contains control characters")
+  if (hasControlValue(e.meta)) errs.push("header metadata contains control characters")
 
   let frames = 0
   for (const [name, clip] of e.clips) {
