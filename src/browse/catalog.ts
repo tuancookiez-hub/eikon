@@ -3,25 +3,16 @@
 // and install. Local reads a directory; remote fetches index.json + files.
 
 import { list as scan, parse, poster, type Meta } from "../ui/eikon"
+import { loadCatalog, entryFromMeta, type CatalogEntry } from "../catalog"
 
-export type Entry = {
-  name: string
-  author?: string
-  glyph?: string
-  w: number
-  h: number
-  poster: string
-}
+export type Entry = CatalogEntry
 
 export type Catalog = {
   list: () => Promise<Entry[]>
   load: (name: string) => Promise<string>
 }
 
-const toEntry = (meta: Meta, p: string): Entry => ({
-  name: meta.name, author: meta.author, glyph: meta.glyph,
-  w: meta.width, h: meta.height, poster: p,
-})
+const toEntry = (meta: Meta, p: string, base: string): Entry => entryFromMeta(meta, p, base, { allowPrivate: true })
 
 export function local(dir: string): Catalog {
   const found = scan([dir])
@@ -31,7 +22,7 @@ export function local(dir: string): Catalog {
       const out: Entry[] = []
       for (const f of found) {
         const raw = await Bun.file(f.path).text()
-        out.push(toEntry(f.meta, poster(parse(raw))))
+        out.push(toEntry(f.meta, poster(parse(raw)), `file://${f.path}`))
       }
       return out
     },
@@ -44,10 +35,13 @@ export function local(dir: string): Catalog {
 }
 
 export function remote(base: string): Catalog {
-  const url = base.replace(/\/$/, "")
   return {
-    list: () => fetch(`${url}/index.json`).then(r => r.json() as Promise<Entry[]>),
-    load: (name) => fetch(`${url}/${name}/${name}.eikon`).then(r => r.text()),
+    async list() {
+      return (await loadCatalog(base, fetch, { allowPrivate: true })).entries
+    },
+    async load(name) {
+      return (await loadCatalog(base, fetch, { allowPrivate: true })).load(name)
+    },
   }
 }
 

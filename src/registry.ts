@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { STATES, DEFAULT_CATALOG } from "./ui/spec"
 import { parse, poster } from "./ui/eikon"
+import { catalogEntry, type CatalogIndexEntry } from "./catalog"
 
 const root = () => {
   let d = import.meta.dir
@@ -12,13 +13,9 @@ const root = () => {
   return join(d, "eikons")
 }
 
-/** Regenerate eikons/index.json from eikons/<name>/<name>.eikon and
- *  re-stamp each header's `source_url` to point at its own dir under
- *  `base` (default: DEFAULT_CATALOG). An entry with `manifest.json`
- *  gets `source: "<name>/"` so install() knows media exists. */
 export async function index(base = DEFAULT_CATALOG) {
   const dir = root()
-  const out = []
+  const out: CatalogIndexEntry[] = []
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (!e.isDirectory()) continue
     const path = join(dir, e.name, `${e.name}.eikon`)
@@ -30,10 +27,37 @@ export async function index(base = DEFAULT_CATALOG) {
     const head = { ...JSON.parse(body.slice(0, nl)),
                    source_url: `${base.replace(/\/?$/, "/")}${e.name}/` }
     writeFileSync(path, JSON.stringify(head) + body.slice(nl))
+    const entry = catalogEntry({
+      name: doc.meta.name,
+      author: doc.meta.author,
+      glyph: doc.meta.glyph,
+      w: doc.meta.width,
+      h: doc.meta.height,
+      description: typeof doc.meta.description === "string" ? doc.meta.description : undefined,
+      license: typeof doc.meta.license === "string" ? doc.meta.license : undefined,
+      provenance: typeof doc.meta.provenance === "string" ? doc.meta.provenance : undefined,
+      review_status: typeof doc.meta.review_status === "string" ? doc.meta.review_status : undefined,
+      source_url: head.source_url,
+      preview_url: `${e.name}/${e.name}.eikon`,
+      install_url: src,
+      ...(src ? { source: src } : {}),
+      poster: poster(doc),
+    }, base)
     out.push({
-      name: doc.meta.name, author: doc.meta.author, glyph: doc.meta.glyph,
-      w: doc.meta.width, h: doc.meta.height,
-      ...(src ? { source: src } : {}), poster: poster(doc),
+      name: entry.name,
+      ...(entry.author ? { author: entry.author } : {}),
+      ...(entry.glyph ? { glyph: entry.glyph } : {}),
+      w: entry.width,
+      h: entry.height,
+      ...(entry.description ? { description: entry.description } : {}),
+      ...(entry.trust.license ? { license: entry.trust.license } : {}),
+      ...(entry.trust.provenance ? { provenance: entry.trust.provenance } : {}),
+      ...(entry.trust.reviewStatus ? { review_status: entry.trust.reviewStatus } : {}),
+      source_url: head.source_url,
+      preview_url: entry.previewUrl,
+      install_url: entry.installUrl,
+      ...(src ? { source: src } : {}),
+      poster: entry.poster,
     })
   }
   out.sort((a, b) => a.name.localeCompare(b.name))
@@ -41,8 +65,6 @@ export async function index(base = DEFAULT_CATALOG) {
   return out.length
 }
 
-/** Emit eikons/<name>/manifest.json for every dir with a states/ tree.
- *  Prefers loop.mp4 over start.mp4. */
 export function manifest() {
   const dir = root()
   let n = 0
