@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test"
 import { join, resolve } from "node:path"
 import { renderToStaticMarkup } from "react-dom/server"
-import { App } from "../src/web/App"
+import { App, WEB_PREVIEW_FPS, WEB_PREVIEW_FRAME_MS } from "../src/web/App"
 
 const repo = resolve(import.meta.dir, "..")
 
@@ -34,4 +34,19 @@ test("web build publishes catalog assets and lets eikon paths hit the filesystem
 
   const vercel = await Bun.file(join(repo, "vercel.json")).json()
   expect(vercel.rewrites).toBeUndefined()
+})
+
+test("web preview uses terminal-like cells, mobile bottom stickiness, and smooth timing", async () => {
+  const css = await Bun.file(join(repo, "src/web/style.css")).text()
+
+  expect(WEB_PREVIEW_FPS).toBeGreaterThanOrEqual(16)
+  expect(WEB_PREVIEW_FRAME_MS).toBeLessThanOrEqual(1000 / 16)
+  expect(css).toContain("--terminal-line-height: 1.18")
+  expect(css).toContain("line-height: var(--terminal-line-height)")
+  expect(css).toContain("overflow-x: clip")
+  expect(css).toContain("grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr))")
+  expect(css).toContain("bottom: 0")
+  expect(css).toContain("max-height: min(72dvh, 620px)")
+  expect(css).not.toMatch(/\.ascii\s*\{[^}]*line-height:\s*1[;}]/)
+  expect(css).not.toMatch(/\.card pre\s*\{[^}]*line-height:\s*1[;}]/)
 })

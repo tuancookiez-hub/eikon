@@ -9,11 +9,13 @@ import { AsciiPreview, EntryCard } from "./player"
 import { browserInstructions, createWebCatalog, type PreviewState } from "./player"
 
 const queryDefault = new URLSearchParams(globalThis.location?.search ?? "").get("catalog") ?? DEFAULT_PUBLIC_CATALOG
+export const WEB_PREVIEW_FPS = 16
+export const WEB_PREVIEW_FRAME_MS = 1000 / WEB_PREVIEW_FPS
 
 export function App() {
   const [query, setQuery] = useState("")
   const [state, setState] = useState("idle")
-  const [tick, setTick] = useState(0)
+  const [tickMs, setTickMs] = useState(0)
   const [copied, setCopied] = useState("")
   const [err, setErr] = useState("")
   const [, rerender] = useState(0)
@@ -21,7 +23,8 @@ export function App() {
 
   useEffect(() => { void catalog.refresh().then(() => rerender(x => x + 1)) }, [catalog])
   useEffect(() => {
-    const id = setInterval(() => setTick(x => x + 1), 180)
+    const start = performance.now()
+    const id = setInterval(() => setTickMs(performance.now() - start), WEB_PREVIEW_FRAME_MS)
     return () => clearInterval(id)
   }, [])
 
@@ -29,7 +32,7 @@ export function App() {
   const selected = catalog.selected() ?? matches[0]
   if (selected && catalog.state.selectedKey !== selected.identityKey) catalog.select(selected.identityKey)
   const preview = catalog.state.preview
-  const frame = preview.status === "ready" ? playbackFrame(preview.eikon, state, fixedClock(tick * 180), 0) : []
+  const frame = preview.status === "ready" ? playbackFrame(preview.eikon, state, fixedClock(tickMs), 0) : []
   const instructions = selected ? browserInstructions(selected) : undefined
   const statusLabel = catalog.state.status === "loading"
     ? "loading catalog"
