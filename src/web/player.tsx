@@ -31,7 +31,7 @@ export type WebCatalogOptions = Partial<WebPolicy> & {
   loadCatalog?: (base?: string, fetcher?: typeof fetch) => Promise<Catalog>
 }
 
-const defaults: WebPolicy = { maxBytes: 1_000_000, timeoutMs: 8_000, concurrency: 3, cacheEntries: 24 }
+const defaults: WebPolicy = { maxBytes: 5_000_000, timeoutMs: 8_000, concurrency: 3, cacheEntries: 24 }
 const dangerous = /\b(publish|auth|login|token)\b|\buse\s+/i
 
 export function AsciiPreview(props: { lines: string[] }) {
@@ -75,7 +75,7 @@ export function browserInstructions(entry: CatalogEntry) {
   if (dangerous.test(command)) throw new Error("unsafe install instructions")
   return {
     command,
-    manual: `Download ${preview}, then open Herm's Eikon gallery and install from URL or file.`,
+    manual: `Preview file: ${preview}`,
     hermUrl: safeHermUrl(entry),
   }
 }

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { stat } from "node:fs/promises"
+import { resolve } from "node:path"
 import { parse } from "../src/ui/eikon"
 import { frameAt, playbackFrame, stateClip } from "../src/player/model"
 import { fixedClock, manualClock, systemClock, type Clock } from "../src/player/clock"
@@ -83,7 +85,7 @@ describe("playback primitives", () => {
   })
 })
 
-describe("browser mirror model", () => {
+describe("browser catalog model", () => {
   test("renders catalog entries and filters by name or author", async () => {
     const catalog = createWebCatalog({
       loadCatalog: async () => ({
@@ -170,6 +172,16 @@ describe("browser mirror model", () => {
     await catalog.refresh()
     await expect(catalog.fetchText(entry.previewUrl)).rejects.toThrow(/size limit/)
     expect(catalog.policy()).toEqual({ maxBytes: 20, timeoutMs: 50, concurrency: 1, cacheEntries: 1 })
+  })
+
+  test("default fetch policy covers packed registry previews", async () => {
+    const sizes = await Promise.all([
+      stat(resolve(import.meta.dir, "../eikons/ares/ares.eikon")),
+      stat(resolve(import.meta.dir, "../eikons/mono/mono.eikon")),
+      stat(resolve(import.meta.dir, "../eikons/nous/nous.eikon")),
+    ])
+
+    expect(createWebCatalog().policy().maxBytes).toBeGreaterThan(Math.max(...sizes.map(s => s.size)))
   })
 
   test("default catalog preview fetches enforce the byte policy before parse", async () => {

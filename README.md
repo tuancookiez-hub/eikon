@@ -94,15 +94,15 @@ import { parse, serialize, lint, install, peek, STATES } from "eikon"
 For browser-safe catalog consumers, import `eikon/catalog`. For renderer-neutral
 playback helpers, import `eikon/player`.
 
-## Browser mirror and launch gate
+## Browser gallery and launch gate
 
-The static discovery mirror for `eikon.liftaris.dev` builds with:
+The static catalog gallery builds with:
 
 ```sh
 bun run web:build
 ```
 
-The mirror is discovery-only: it reads the public catalog, filters by eikon name
+The page is discovery-only: it reads the public catalog, filters by eikon name
 or author, previews selected `.eikon` files, and exposes copyable Herm
 install/open-detail instructions. It has no browser-native publish, auth,
 install, or activation path. Install/use/publish happen in Herm or through the
@@ -121,7 +121,7 @@ Before promoting `eikon.liftaris.dev`, verify:
 - staging and production smoke both load the catalog, preview an eikon, and keep
   the page limited to copy instructions and Herm detail links
 
-Repo ownership is split deliberately: eikon owns the registry, mirror, catalog
+Repo ownership is split deliberately: eikon owns the registry, gallery, catalog
 client, install resolver, publish preflight, and shared player primitives; Herm
 owns the native Marketplace UI, local install/use state, sidebar preview, and
 submit dialog.

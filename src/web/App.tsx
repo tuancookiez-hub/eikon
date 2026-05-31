@@ -31,6 +31,11 @@ export function App() {
   const preview = catalog.state.preview
   const frame = preview.status === "ready" ? playbackFrame(preview.eikon, state, fixedClock(tick * 180), 0) : []
   const instructions = selected ? browserInstructions(selected) : undefined
+  const statusLabel = catalog.state.status === "loading"
+    ? "loading catalog"
+    : catalog.state.status === "error"
+      ? "catalog unavailable"
+      : `${matches.length}/${catalog.state.entries.length} shown`
 
   const pick = async (entry: CatalogEntry) => {
     catalog.select(entry.identityKey)
@@ -50,22 +55,39 @@ export function App() {
 
   return (
     <main>
-      <header className="hero">
-        <p className="eyebrow">eikon.liftaris.dev</p>
-        <h1>Discovery mirror for Herm eikons</h1>
-        <p>Browse the public catalog, preview stateful terminal avatars, then copy Herm-oriented install/open instructions. This page does not publish, authenticate, or install in the browser.</p>
+      <header className="pageHeader">
+        <div className="intro">
+          <h1>eikon</h1>
+          <p>A terminal avatar format for Herm. Browse the catalog, preview each state, and copy the install command for your local profile.</p>
+        </div>
+        <dl className="quickGuide" aria-label="How to use eikons">
+          <div>
+            <dt>install</dt>
+            <dd>Select an eikon, copy <code>eikon install &lt;url&gt;</code>, then run it locally.</dd>
+          </div>
+          <div>
+            <dt>create</dt>
+            <dd>Author a .eikon package locally, then submit it through Herm for review.</dd>
+          </div>
+        </dl>
       </header>
 
       <section className="toolbar" aria-label="Catalog controls">
         <label>
-          Search name or author
-          <input value={query} onChange={e => setQuery(e.currentTarget.value)} placeholder="ares, kaio, nous…" autoFocus />
+          Search by name or author
+          <input value={query} onChange={e => setQuery(e.currentTarget.value)} placeholder="Search catalog" autoFocus />
         </label>
-        <button type="button" onClick={() => void catalog.refresh().then(() => rerender(x => x + 1))}>Retry catalog</button>
+        <div className="catalogStatus" aria-live="polite">{statusLabel}</div>
+        <button type="button" onClick={() => void catalog.refresh().then(() => rerender(x => x + 1))}>Reload</button>
       </section>
 
-      {catalog.state.status === "error" ? <p role="alert" className="error">Catalog failed: {catalog.state.error}. Check the network and retry.</p> : null}
-      {matches.length === 0 && catalog.state.status !== "error" ? <p className="empty">No eikons match this search. Clear the query to return to the catalog.</p> : null}
+      {catalog.state.status === "error" ? (
+        <div role="alert" className="notice error">
+          <span>Catalog unavailable.</span>
+          <code>{catalog.state.error}</code>
+        </div>
+      ) : null}
+      {matches.length === 0 && catalog.state.status !== "error" ? <p className="empty">No eikons match this search.</p> : null}
 
       <section className="shell">
         <div className="grid" aria-label="Catalog entries">
@@ -73,10 +95,10 @@ export function App() {
         </div>
 
         <aside className="detail" aria-label="Preview and instructions">
-          {selected ? <Preview selected={selected} preview={preview} frame={frame} state={state} setState={setState} load={() => pick(selected)} /> : <p>Select an eikon to preview it.</p>}
+          {selected ? <Preview selected={selected} preview={preview} frame={frame} state={state} setState={setState} load={() => pick(selected)} /> : <p className="muted">Select an eikon to preview it.</p>}
           {instructions ? (
             <div className="instructions">
-              <h2>Open in Herm</h2>
+              <h2>install</h2>
               <code>{instructions.command}</code>
               <button type="button" onClick={() => void copy(instructions.command, "command")}>Copy command</button>
               <a href={instructions.hermUrl}>Open Herm detail</a>
