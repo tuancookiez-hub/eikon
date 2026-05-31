@@ -109,6 +109,16 @@ describe("shared catalog contract", () => {
     expect(() => publicCatalogUrl("http://[::1]/eikon.eikon")).toThrow(/private host/)
     expect(() => publicCatalogUrl("http://[fe80::1]/eikon.eikon")).toThrow(/private host/)
     expect(() => publicCatalogUrl("http://[fc00::1]/eikon.eikon")).toThrow(/private host/)
+    for (const host of [
+      "[::ffff:10.0.0.1]",
+      "[::ffff:127.0.0.1]",
+      "[::ffff:169.254.169.254]",
+      "[::ffff:172.16.0.1]",
+      "[::ffff:172.31.255.255]",
+      "[::ffff:192.168.1.1]",
+    ]) {
+      expect(() => publicCatalogUrl(`http://${host}/eikon.eikon`)).toThrow(/private host/)
+    }
     expect(() => catalogEntry({ name: "bad", source: "../bad/", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/path escape/)
     expect(() => catalogEntry({ name: "bad", preview_url: "https://evil.example/bad.eikon", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/host/)
   })

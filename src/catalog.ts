@@ -79,19 +79,30 @@ const cleanTextBlock = (v: unknown) => {
 const safeName = (v: unknown, fallback = "unnamed") => clean(v) || fallback
 const safeNum = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : 0
 
+const privateIpv4 = (a: number, b: number) => {
+  if (a === 10) return true
+  if (a === 127) return true
+  if (a === 169 && b === 254) return true
+  if (a === 192 && b === 168) return true
+  return a === 172 && b >= 16 && b <= 31
+}
+
+const mappedIpv4Private = (host: string) => {
+  const hex = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (!hex) return false
+  const n = Number.parseInt(hex[1]!, 16) * 0x10000 + Number.parseInt(hex[2]!, 16)
+  return privateIpv4(Math.floor(n / 0x1000000), Math.floor(n / 0x10000) & 0xff)
+}
+
 const privateHost = (host: string) => {
   const h = host.toLowerCase().replace(/^\[|\]$/g, "")
   if (PRIVATE_HOSTS.has(h)) return true
   if (h.endsWith(".localhost")) return true
-  if (/^10\./.test(h)) return true
-  if (/^127\./.test(h)) return true
-  if (/^169\.254\./.test(h)) return true
-  if (/^192\.168\./.test(h)) return true
-  const m = h.match(/^172\.(\d+)\./)
-  if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return true
+  const ip = h.match(/^(\d+)\.(\d+)\./)
+  if (ip && privateIpv4(Number(ip[1]), Number(ip[2]))) return true
   if (h.startsWith("fe80:")) return true
   if (/^f[cd][0-9a-f]{2}:/.test(h)) return true
-  return h.startsWith("::ffff:127.") || h.startsWith("::ffff:10.") || h.startsWith("::ffff:192.168.") || h.startsWith("::ffff:169.254.")
+  return mappedIpv4Private(h)
 }
 
 function catalogBaseUrl(base: string, opts: CatalogOptions) {
