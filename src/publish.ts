@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, realpathSync, statSync, readFileSync } from "node:fs"
+import { existsSync, lstatSync, readFileSync } from "node:fs"
 import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { lint, lintManifest, type Manifest } from "./ui/lint"
 import { poster } from "./ui/eikon"
@@ -67,13 +67,9 @@ function add(root: string, rel: string, out: Map<string, BundleFile>, opts: Bund
   if (!opts.allowHidden && hidden(path.rel)) return
   if (!opts.allowSecrets && secret(path.rel)) return
   const st = lstatSync(path.abs)
-  if (st.isSymbolicLink()) {
-    const real = realpathSync(path.abs)
-    const back = relative(root, real)
-    if (back.startsWith("..") || back === "") throw new Error(`review bundle symlink escape: ${path.rel}`)
-  }
-  if (!st.isFile() && !st.isSymbolicLink()) return
-  const bytes = statSync(path.abs).size
+  if (st.isSymbolicLink()) throw new Error(`review bundle symlink unsupported: ${path.rel}`)
+  if (!st.isFile()) return
+  const bytes = st.size
   out.set(path.rel, { path: path.rel, abs: path.abs, bytes })
 }
 
@@ -169,6 +165,16 @@ async function gh(args: string[], input?: string) {
   return out.trim()
 }
 
+async function existingSha(run: Gh, fork: string, branch: string, path: string) {
+  try {
+    const out = await run(["api", "-X", "GET", `repos/${fork}/contents/${path}`, "-f", `ref=${branch}`])
+    const json = JSON.parse(out) as { sha?: unknown }
+    return typeof json.sha === "string" ? json.sha : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function githubReviewBackend(repo = DEFAULT_REVIEW_REPO, run: Gh = gh): ReviewBackend {
   return {
     async check() {
@@ -184,9 +190,13 @@ export function githubReviewBackend(repo = DEFAULT_REVIEW_REPO, run: Gh = gh): R
       const main = await run(["api", `repos/${repo}/git/ref/heads/main`, "-q", ".object.sha"])
       await run(["api", "-X", "POST", `repos/${fork}/git/refs`, "-f", `ref=refs/heads/${branch}`, "-f", `sha=${main}`]).catch(() => "")
       for (const file of req.bundle.files) {
+        const dest = `eikons/${name}/${file.path}`
         const content = Buffer.from(await Bun.file(file.abs).arrayBuffer()).toString("base64")
-        await run(["api", "-X", "PUT", `repos/${fork}/contents/eikons/${name}/${file.path}`,
-          "-f", `message=eikons: submit ${name} for review`, "-f", `branch=${branch}`, "-f", `content=${content}`])
+        const sha = await existingSha(run, fork, branch, dest)
+        const args = ["api", "-X", "PUT", `repos/${fork}/contents/${dest}`,
+          "-f", `message=eikons: submit ${name} for review`, "-f", `branch=${branch}`, "-f", `content=${content}`]
+        if (sha) args.push("-f", `sha=${sha}`)
+        await run(args)
       }
       const url = await run(["pr", "create", "-R", repo, "-H", `${user}:${branch}`, "-B", "main", "-t", req.title, "-b", req.body])
       return { kind: "review-created", url, request: req }

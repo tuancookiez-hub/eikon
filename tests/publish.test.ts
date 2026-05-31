@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { previewReviewBundle, submitForReview, type ReviewBackend } from "../src/publish"
+import { githubReviewBackend, previewReviewBundle, reviewRequest, submitForReview, type ReviewBackend } from "../src/publish"
 
 const frame = "........\n........\n........\n........"
 const packed = (extra: Record<string, unknown> = {}) => [
@@ -150,18 +150,61 @@ describe("previewReviewBundle", () => {
     await expect(previewReviewBundle({ path: fx.file, extraFiles: ["../secret.txt"] })).rejects.toThrow(/path escape/)
   })
 
-  test("rejects symlink escapes", async () => {
+  test("rejects symlinks", async () => {
     const fx = seed({ license: "MIT", provenance: "human-made" })
     const outside = mkdtempSync(join(tmpdir(), "eikon-outside-"))
     writeFileSync(join(outside, "secret.txt"), "secret")
     symlinkSync(join(outside, "secret.txt"), join(fx.root, "link.txt"))
 
-    await expect(previewReviewBundle({ path: fx.file, extraFiles: ["link.txt"] })).rejects.toThrow(/symlink escape/)
+    await expect(previewReviewBundle({ path: fx.file, extraFiles: ["link.txt"] })).rejects.toThrow(/symlink unsupported/)
+  })
+
+  test("rejects in-root symlinks before backend upload", async () => {
+    const fx = seed({ license: "MIT", provenance: "human-made" })
+    writeFileSync(join(fx.root, "note.txt"), "safe")
+    symlinkSync(join(fx.root, "note.txt"), join(fx.root, "link.txt"))
+
+    await expect(previewReviewBundle({ path: fx.file, extraFiles: ["link.txt"] })).rejects.toThrow(/symlink/)
   })
 
   test("bounds bundle size", async () => {
     const fx = seed({ license: "MIT", provenance: "human-made" })
 
     await expect(previewReviewBundle({ path: fx.file, maxBytes: 10 })).rejects.toThrow(/bundle too large/)
+  })
+})
+
+describe("githubReviewBackend", () => {
+  test("updates existing files on rerun", async () => {
+    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const bundle = await previewReviewBundle({ path: fx.file })
+    const puts: Array<Record<string, string>> = []
+    const existing = new Set<string>()
+    const run = async (args: string[]) => {
+      const path = args[3] ?? ""
+      if (args[0] === "repo") return ""
+      if (args[1] === "user") return "kaio"
+      if (args[1] === "repos/liftaris/eikon/git/ref/heads/main") return "main-sha"
+      if (args[1] === "POST") return ""
+      if (args[2] === "GET") {
+        if (!existing.has(path)) throw new Error("not found")
+        return JSON.stringify({ sha: "existing-sha" })
+      }
+      if (args[2] === "PUT") {
+        puts.push(Object.fromEntries(args.filter(a => !a.startsWith("-f") && a.includes("=")).map(a => a.split("=", 2))))
+        existing.add(path)
+        return ""
+      }
+      if (args[0] === "pr") return "https://example.test/pr/1"
+      throw new Error(`unexpected gh call: ${args.join(" ")}`)
+    }
+    const backend = githubReviewBackend("liftaris/eikon", run)
+
+    await backend.create(reviewRequest(bundle))
+    await backend.create(reviewRequest(bundle))
+
+    expect(puts).toHaveLength(2)
+    expect(puts[0]?.sha).toBeUndefined()
+    expect(puts[1]?.sha).toBe("existing-sha")
   })
 })
