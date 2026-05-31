@@ -107,3 +107,29 @@ test("registry lint: rejects unsafe public content before indexing", () => {
   const unsafe = raw("bad", { source_url: "http://127.0.0.1/eikons/bad/", description: "bad\u001bdesc" })
   expect(() => lintRegistry(unsafe)).toThrow(/control character|source_url/)
 })
+
+test("registry lint: rejects non-public metadata URL hosts", () => {
+  const urls = [
+    "https://169.254.169.254/latest/meta-data/",
+    "https://[::]/eikons/bad/",
+    "https://[::ffff:127.0.0.1]/eikons/bad/",
+    "https://[::ffff:10.0.0.1]/eikons/bad/",
+    "https://[::ffff:169.254.169.254]/eikons/bad/",
+    "https://[fc00::1]/eikons/bad/",
+    "https://[fe80::1]/eikons/bad/",
+  ]
+
+  for (const source_url of urls)
+    expect(() => lintRegistry(raw("bad", { source_url }))).toThrow(/public host/)
+  expect(() => lintRegistry(raw("bad", { homepage_url: "https://[::ffff:192.168.1.1]/" }))).toThrow(/public host/)
+})
+
+test("registry lint: rejects metadata control characters with otherwise valid URLs", () => {
+  const unsafe = raw("bad", {
+    source_url: "https://cdn.example/eikons/bad/",
+    repository_url: "https://github.com/example/bad",
+    description: "bad\u001bdesc",
+  })
+
+  expect(() => lintRegistry(unsafe)).toThrow(/metadata contains control characters/)
+})
