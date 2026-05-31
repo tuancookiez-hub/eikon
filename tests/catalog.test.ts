@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"
 import { resolve } from "node:path"
 import { remote } from "../src/browse/catalog"
-import { lint } from "../src/ui/lint"
+import { lint, lintRegistry } from "../src/ui/lint"
 import {
   catalogEntry,
   loadCatalog,
@@ -20,6 +20,23 @@ beforeAll(() => {
   })
 })
 afterAll(() => srv.stop())
+
+function raw(name: string, meta: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    eikon: 1,
+    name,
+    author: "maker",
+    glyph: "◆",
+    width: 8,
+    height: 4,
+    license: "MIT",
+    description: `${name} test eikon`,
+    homepage_url: `https://example.com/${name}`,
+    ...meta,
+  }) + "\n" + ["idle", "listening", "thinking", "speaking", "working", "error"]
+    .flatMap(state => [JSON.stringify({ state, fps: 12, frame_count: 1 }), JSON.stringify({ f: 0, data: "abcd\\nefgh\\nijkl\\nmnop" })])
+    .join("\n") + "\n"
+}
 
 test("remote catalog: index + load round-trip over http", async () => {
   const cat = remote(`http://localhost:${srv.port}`)
