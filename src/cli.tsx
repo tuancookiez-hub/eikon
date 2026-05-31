@@ -5,7 +5,7 @@ import { resolve, basename, join } from "node:path"
 import { homedir } from "node:os"
 import { existsSync, readFileSync } from "node:fs"
 import { parse, poster } from "./ui/eikon"
-import { lint, lintManifest, type Manifest } from "./ui/lint"
+import { lint, lintManifest, lintRegistry, type Manifest } from "./ui/lint"
 import { install, dirty, type Origin } from "./install"
 import { pack } from "./pack"
 import { submitForReview } from "./publish"
@@ -33,14 +33,15 @@ function args(argv: string[]) {
 
 const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async lint(argv) {
-    const path = argv[0] ?? die("usage: eikon lint <file.eikon|manifest.json>")
+    const registry = argv.includes("--registry")
+    const path = argv.find(a => a !== "--registry") ?? die("usage: eikon lint [--registry] <file.eikon|manifest.json>")
     const raw = await Bun.file(resolve(path)).text()
     if (basename(path) === "manifest.json") {
-      const m = lintManifest(resolve(path), raw)
+      const m = lintManifest(resolve(path), raw, registry)
       console.log(`✓ ${m.name} · ${Object.keys(m.states).length} states${m.source ? ` · ${m.source}` : ""}`)
       return
     }
-    const e = lint(raw)
+    const e = registry ? lintRegistry(raw) : lint(raw)
     console.log(`✓ ${e.meta.name} · ${e.meta.width}×${e.meta.height} · ${e.clips.size} states`)
   },
 
