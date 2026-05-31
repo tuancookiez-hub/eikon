@@ -45,7 +45,7 @@ export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPic
         <span className="cardPoster">{props.entry.poster}</span>
       </span>
       <span className="name">{props.entry.glyph ?? "⬡"} {props.entry.name}</span>
-      <span className="meta">{props.entry.author ?? "unknown"} · {props.entry.width}×{props.entry.height}</span>
+      <span className="meta">{props.entry.author ?? "unknown"}</span>
     </button>
   )
 }
@@ -73,7 +73,7 @@ export function safeHermUrl(entry: CatalogEntry): string {
 export function browserInstructions(entry: CatalogEntry) {
   const install = safePublicUrl(entry.installUrl || entry.previewUrl)
   const preview = safePublicUrl(entry.previewUrl)
-  const command = `eikon install ${install}`
+  const command = `herm eikon install ${install}`
   if (dangerous.test(command)) throw new Error("unsafe install instructions")
   return {
     command,

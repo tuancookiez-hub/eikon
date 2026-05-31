@@ -3,6 +3,7 @@ import { expect, test } from "bun:test"
 import { join, resolve } from "node:path"
 import { renderToStaticMarkup } from "react-dom/server"
 import { App, WEB_PREVIEW_FPS, WEB_PREVIEW_FRAME_MS } from "../src/web/App"
+import { browserInstructions, EntryCard } from "../src/web/player"
 
 const repo = resolve(import.meta.dir, "..")
 
@@ -17,8 +18,62 @@ test("public page copy stays gallery-focused and avoids placeholder names", () =
   expect(html).not.toContain("Reload preview")
   expect(html).not.toContain("Load preview")
   expect(html).not.toMatch(/\bmirror\b/i)
+  expect(html).toContain("<code>herm eikon install &lt;url&gt;</code>")
+  expect(html).not.toContain("<code>eikon install &lt;url&gt;</code>")
   expect(html).not.toContain("eikon.liftaris.dev")
   expect(html).not.toMatch(/ares,\s*kaio|kaio,\s*nous|nous…/i)
+})
+
+test("install instructions use Herm instead of the standalone eikon executable", () => {
+  const entry = {
+    name: "ares",
+    author: "kaio",
+    glyph: "⚔",
+    width: 48,
+    height: 24,
+    w: 48,
+    h: 24,
+    poster: "██",
+    trust: {},
+    previewUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
+    installUrl: "https://eikon.liftaris.dev/eikons/ares/",
+    sourceKey: "https://eikon.liftaris.dev/eikons/ares/",
+    identityKey: "ares-id",
+    raw: { name: "ares" },
+  }
+
+  const instructions = browserInstructions(entry)
+
+  expect(instructions.command).toBe("herm eikon install https://eikon.liftaris.dev/eikons/ares/")
+  expect(instructions.command).not.toStartWith("eikon install ")
+})
+
+test("catalog cards omit fixed dimensions", () => {
+  const html = renderToStaticMarkup(
+    <EntryCard
+      entry={{
+        name: "ares",
+        author: "kaio",
+        glyph: "⚔",
+        width: 48,
+        height: 24,
+        w: 48,
+        h: 24,
+        poster: "██",
+        trust: {},
+        previewUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
+        installUrl: "https://eikon.liftaris.dev/eikons/ares/",
+        sourceKey: "https://eikon.liftaris.dev/eikons/ares/",
+        identityKey: "ares-id",
+        raw: { name: "ares" },
+      }}
+      selected={false}
+      onPick={() => {}}
+    />,
+  )
+
+  expect(html).toContain("kaio")
+  expect(html).not.toContain("48×24")
 })
 
 test("web build publishes catalog assets and lets eikon paths hit the filesystem", async () => {

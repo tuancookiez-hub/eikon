@@ -101,7 +101,7 @@ export function App() {
         <dl className="quickGuide" aria-label="How to use eikons">
           <div>
             <dt>install</dt>
-            <dd>Select an eikon, copy <code>eikon install &lt;url&gt;</code>, then run it locally.</dd>
+            <dd>Select an eikon, copy <code>herm eikon install &lt;url&gt;</code>, then run it locally.</dd>
           </div>
           <div>
             <dt>create</dt>
