@@ -92,13 +92,36 @@ import { parse, serialize, lint, install, peek, STATES } from "eikon"
 ```
 
 For browser-safe catalog consumers, import `eikon/catalog`. For renderer-neutral
-playback helpers, import `eikon/player`. The static discovery mirror for
-`eikon.liftaris.dev` builds with:
+playback helpers, import `eikon/player`.
+
+## Browser mirror and launch gate
+
+The static discovery mirror for `eikon.liftaris.dev` builds with:
 
 ```sh
 bun run web:build
 ```
 
-The mirror reads the public catalog, filters by eikon name or author, previews
-selected `.eikon` files, and only exposes copyable Herm install/open-detail
-instructions. It has no browser-native publish, auth, or install path.
+The mirror is discovery-only: it reads the public catalog, filters by eikon name
+or author, previews selected `.eikon` files, and exposes copyable Herm
+install/open-detail instructions. It has no browser-native publish, auth,
+install, or activation path. Install/use/publish happen in Herm or through the
+`eikon` CLI.
+
+Before promoting `eikon.liftaris.dev`, verify:
+
+- the Vercel project is owned from this repo and serves `dist/web` from the
+  `main` branch build
+- DNS maps `eikon.liftaris.dev` to that Vercel project, not another repo or
+  deployment
+- `/eikons/index.json`, posters, manifests, and packed `.eikon` assets are
+  hosted by the eikon registry path with `Access-Control-Allow-Origin: *`
+- catalog JSON uses a short revalidation cache, while packed assets/posters can
+  use long immutable cache headers
+- staging and production smoke both load the catalog, preview an eikon, and keep
+  the page limited to copy instructions and Herm detail links
+
+Repo ownership is split deliberately: eikon owns the registry, mirror, catalog
+client, install resolver, publish preflight, and shared player primitives; Herm
+owns the native Marketplace UI, local install/use state, sidebar preview, and
+submit dialog.
