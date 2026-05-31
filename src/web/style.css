@@ -138,7 +138,7 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
 }
 .name { color: var(--text); font-size: 17px; }
 .meta { color: var(--muted); }
-.detail { position: sticky; top: 14px; align-self: start; border: 1px solid var(--line); background: var(--panel); padding: 14px; }
+.detail { position: sticky; top: 14px; align-self: start; border: 1px solid var(--line); background: var(--panel); padding: 14px; container-type: inline-size; }
 .drawerHandle { display: none; }
 .preview { display: grid; gap: 10px; }
 .previewHead { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
@@ -221,10 +221,23 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .detail.drawer-expanded { height: calc(100dvh - 10px - env(safe-area-inset-top)); }
   .detail.drawer-expanded .detailBody { overflow: auto; }
   .detail.drawer-peek .drawerExtras,
-  .detail.drawer-peek .previewOptions,
   .detail.drawer-peek .previewStatus { display: none; }
+  .detail.drawer-peek .previewOptions { display: none; }
   .previewHead { display: none; }
   .ascii { font-size: clamp(6.5px, 2.15vw, 11px); }
   .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .states button { padding-left: 8px; padding-right: 8px; }
+  @container (min-width: 640px) {
+    .detail.drawer-peek .preview {
+      grid-template-columns: max-content minmax(160px, 1fr);
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .detail.drawer-peek .previewOptions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-self: center;
+    }
+  }
 }
