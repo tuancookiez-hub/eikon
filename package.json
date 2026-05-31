@@ -7,7 +7,7 @@
   "scripts": {
     "browse": "bun run src/browse/main.tsx",
     "sshd": "bun run src/browse/sshd.tsx",
-    "index": "bun src/cli.tsx index",
+    "index": "EIKON_REGISTRY=1 bun src/cli.tsx index",
     "manifest": "bun src/cli.tsx manifest",
     "typecheck": "bunx tsc --noEmit"
   },

@@ -47,6 +47,27 @@ States appear in the recommended display order.
 | `created`  | string | no       | ISO 8601 creation timestamp.         |
 | `source_url` | string | no     | Base URL of this eikon's `manifest.json` + media. See `docs/MANIFEST.md`. Absent ⇒ no editable source. |
 | `description` | string | no   | Human-readable description.          |
+| `homepage_url` | string | no   | HTTPS project or author page. Public registry entries only. |
+| `repository_url` | string | no | HTTPS source repository. Public registry entries only. |
+
+## Public registry policy
+
+The `.eikon` format remains permissive for local/private files. Entries
+submitted to this repository's public registry are additionally linted for
+marketplace trust and preview safety:
+
+- `author`, `glyph`, `license`, and `description` are required.
+- Public URLs (`source_url`, `homepage_url`, `repository_url`) must be HTTPS,
+  omit credentials, and avoid localhost/private network hosts.
+- Packed `.eikon` files are capped at 2 MB; the generated catalog is capped at
+  500 KB.
+- Frames may not contain terminal/browser control characters other than normal
+  line structure.
+- Public preview dimensions are capped at 160×80, FPS at 30, and total frames
+  at 1200.
+- Posters and source stills are capped at 250 KB.
+- Registry consumers should use a 10s fetch timeout and should not load more
+  than 100 KB for preview metadata before selecting/installing an entry.
 
 ## State Declaration
 

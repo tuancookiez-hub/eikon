@@ -31,6 +31,11 @@ standalone eikon repo). The packed `.eikon`'s header carries
 | `source` | string | no | Still portrait, relative to manifest dir. Becomes `base.<ext>` on install. |
 | `states.<k>.file` | string | per | Clip path, relative to manifest dir. `<k>` ∈ the six reserved states. Becomes `<k>.<ext>` on install. |
 
+Registry manifests are linted as public content. Source and state paths must be
+relative paths inside the eikon directory, referenced files must exist, source
+stills must be at most 250 KB, and installed `origin` blocks must not be
+committed back to the registry.
+
 ## Installed form
 
 `install()` writes the manifest back to `<dest>/<name>/manifest.json`

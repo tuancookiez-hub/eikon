@@ -68,9 +68,11 @@ Studio tab.
 eikon publish mine.eikon   # opens a PR: eikons/mine/mine.eikon
 ```
 
-PR source media to `eikons/<name>/` alongside it. CI lints both; on merge,
-`eikon index` regenerates `eikons/index.json` and stamps `source_url` into
-the header.
+PR source media to `eikons/<name>/` alongside it. CI lints both with public
+registry policy: `author`, `glyph`, `license`, and `description` are required;
+public URLs must be HTTPS; packed files, previews, posters, dimensions, FPS,
+and frame counts have marketplace limits. On merge, `eikon index` regenerates
+the enriched `eikons/index.json` and stamps `source_url` into the header.
 
 ## States
 
