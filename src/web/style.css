@@ -14,7 +14,7 @@
   --ok: #a8d5a8;
   --err: #ffb4b4;
   --terminal-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
-  --terminal-line-height: 1.18;
+  --terminal-line-height: 2.44ch;
 }
 
 * { box-sizing: border-box; }
@@ -127,14 +127,14 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   max-height: 100%;
   overflow: hidden;
   color: #c8c8c8;
-  font-size: clamp(7.5px, 2.7cqw, 12px);
+  font-size: clamp(5px, 2.7cqw, 12px);
 }
 .asciiArt {
   display: block;
   width: max-content;
-  max-width: 100%;
-  max-height: 100%;
-  overflow: hidden;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
 }
 .name { color: var(--text); font-size: 17px; }
 .meta { color: var(--muted); }
@@ -146,7 +146,7 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
 .ascii {
   display: grid;
   place-items: center;
-  width: 100%;
+  width: max-content;
   max-width: 100%;
   aspect-ratio: 1 / 1;
   justify-self: center;
@@ -155,7 +155,7 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   background: #020202;
   border: 1px solid var(--line);
   color: var(--text);
-  font-size: clamp(9px, .82vw, 11px);
+  font-size: clamp(8.5px, .82vw, 11px);
 }
 .states { display: flex; flex-wrap: wrap; gap: 8px; }
 .states .active { border-color: var(--line-strong); background: #161616; }
@@ -172,7 +172,7 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .toolbar { align-items: stretch; }
   .catalogStatus { text-align: left; min-width: 0; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
-  .cardPoster { font-size: clamp(8px, 2.85cqw, 11.5px); }
+  .cardPoster { font-size: clamp(5px, 2.85cqw, 11.5px); }
   .detail {
     position: fixed;
     left: 10px;
@@ -224,7 +224,7 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .detail.drawer-peek .previewOptions,
   .detail.drawer-peek .previewStatus { display: none; }
   .previewHead { display: none; }
-  .ascii { font-size: clamp(8px, 2.15vw, 11px); }
+  .ascii { font-size: clamp(6.5px, 2.15vw, 11px); }
   .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .states button { padding-left: 8px; padding-right: 8px; }
 }
