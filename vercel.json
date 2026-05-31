@@ -1,0 +1,8 @@
+{
+  "buildCommand": "bun run web:build",
+  "outputDirectory": "dist/web",
+  "rewrites": [
+    { "source": "/eikons/:path*", "destination": "/eikons/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
