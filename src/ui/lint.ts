@@ -24,6 +24,8 @@ export type Manifest = {
   version: number
   eikon_requires?: string
   source?: string
+  license?: string
+  provenance?: string
   states: Partial<Record<State, { file: string }>>
   origin?: Origin
 }

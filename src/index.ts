@@ -10,3 +10,5 @@ export { CATALOG_VERSION, DEFAULT_PUBLIC_CATALOG, catalogEntry, entryFromMeta, l
          type Catalog, type CatalogEntry, type CatalogIndexEntry, type CatalogOptions, type CatalogTrust } from "./catalog"
 export { resolve, install, peek, entries, dirty,
          type Resolved, type Installed, type Origin, type Sources, type Opts } from "./install"
+export { previewReviewBundle, reviewRequest, submitForReview, githubReviewBackend,
+         type BundleFile, type BundleOpts, type ReviewBackend, type ReviewBundle, type ReviewFailure, type ReviewRequest, type SubmitResult } from "./publish"

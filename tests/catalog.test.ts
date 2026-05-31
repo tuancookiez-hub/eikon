@@ -146,4 +146,10 @@ describe("shared catalog contract", () => {
     expect("install" in cat).toBe(false)
     expect("resolve" in cat).toBe(false)
   })
+
+  test("root export exposes submit primitives for Herm", async () => {
+    const eikon = await import("eikon")
+    expect("submitForReview" in eikon).toBe(true)
+    expect("previewReviewBundle" in eikon).toBe(true)
+  })
 })
