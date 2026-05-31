@@ -12,3 +12,5 @@ export { frameAt, frameIndex, playback, playbackFrame, stateClip, type Playback 
 export { fixedClock, manualClock, systemClock, type Clock } from "./player/clock"
 export { resolve, install, peek, entries, dirty,
          type Resolved, type Installed, type Origin, type Sources, type Opts } from "./install"
+export { previewReviewBundle, reviewRequest, submitForReview, githubReviewBackend,
+         type BundleFile, type BundleOpts, type ReviewBackend, type ReviewBundle, type ReviewFailure, type ReviewRequest, type SubmitResult } from "./publish"

@@ -29,7 +29,27 @@ standalone eikon repo). The packed `.eikon`'s header carries
 | `version` | int | no | Avatar content revision. Informational. |
 | `eikon_requires` | string | no | Minimum `.eikon` format version (`>=N`, `==N`). `install()` refuses on mismatch. |
 | `source` | string | no | Still portrait, relative to manifest dir. Becomes `base.<ext>` on install. |
+| `license` | string | submit | SPDX/license string. May be supplied transiently by the submit caller instead of written to the manifest. |
+| `provenance` | string | submit | Human-readable source/provenance note. May be supplied transiently by the submit caller instead of written to the manifest. |
 | `states.<k>.file` | string | per | Clip path, relative to manifest dir. `<k>` ∈ the six reserved states. Becomes `<k>.<ext>` on install. |
+
+## Review bundle contract
+
+Submitting an eikon for registry review builds a bounded allowlisted bundle under
+`eikons/<name>/`:
+
+- packed `<name>.eikon`
+- `manifest.json` when present
+- only source files referenced by `manifest.source` or `manifest.states.*.file`
+- submit license and provenance
+- generated catalog fields: name, author, glyph, dimensions, poster, pending
+  review status, preview/install URLs, and trust metadata
+
+Paths are normalized relative to the eikon root. Parent/absolute escapes and
+symlink escapes are rejected. Hidden and secret-like files are excluded unless a
+caller explicitly opts in, and total bundle size is capped before backend submit.
+Static packed eikons without a source manifest are valid; missing source media is
+only blocking when a manifest references it.
 
 ## Catalog index fields
 

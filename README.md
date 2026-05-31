@@ -65,12 +65,14 @@ Studio tab.
 ## Publish one
 
 ```sh
-eikon publish mine.eikon   # opens a PR: eikons/mine/mine.eikon
+eikon publish mine.eikon --license MIT --provenance "made by Kaio"
 ```
 
-PR source media to `eikons/<name>/` alongside it. CI lints both; on merge,
-`eikon index` regenerates `eikons/index.json` and stamps `source_url` into
-the header.
+This submits a review bundle to `eikons/<name>/`: the packed `.eikon`,
+`manifest.json` when present, referenced source files, license, provenance, and
+catalog metadata. The CLI previews and allowlists bundle paths, skips hidden or
+secret-like extras by default, rejects path/symlink escapes, and reports setup
+or validation errors before creating the review request.
 
 ## States
 
