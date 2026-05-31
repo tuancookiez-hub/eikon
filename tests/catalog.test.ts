@@ -105,8 +105,22 @@ describe("shared catalog contract", () => {
   test("rejects unsafe public catalog urls", () => {
     expect(() => publicCatalogUrl("file:///tmp/eikon.eikon")).toThrow(/public catalog URL/)
     expect(() => publicCatalogUrl("http://127.0.0.1/eikon.eikon")).toThrow(/public catalog URL/)
+    expect(() => publicCatalogUrl("http://169.254.169.254/eikon.eikon")).toThrow(/private host/)
+    expect(() => publicCatalogUrl("http://[::1]/eikon.eikon")).toThrow(/private host/)
+    expect(() => publicCatalogUrl("http://[fe80::1]/eikon.eikon")).toThrow(/private host/)
+    expect(() => publicCatalogUrl("http://[fc00::1]/eikon.eikon")).toThrow(/private host/)
     expect(() => catalogEntry({ name: "bad", source: "../bad/", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/path escape/)
     expect(() => catalogEntry({ name: "bad", preview_url: "https://evil.example/bad.eikon", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/host/)
+  })
+
+  test("rejects unsafe catalog bases before fetching", async () => {
+    const fetcher = async () => {
+      throw new Error("fetch should not run")
+    }
+
+    await expect(loadCatalog("file:///tmp/eikons", fetcher)).rejects.toThrow(/public catalog URL/)
+    await expect(loadCatalog("http://localhost:1234/eikons", fetcher)).rejects.toThrow(/private host/)
+    await expect(loadCatalog("https://eikon.liftaris.dev/eikons/../private", fetcher)).rejects.toThrow(/path escape/)
   })
 
   test("missing trust fields remain absent for compatibility", () => {
@@ -117,7 +131,7 @@ describe("shared catalog contract", () => {
   })
 
   test("browser-safe import avoids host-only install exports", async () => {
-    const cat = await import("../src/catalog")
+    const cat = await import("eikon/catalog")
     expect("searchCatalog" in cat).toBe(true)
     expect("install" in cat).toBe(false)
     expect("resolve" in cat).toBe(false)

@@ -3,7 +3,7 @@ import type { Meta } from "./ui/eikon"
 export const CATALOG_VERSION = 1
 export const DEFAULT_PUBLIC_CATALOG = "https://eikon.liftaris.dev/eikons"
 
-const PRIVATE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"])
+const PRIVATE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"])
 const REVIEWED = new Set(["reviewed", "pending", "unreviewed"])
 
 export type CatalogTrust = {
@@ -64,6 +64,8 @@ type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Re
 const trimSlash = (s: string) => s.replace(/\/$/, "")
 const slash = (s: string) => s.replace(/\/?$/, "/")
 
+const pathEscape = (raw: string) => raw.split(/[?#]/, 1)[0]?.split(/[\\/]/).some(p => p === "..") ?? false
+
 const clean = (v: unknown) => {
   if (typeof v !== "string") return undefined
   return v.replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
@@ -78,18 +80,30 @@ const safeName = (v: unknown, fallback = "unnamed") => clean(v) || fallback
 const safeNum = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : 0
 
 const privateHost = (host: string) => {
-  const h = host.toLowerCase()
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "")
   if (PRIVATE_HOSTS.has(h)) return true
+  if (h.endsWith(".localhost")) return true
   if (/^10\./.test(h)) return true
+  if (/^127\./.test(h)) return true
+  if (/^169\.254\./.test(h)) return true
   if (/^192\.168\./.test(h)) return true
   const m = h.match(/^172\.(\d+)\./)
-  return !!m && Number(m[1]) >= 16 && Number(m[1]) <= 31
+  if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return true
+  if (h.startsWith("fe80:")) return true
+  if (/^f[cd][0-9a-f]{2}:/.test(h)) return true
+  return h.startsWith("::ffff:127.") || h.startsWith("::ffff:10.") || h.startsWith("::ffff:192.168.") || h.startsWith("::ffff:169.254.")
+}
+
+function catalogBaseUrl(base: string, opts: CatalogOptions) {
+  const url = publicCatalogUrl(base, undefined, opts)
+  return trimSlash(url)
 }
 
 export function publicCatalogUrl(raw: string, base?: string, opts: CatalogOptions = {}): string {
   let url: URL
   try { url = new URL(raw, base) }
   catch { throw new Error(`public catalog URL is invalid: ${raw}`) }
+  if (pathEscape(raw)) throw new Error(`public catalog URL path escape: ${url.href}`)
   if (opts.allowPrivate && url.protocol === "file:") return url.href
   if (url.protocol !== "https:" && url.protocol !== "http:")
     throw new Error(`public catalog URL must use http(s): ${url.href}`)
@@ -118,7 +132,8 @@ function entryAssetUrl(raw: unknown, base: string, dir: string, fallback: string
   if (raw.includes("://") || raw.startsWith("/")) return assetUrl(raw, base, fallback, opts)
   if (raw.startsWith("./")) return assetUrl(raw, dir, fallback, opts)
   const prefix = new URL(dir).pathname.replace(new URL(slash(base)).pathname, "").replace(/^\//, "")
-  return assetUrl(raw === prefix || raw.startsWith(prefix) ? `../${raw}` : raw, dir, fallback, opts)
+  const relativeBase = raw === prefix || raw.startsWith(prefix) ? base : dir
+  return assetUrl(raw, relativeBase, fallback, opts)
 }
 
 export function catalogEntry(e: CatalogIndexEntry, base = DEFAULT_PUBLIC_CATALOG, opts: CatalogOptions = {}): CatalogEntry {
@@ -164,7 +179,7 @@ export function searchCatalog(entries: CatalogEntry[], query: string): CatalogEn
 }
 
 export async function loadCatalog(base = DEFAULT_PUBLIC_CATALOG, fetcher: Fetcher = fetch, opts: CatalogOptions = {}): Promise<Catalog> {
-  const root = trimSlash(base)
+  const root = catalogBaseUrl(base, opts)
   const res = await fetcher(`${root}/index.json`)
   if (!res.ok) throw new Error(`catalog: HTTP ${res.status}`)
   const idx = await res.json() as CatalogIndexEntry[]

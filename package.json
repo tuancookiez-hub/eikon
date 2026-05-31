@@ -3,7 +3,10 @@
   "type": "module",
   "license": "MIT",
   "private": true,
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts"
+  },
   "scripts": {
     "browse": "bun run src/browse/main.tsx",
     "sshd": "bun run src/browse/sshd.tsx",
