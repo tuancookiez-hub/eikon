@@ -32,6 +32,17 @@ const entry = {
   raw: { name: "cycle" },
 }
 
+const index = JSON.stringify([{
+  name: "cycle",
+  author: "Kaio",
+  glyph: "⬡",
+  width: 2,
+  height: 1,
+  poster: "A",
+  preview_url: "cycle/cycle.eikon",
+  install_url: "cycle/manifest.json",
+}])
+
 describe("playback primitives", () => {
   test("selects requested clip with idle fallback", () => {
     const doc = parse(raw)
@@ -89,6 +100,7 @@ describe("browser mirror model", () => {
 
   test("loads selected full eikon and advances preview through helpers", async () => {
     const catalog = createWebCatalog({
+      fetch: (async () => new Response(raw)) as unknown as typeof fetch,
       loadCatalog: async () => ({ base: "https://eikon.liftaris.dev/eikons", entries: [entry], load: async () => raw }),
     })
     await catalog.refresh()
@@ -121,6 +133,7 @@ describe("browser mirror model", () => {
 
   test("preview load failures keep catalog usable", async () => {
     const catalog = createWebCatalog({
+      fetch: (async () => new Response("not json")) as unknown as typeof fetch,
       loadCatalog: async () => ({ base: "https://eikon.liftaris.dev/eikons", entries: [entry], load: async () => "not json" }),
     })
     await catalog.refresh()
@@ -157,5 +170,56 @@ describe("browser mirror model", () => {
     await catalog.refresh()
     await expect(catalog.fetchText(entry.previewUrl)).rejects.toThrow(/size limit/)
     expect(catalog.policy()).toEqual({ maxBytes: 20, timeoutMs: 50, concurrency: 1, cacheEntries: 1 })
+  })
+
+  test("default catalog preview fetches enforce the byte policy before parse", async () => {
+    const base = "https://eikon.liftaris.dev/eikons"
+    const catalog = createWebCatalog({
+      base,
+      maxBytes: 20,
+      fetch: (async (input: string | URL | Request) => {
+        const url = String(input)
+        if (url.endsWith("/index.json")) return new Response(index)
+        if (url.endsWith("/cycle/cycle.eikon")) return new Response(raw)
+        return new Response("missing", { status: 404 })
+      }) as unknown as typeof fetch,
+    })
+    await catalog.refresh()
+
+    const loaded = await catalog.preview(catalog.state.entries[0]!.identityKey)
+
+    expect(loaded.status).toBe("error")
+    if (loaded.status !== "error") throw new Error("preview unexpectedly loaded")
+    expect(loaded.error).toMatch(/size limit/)
+  })
+
+  test("default catalog preview fetches enforce timeout and caller cancellation", async () => {
+    const base = "https://eikon.liftaris.dev/eikons"
+    const stalled = (message: string) => (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith("/index.json")) return new Response(index)
+      return new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error(message)), { once: true })
+      })
+    }) as unknown as typeof fetch
+    const timed = createWebCatalog({ base, timeoutMs: 1, fetch: stalled("preview fetch timed out") })
+    await timed.refresh()
+
+    const timeout = await timed.preview(timed.state.entries[0]!.identityKey)
+
+    expect(timeout.status).toBe("error")
+    if (timeout.status !== "error") throw new Error("preview unexpectedly loaded")
+    expect(timeout.error).toMatch(/timed out/)
+
+    const cancelled = createWebCatalog({ base, timeoutMs: 1_000, fetch: stalled("preview fetch cancelled") })
+    await cancelled.refresh()
+    const ctrl = new AbortController()
+    const preview = cancelled.preview(cancelled.state.entries[0]!.identityKey, ctrl.signal)
+    ctrl.abort()
+    const abort = await preview
+
+    expect(abort.status).toBe("error")
+    if (abort.status !== "error") throw new Error("preview unexpectedly loaded")
+    expect(abort.error).toMatch(/cancelled/)
   })
 })

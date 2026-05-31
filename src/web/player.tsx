@@ -166,7 +166,7 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
       state.selectedKey = key
       state.preview = { status: "loading", entry }
       try {
-        const raw = cat ? await cat.load(entry) : await fetchText(entry.previewUrl, signal)
+        const raw = await fetchText(entry.previewUrl, signal)
         const eikon = parse(raw)
         state.preview = { status: "ready", entry, raw, eikon }
       } catch (err) {
