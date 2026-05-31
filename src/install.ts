@@ -11,6 +11,7 @@ import { join, extname, basename } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { STATES, FORMAT_VERSION, DEFAULT_CATALOG, type State } from "./ui/spec"
+import { loadCatalog } from "./catalog"
 import type { Manifest } from "./ui/lint"
 
 export type Role = State | "base"
@@ -30,7 +31,6 @@ export type Resolved = {
 }
 
 export type Installed = Resolved & { dir: string; sources: Sources; n: number; bytes: number }
-
 export type Opts = {
   name?: string
   /** Fetch source media into <dest>/source/. Default true. */
@@ -88,27 +88,19 @@ function checkRequires(spec: string | undefined): void {
   if (!ok) throw new Error(`eikon_requires ${spec}: this build supports format ${cur}`)
 }
 
-type IndexEntry = { name: string; source?: string; [k: string]: unknown }
-
 async function catalog(name: string, url: string): Promise<string> {
-  const base = url.replace(/\/?$/, "/")
-  const res = await fetch(base + "index.json")
-  if (!res.ok) throw new Error(`catalog: HTTP ${res.status}`)
-  const idx = await res.json() as IndexEntry[]
-  const hit = idx.find(e => e.name === name)
+  const cat = await loadCatalog(url, fetch, { allowPrivate: true })
+  const hit = cat.entries.find(e => e.name === name)
   if (!hit) throw new Error(`catalog: no eikon named "${name}"`)
-  // Entry dir sits beside index.json; manifest.json is inside it.
-  return base + (hit.source ?? `${name}/`)
+  return hit.installUrl
 }
 
 export async function resolve(src: string, opts?: Pick<Opts, "catalog">): Promise<Resolved> {
   const at = new Date().toISOString()
 
-  // Bare name → catalog → recurse with the resolved source URL.
   if (!/[\/:]/.test(src))
     return resolve(await catalog(src, opts?.catalog ?? DEFAULT_CATALOG), opts)
 
-  // Local directory.
   const local = src.replace(/^file:\/\//, "")
   if (!gitish(src) && existsSync(local) && statSync(local).isDirectory()) {
     const staged = locate(local)
@@ -116,7 +108,6 @@ export async function resolve(src: string, opts?: Pick<Opts, "catalog">): Promis
     return { name: man.name, manifest: man, staged, origin: { source: src, at } }
   }
 
-  // Git URL.
   if (gitish(src)) {
     const tmp = mkdtempSync(join(tmpdir(), "eikon-"))
     const sha = await clone(src, tmp)
@@ -125,7 +116,6 @@ export async function resolve(src: string, opts?: Pick<Opts, "catalog">): Promis
     return { name: man.name, manifest: man, staged, tmp: true, origin: { source: src, at, sha } }
   }
 
-  // http(s) manifest base.
   if (/^https?:\/\//.test(src)) {
     const base = src.replace(/\/?$/, "/")
     const res = await fetch(base + "manifest.json")

@@ -89,4 +89,14 @@ the header.
 import { parse, serialize, lint, install, peek, STATES } from "eikon"
 ```
 
-See [`src/index.ts`](src/index.ts) for the full export surface.
+For browser-safe catalog consumers, import `eikon/catalog`. For renderer-neutral
+playback helpers, import `eikon/player`. The static discovery mirror for
+`eikon.liftaris.dev` builds with:
+
+```sh
+bun run web:build
+```
+
+The mirror reads the public catalog, filters by eikon name or author, previews
+selected `.eikon` files, and only exposes copyable Herm install/open-detail
+instructions. It has no browser-native publish, auth, or install path.
