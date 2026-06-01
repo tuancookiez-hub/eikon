@@ -112,7 +112,7 @@ export function App() {
     <main>
       <header className="pageHeader">
         <div className="intro">
-          <h1>eikon</h1>
+          <h1>𝝴ikon</h1>
           <p>A terminal avatar format for Herm. Browse the catalog, preview each state, and copy the install command for your local profile.</p>
         </div>
         <dl className="quickGuide" aria-label="How to use eikons">
