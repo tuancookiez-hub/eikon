@@ -10,7 +10,7 @@ const repo = resolve(import.meta.dir, "..")
 test("public page copy stays gallery-focused and avoids placeholder names", () => {
   const html = renderToStaticMarkup(<App />)
 
-  expect(html).toContain("<h1>eikon</h1>")
+  expect(html).toContain("<h1>𝝴ikon</h1>")
   expect(html).toContain("A terminal avatar format for Herm")
   expect(html).toContain("Search by name or author")
   expect(html).toContain("Search catalog")
@@ -107,7 +107,13 @@ test("web build publishes catalog assets and lets eikon paths hit the filesystem
   expect(await Bun.file(join(root, "eikons/ares/ares.eikon")).exists()).toBe(true)
 
   const html = await Bun.file(join(root, "index.html")).text()
-  expect(html).toContain("<title>eikon</title>")
+  expect(html).toContain("<title>𝝴ikon</title>")
+  expect(html).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml" />')
+
+  const favicon = await Bun.file(join(root, "favicon.svg")).text()
+  expect(favicon).toContain("𝝴")
+  expect(favicon).toContain('fill="#050505"')
+  expect(favicon).toContain('fill="#fff"')
 
   const vercel = await Bun.file(join(repo, "vercel.json")).json()
   expect(vercel.rewrites).toBeUndefined()
