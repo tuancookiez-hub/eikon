@@ -16,6 +16,7 @@ export type WebState = {
   selectedKey?: string
   error?: string
   preview: PreviewState
+  previews: Record<string, PreviewState>
 }
 
 export type WebPolicy = {
@@ -38,11 +39,12 @@ export function AsciiPreview(props: { lines: string[] }) {
   return <pre className="ascii" aria-label="Eikon ASCII preview"><span className="asciiArt">{props.lines.join("\n")}</span></pre>
 }
 
-export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPick: () => void }) {
+export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPick: () => void; frame?: string[] }) {
+  const preview = props.frame?.length ? props.frame.join("\n") : props.entry.poster
   return (
     <button type="button" className={props.selected ? "card selected" : "card"} onClick={props.onPick}>
       <span className="cardPreview" aria-hidden="true">
-        <span className="cardPoster">{props.entry.poster}</span>
+        <span className="cardPoster">{preview}</span>
       </span>
       <span className="name">{props.entry.glyph ?? "⬡"} {props.entry.name}</span>
       <span className="meta">{props.entry.author ?? "unknown"}</span>
@@ -103,8 +105,9 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
   const loader = opts.loadCatalog ?? ((base?: string, f?: typeof fetch) => loadCatalog(base, f))
   const limit = new Limiter(policy.concurrency)
   const cache = new Map<string, string>()
+  const inflight = new Map<string, Promise<PreviewState>>()
   let cat: Catalog | undefined
-  const state: WebState = { status: "idle", entries: [], query: "", preview: { status: "idle" } }
+  const state: WebState = { status: "idle", entries: [], query: "", preview: { status: "idle" }, previews: {} }
 
   const put = (key: string, val: string) => {
     if (cache.has(key)) cache.delete(key)
@@ -133,6 +136,35 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
     })
   }
 
+  const entryFor = (key: string) => state.entries.find(e => e.identityKey === key)
+
+  const loadPreview = async (key: string, signal?: AbortSignal): Promise<PreviewState> => {
+    const entry = entryFor(key)
+    if (!entry) return { status: "error", error: "unknown entry" }
+    const ready = state.previews[key]
+    if (ready?.status === "ready") return ready
+    const active = inflight.get(key)
+    if (active) return active
+    state.previews[key] = { status: "loading", entry }
+    const work = (async () => {
+      try {
+        const raw = await fetchText(entry.previewUrl, signal)
+        const eikon = parse(raw)
+        const loaded: PreviewState = { status: "ready", entry, raw, eikon }
+        state.previews[key] = loaded
+        return loaded
+      } catch (err) {
+        const failed: PreviewState = { status: "error", entry, error: err instanceof Error ? err.message : String(err) }
+        state.previews[key] = failed
+        return failed
+      } finally {
+        inflight.delete(key)
+      }
+    })()
+    inflight.set(key, work)
+    return work
+  }
+
   const api = {
     state,
     policy: () => ({ maxBytes: policy.maxBytes, timeoutMs: policy.timeoutMs, concurrency: policy.concurrency, cacheEntries: policy.cacheEntries }),
@@ -155,26 +187,23 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
       return xs
     },
     select(key: string) { state.selectedKey = key },
-    selected() { return state.entries.find(e => e.identityKey === state.selectedKey) },
+    selected() { return entryFor(state.selectedKey ?? "") },
     actions() {
       if (state.status === "error") return ["retry"]
       if (state.preview.status === "error") return ["copy-instructions", "open-herm-detail", "retry-preview"]
       return ["copy-instructions", "open-herm-detail"]
     },
     fetchText,
+    loadPreview,
     async preview(key: string, signal?: AbortSignal): Promise<PreviewState> {
-      const entry = state.entries.find(e => e.identityKey === key)
+      const entry = entryFor(key)
       if (!entry) return { status: "error", error: "unknown entry" }
       state.selectedKey = key
-      state.preview = { status: "loading", entry }
-      try {
-        const raw = await fetchText(entry.previewUrl, signal)
-        const eikon = parse(raw)
-        state.preview = { status: "ready", entry, raw, eikon }
-      } catch (err) {
-        state.preview = { status: "error", entry, error: err instanceof Error ? err.message : String(err) }
-      }
-      return state.preview
+      state.preview = state.previews[key]?.status === "ready" ? state.previews[key]! : { status: "loading", entry }
+      if (state.preview.status === "ready") return state.preview
+      const loaded = await loadPreview(key, signal)
+      if (state.selectedKey === key) state.preview = loaded
+      return loaded
     },
   }
   return api

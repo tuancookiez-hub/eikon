@@ -32,6 +32,7 @@ export function App() {
   }, [])
 
   const matches = catalog.search(query)
+  const visibleKeys = matches.map(e => e.identityKey).join("\0")
   const selected = catalog.selected()
   const preview = catalog.state.preview
   const previewReady = selected && preview.status === "ready" && preview.entry.identityKey === selected.identityKey
@@ -43,6 +44,15 @@ export function App() {
     : catalog.state.status === "error"
       ? "catalog unavailable"
       : `${matches.length}/${catalog.state.entries.length} shown`
+
+  useEffect(() => {
+    if (matches.length === 0) return
+    const ctrl = new AbortController()
+    let live = true
+    void Promise.all(matches.map(entry => catalog.loadPreview(entry.identityKey, ctrl.signal)))
+      .then(() => { if (live) rerender(x => x + 1) })
+    return () => { live = false; ctrl.abort() }
+  }, [catalog, visibleKeys])
 
   const pick = async (entry: CatalogEntry) => {
     setErr("")
@@ -129,7 +139,13 @@ export function App() {
 
       <section className="shell">
         <div className="grid" aria-label="Catalog entries">
-          {matches.map(entry => <EntryCard key={entry.identityKey} entry={entry} selected={selected?.identityKey === entry.identityKey} onPick={() => void pick(entry)} />)}
+          {matches.map(entry => {
+            const cardPreview = catalog.state.previews[entry.identityKey]
+            const cardFrame = cardPreview?.status === "ready"
+              ? playbackFrame(cardPreview.eikon, "idle", fixedClock(tickMs), 0)
+              : undefined
+            return <EntryCard key={entry.identityKey} entry={entry} frame={cardFrame} selected={selected?.identityKey === entry.identityKey} onPick={() => void pick(entry)} />
+          })}
         </div>
 
         <aside className={`detail drawer-${drawerState}`} aria-label="Preview and instructions" data-drawer-state={drawerState}>

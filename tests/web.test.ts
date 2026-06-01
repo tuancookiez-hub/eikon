@@ -112,6 +112,22 @@ describe("browser catalog model", () => {
     expect(playbackFrame(loaded.eikon, "idle", fixedClock(1000), 0)).toEqual(["C"])
   })
 
+  test("loads gallery previews without selecting entries", async () => {
+    const catalog = createWebCatalog({
+      fetch: (async () => new Response(raw)) as unknown as typeof fetch,
+      loadCatalog: async () => ({ base: "https://eikon.liftaris.dev/eikons", entries: [entry], load: async () => raw }),
+    })
+    await catalog.refresh()
+
+    const loaded = await catalog.loadPreview(entry.identityKey)
+
+    expect(catalog.selected()).toBeUndefined()
+    expect(loaded.status).toBe("ready")
+    if (loaded.status !== "ready") throw new Error("preview not ready")
+    expect(playbackFrame(loaded.eikon, "idle", fixedClock(1000), 0)).toEqual(["C"])
+    expect(catalog.state.previews[entry.identityKey]?.status).toBe("ready")
+  })
+
   test("catalog load failure exposes retry state without install or auth actions", async () => {
     const catalog = createWebCatalog({
       loadCatalog: async () => { throw new Error("network down") },

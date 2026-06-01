@@ -48,25 +48,27 @@ test("install instructions use Herm instead of the standalone eikon executable",
   expect(instructions.command).not.toStartWith("eikon install ")
 })
 
+const cardEntry = {
+  name: "ares",
+  author: "kaio",
+  glyph: "⚔",
+  width: 48,
+  height: 24,
+  w: 48,
+  h: 24,
+  poster: "STATIC",
+  trust: {},
+  previewUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
+  installUrl: "https://eikon.liftaris.dev/eikons/ares/",
+  sourceKey: "https://eikon.liftaris.dev/eikons/ares/",
+  identityKey: "ares-id",
+  raw: { name: "ares" },
+}
+
 test("catalog cards omit fixed dimensions", () => {
   const html = renderToStaticMarkup(
     <EntryCard
-      entry={{
-        name: "ares",
-        author: "kaio",
-        glyph: "⚔",
-        width: 48,
-        height: 24,
-        w: 48,
-        h: 24,
-        poster: "██",
-        trust: {},
-        previewUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
-        installUrl: "https://eikon.liftaris.dev/eikons/ares/",
-        sourceKey: "https://eikon.liftaris.dev/eikons/ares/",
-        identityKey: "ares-id",
-        raw: { name: "ares" },
-      }}
+      entry={cardEntry}
       selected={false}
       onPick={() => {}}
     />,
@@ -74,6 +76,20 @@ test("catalog cards omit fixed dimensions", () => {
 
   expect(html).toContain("kaio")
   expect(html).not.toContain("48×24")
+})
+
+test("catalog cards render streaming idle frames when available", () => {
+  const html = renderToStaticMarkup(
+    <EntryCard
+      entry={cardEntry}
+      selected={false}
+      onPick={() => {}}
+      frame={["LIVE"]}
+    />,
+  )
+
+  expect(html).toContain("LIVE")
+  expect(html).not.toContain("STATIC")
 })
 
 test("web build publishes catalog assets and lets eikon paths hit the filesystem", async () => {
