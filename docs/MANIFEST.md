@@ -29,9 +29,10 @@ standalone eikon repo). The packed `.eikon`'s header carries
 | `version` | int | no | Avatar content revision. Informational. |
 | `eikon_requires` | string | no | Minimum `.eikon` format version (`>=N`, `==N`). `install()` refuses on mismatch. |
 | `source` | string | no | Still portrait, relative to manifest dir. Becomes `base.<ext>` on install. |
-| `license` | string | submit | SPDX/license string. May be supplied transiently by the submit caller instead of written to the manifest. |
-| `provenance` | string | submit | Human-readable source/provenance note. May be supplied transiently by the submit caller instead of written to the manifest. |
 | `states.<k>.file` | string | per | Clip path, relative to manifest dir. `<k>` ∈ the six reserved states. Becomes `<k>.<ext>` on install. |
+
+License/provenance are not manifest fields. Submission can receive them as
+transient caller options or derive them from packed/catalog trust metadata.
 
 ## Review bundle contract
 
@@ -41,7 +42,7 @@ Submitting an eikon for registry review builds a bounded allowlisted bundle unde
 - packed `<name>.eikon`
 - `manifest.json` when present
 - only source files referenced by `manifest.source` or `manifest.states.*.file`
-- submit license and provenance
+- license/provenance supplied outside the manifest for review metadata
 - generated catalog fields: name, author, glyph, dimensions, poster, pending
   review status, preview/install URLs, and trust metadata
 

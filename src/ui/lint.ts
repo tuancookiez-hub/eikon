@@ -145,8 +145,6 @@ export type Manifest = {
   version: number
   eikon_requires?: string
   source?: string
-  license?: string
-  provenance?: string
   states: Partial<Record<State, { file: string }>>
   origin?: Origin
 }
@@ -163,6 +161,7 @@ export function lintManifest(path: string, raw: string, registry = false): Manif
   const errs: string[] = []
   if (!NAME_RE.test(man.name)) errs.push(`name "${man.name}" must match ${NAME_RE}`)
   if (basename(dir) !== man.name) errs.push(`name "${man.name}" ≠ folder "${basename(dir)}"`)
+  if ("license" in man || "provenance" in man) errs.push("manifest must not contain license or provenance")
   if (man.source) {
     rel("source", man.source, errs)
     const p = join(dir, man.source)

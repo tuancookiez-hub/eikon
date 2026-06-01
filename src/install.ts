@@ -189,7 +189,10 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
     sources[role] = fname; tick()
   }))
 
-  const out = { ...r.manifest, origin: r.origin }
+  const clean = { ...(r.manifest as Manifest & { license?: unknown; provenance?: unknown }) }
+  delete clean.license
+  delete clean.provenance
+  const out = { ...clean, origin: r.origin }
   writeFileSync(join(dst, "manifest.json"), JSON.stringify(out, null, 2) + "\n")
 
   if (r.tmp) rmSync(r.staged, { recursive: true, force: true })

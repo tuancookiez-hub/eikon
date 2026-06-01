@@ -118,6 +118,19 @@ describe("previewReviewBundle", () => {
     await expect(previewReviewBundle({ path: fx.file })).rejects.toThrow(/states.idle.file: missing.mp4 missing/)
   })
 
+  test("rejects license and provenance in source manifests", async () => {
+    const fx = seed({ license: "MIT", provenance: "human-made" })
+    writeFileSync(join(fx.root, "manifest.json"), JSON.stringify({
+      name: "demo",
+      version: 1,
+      license: "MIT",
+      provenance: "made by Kaio",
+      states: { idle: { file: "missing.mp4" } },
+    }))
+
+    await expect(previewReviewBundle({ path: fx.file })).rejects.toThrow(/manifest must not contain license or provenance/)
+  })
+
   test("classifies missing referenced files as missing-source", async () => {
     const fx = seed({ license: "MIT", provenance: "human-made" })
     writeFileSync(join(fx.root, "manifest.json"), JSON.stringify({
