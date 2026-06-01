@@ -1,8 +1,7 @@
 /** @jsxImportSource react */
 import type { CatalogEntry } from "../catalog"
 import { loadCatalog, publicCatalogUrl, searchCatalog, type Catalog } from "../catalog"
-import { fixedClock } from "../player/clock"
-import { playbackFrame } from "../player/model"
+import { stateClip } from "../player/model"
 import { parse, type Eikon } from "../ui/eikon"
 
 export type PreviewState =
@@ -55,7 +54,17 @@ export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPic
 }
 
 export function webPlaybackFrame(eikon: Eikon, state: string, tickMs: number, startedAtMs = 0): string[] {
-  return playbackFrame(eikon, state, fixedClock(tickMs), startedAtMs)
+  const clip = stateClip(eikon, state)
+  const n = clip?.frames.length ?? 0
+  if (!clip || n === 0) return []
+  if (n === 1) return clip.frames[0] ?? []
+  const fps = clip.fps > 0 ? clip.fps : 12
+  const raw = Math.max(0, Math.floor(Math.max(0, tickMs - startedAtMs) / (1000 / fps)))
+  if (raw < n) return clip.frames[raw] ?? []
+  if (clip.loopFrom >= n) return clip.frames[raw % n] ?? []
+  const loopStart = Math.max(0, Math.min(clip.loopFrom, n - 1))
+  const loopLen = n - loopStart
+  return clip.frames[loopStart + ((raw - loopStart) % loopLen)] ?? []
 }
 
 export function previewError(preview: PreviewState): string | undefined {

@@ -84,10 +84,11 @@ describe("playback primitives", () => {
     expect(playbackFrame(doc, "idle", clock, 1000)).toEqual(["B"])
   })
 
-  test("web preview playback restarts from state selection time", () => {
+  test("web preview playback restarts from state selection time and loops play-once clips", () => {
     const doc = parse(raw)
     expect(webPlaybackFrame(doc, "error", 1750, 0)).toEqual(["Y"])
     expect(webPlaybackFrame(doc, "error", 1750, 1700)).toEqual(["X"])
+    expect(webPlaybackFrame(doc, "error", 2250, 1700)).toEqual(["X"])
   })
 })
 
