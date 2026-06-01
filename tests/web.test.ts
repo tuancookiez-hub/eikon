@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 import { parse } from "../src/ui/eikon"
 import { frameAt, playbackFrame, stateClip } from "../src/player/model"
 import { fixedClock, manualClock, systemClock, type Clock } from "../src/player/clock"
-import { browserInstructions, createWebCatalog, safeHermUrl, webPlaybackFrame } from "../src/web/player"
+import { browserInstructions, createWebCatalog, webPlaybackFrame } from "../src/web/player"
 
 const raw = [
   JSON.stringify({ eikon: 1, name: "cycle", width: 2, height: 1, states: ["idle", "error"] }),
@@ -165,18 +165,17 @@ describe("browser catalog model", () => {
     const loaded = await catalog.preview(entry.identityKey)
     expect(loaded.status).toBe("error")
     expect(catalog.search("cycle").map(e => e.name)).toEqual(["cycle"])
-    expect(catalog.actions()).toEqual(["copy-instructions", "open-herm-detail", "retry-preview"])
+    expect(catalog.actions()).toEqual(["copy-instructions", "retry-preview"])
   })
 
-  test("instructions and Herm URLs reject dangerous schemes and stay discovery-only", () => {
+  test("instructions reject dangerous schemes and stay discovery-only", () => {
     const safe = browserInstructions(entry)
     expect(safe.command).toContain("eikon install")
     expect(safe.command).toContain(entry.installUrl)
     expect(safe.manual).toContain(entry.previewUrl)
-    expect(safeHermUrl(entry)).toBe("herm://eikon/detail?url=https%3A%2F%2Feikon.liftaris.dev%2Feikons%2Fcycle%2Fmanifest.json")
     expect(() => browserInstructions({ ...entry, installUrl: "javascript:alert(1)" })).toThrow(/unsafe/)
-    expect(() => safeHermUrl({ ...entry, installUrl: "file:///tmp/x" })).toThrow(/unsafe/)
-    expect(safe.command).not.toMatch(/publish|auth|login|token|use /)
+    expect(safe).not.toHaveProperty("hermUrl")
+    expect(safe.command).not.toMatch(/publish|auth|login|token|use |herm:\/\//)
   })
 
   test("fetch policy enforces timeout, byte, concurrency, and cache limits", async () => {
