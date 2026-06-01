@@ -3,9 +3,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react"
 import type { CatalogEntry } from "../catalog"
 import { DEFAULT_PUBLIC_CATALOG, loadCatalog } from "../catalog"
 import { STATES } from "../ui/eikon"
-import { fixedClock } from "../player/clock"
-import { playbackFrame } from "../player/model"
-import { AsciiPreview, EntryCard } from "./player"
+import { AsciiPreview, EntryCard, webPlaybackFrame } from "./player"
 import { browserInstructions, createWebCatalog, type PreviewState } from "./player"
 
 const queryDefault = new URLSearchParams(globalThis.location?.search ?? "").get("catalog") ?? DEFAULT_PUBLIC_CATALOG
@@ -17,6 +15,9 @@ export function App() {
   const [query, setQuery] = useState("")
   const [state, setState] = useState("idle")
   const [tickMs, setTickMs] = useState(0)
+  const tickRef = useRef(0)
+  tickRef.current = tickMs
+  const [previewStartedAtMs, setPreviewStartedAtMs] = useState(0)
   const [copied, setCopied] = useState("")
   const [err, setErr] = useState("")
   const [drawerMode, setDrawerMode] = useState<DrawerMode>("collapsed")
@@ -36,7 +37,7 @@ export function App() {
   const selected = catalog.selected()
   const preview = catalog.state.preview
   const previewReady = selected && preview.status === "ready" && preview.entry.identityKey === selected.identityKey
-  const frame = previewReady ? playbackFrame(preview.eikon, state, fixedClock(tickMs), 0) : []
+  const frame = previewReady ? webPlaybackFrame(preview.eikon, state, tickMs, previewStartedAtMs) : []
   const instructions = selected ? browserInstructions(selected) : undefined
   const drawerState: DrawerMode = selected ? drawerMode === "collapsed" ? "peek" : drawerMode : "collapsed"
   const statusLabel = catalog.state.status === "loading"
@@ -61,7 +62,13 @@ export function App() {
     setDrawerMode("peek")
     rerender(x => x + 1)
     await catalog.preview(entry.identityKey)
+    setPreviewStartedAtMs(tickRef.current)
     rerender(x => x + 1)
+  }
+
+  const chooseState = (next: string) => {
+    setState(next)
+    setPreviewStartedAtMs(tickRef.current)
   }
 
   const copy = async (text: string, label: string) => {
@@ -142,7 +149,7 @@ export function App() {
           {matches.map(entry => {
             const cardPreview = catalog.state.previews[entry.identityKey]
             const cardFrame = cardPreview?.status === "ready"
-              ? playbackFrame(cardPreview.eikon, "idle", fixedClock(tickMs), 0)
+              ? webPlaybackFrame(cardPreview.eikon, "idle", tickMs, 0)
               : undefined
             return <EntryCard key={entry.identityKey} entry={entry} frame={cardFrame} selected={selected?.identityKey === entry.identityKey} onPick={() => void pick(entry)} />
           })}
@@ -163,7 +170,7 @@ export function App() {
             <span className="drawerCue">{selected ? drawerState === "expanded" ? "collapse" : "expand" : "collapsed"}</span>
           </button>
           <div className="detailBody">
-            {selected ? <Preview selected={selected} preview={preview} frame={frame} state={state} setState={setState} /> : <p className="muted">Select an eikon to preview it.</p>}
+            {selected ? <Preview selected={selected} preview={preview} frame={frame} state={state} setState={chooseState} /> : <p className="muted">Select an eikon to preview it.</p>}
             <div className="drawerExtras">
               {instructions ? (
                 <div className="instructions">

@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 import { parse } from "../src/ui/eikon"
 import { frameAt, playbackFrame, stateClip } from "../src/player/model"
 import { fixedClock, manualClock, systemClock, type Clock } from "../src/player/clock"
-import { browserInstructions, createWebCatalog, safeHermUrl } from "../src/web/player"
+import { browserInstructions, createWebCatalog, safeHermUrl, webPlaybackFrame } from "../src/web/player"
 
 const raw = [
   JSON.stringify({ eikon: 1, name: "cycle", width: 2, height: 1, states: ["idle", "error"] }),
@@ -82,6 +82,12 @@ describe("playback primitives", () => {
     const doc = parse(raw)
     const clock: Clock = fixedClock(1750)
     expect(playbackFrame(doc, "idle", clock, 1000)).toEqual(["B"])
+  })
+
+  test("web preview playback restarts from state selection time", () => {
+    const doc = parse(raw)
+    expect(webPlaybackFrame(doc, "error", 1750, 0)).toEqual(["Y"])
+    expect(webPlaybackFrame(doc, "error", 1750, 1700)).toEqual(["X"])
   })
 })
 

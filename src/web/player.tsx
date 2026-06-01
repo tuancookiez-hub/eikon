@@ -1,6 +1,8 @@
 /** @jsxImportSource react */
 import type { CatalogEntry } from "../catalog"
 import { loadCatalog, publicCatalogUrl, searchCatalog, type Catalog } from "../catalog"
+import { fixedClock } from "../player/clock"
+import { playbackFrame } from "../player/model"
 import { parse, type Eikon } from "../ui/eikon"
 
 export type PreviewState =
@@ -50,6 +52,10 @@ export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPic
       <span className="meta">{props.entry.author ?? "unknown"}</span>
     </button>
   )
+}
+
+export function webPlaybackFrame(eikon: Eikon, state: string, tickMs: number, startedAtMs = 0): string[] {
+  return playbackFrame(eikon, state, fixedClock(tickMs), startedAtMs)
 }
 
 export function previewError(preview: PreviewState): string | undefined {
