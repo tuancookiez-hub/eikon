@@ -21,6 +21,24 @@ const MAIN = resolve(import.meta.dir, "./main.tsx")
 if (!existsSync(KEY))
   spawnSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", KEY])
 
+function pipeStream(
+  stream: ReadableStream<Uint8Array>,
+  write: (chunk: Uint8Array) => void,
+) {
+  ;(async () => {
+    const reader = stream.getReader()
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) write(value)
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  })()
+}
+
 const server = new Server({ hostKeys: [await Bun.file(KEY).text()] }, conn => {
   conn.on("authentication", ctx => ctx.accept())
   conn.on("error", () => {})
@@ -48,8 +66,8 @@ const server = new Server({ hostKeys: [await Bun.file(KEY).text()] }, conn => {
       // chan → child.stdin (keystrokes), child.stdout → chan (frames),
       // child.stderr → chan.stderr (picks).
       chan.on("data", (b: Buffer) => { proc.stdin.write(b); proc.stdin.flush() })
-      ;(async () => { for await (const b of proc.stdout) chan.write(b) })()
-      ;(async () => { for await (const b of proc.stderr) chan.stderr.write(b) })()
+      pipeStream(proc.stdout, b => chan.write(b))
+      pipeStream(proc.stderr, b => chan.stderr.write(b))
 
       proc.exited.then(code => { chan.exit(code ?? 0); chan.end() })
       const down = () => { child?.kill(); child = null }

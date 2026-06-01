@@ -54,6 +54,18 @@ describe("resolve + install: local dir", () => {
     expect(m.origin.source).toBe(src)
   })
 
+  test("install() strips trust metadata from persisted manifest", async () => {
+    const withTrust = join(root, "local-trust")
+    seed(withTrust, "trusty", { license: "MIT", provenance: "made by Kaio" })
+
+    const out = await install(withTrust, dest)
+    const m = JSON.parse(readFileSync(join(out.dir, "manifest.json"), "utf8"))
+
+    expect(m.license).toBeUndefined()
+    expect(m.provenance).toBeUndefined()
+    expect(m.origin.source).toBe(withTrust)
+  })
+
   test("--no-source skips media but still writes manifest", async () => {
     const out = await install(src, dest, { name: "ares-lite", media: false })
     expect(out.n).toBe(3); expect(out.bytes).toBe(0)

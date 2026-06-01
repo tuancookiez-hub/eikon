@@ -47,6 +47,40 @@ States appear in the recommended display order.
 | `created`  | string | no       | ISO 8601 creation timestamp.         |
 | `source_url` | string | no     | Base URL of this eikon's `manifest.json` + media. See `docs/MANIFEST.md`. Absent ⇒ no editable source. |
 | `description` | string | no   | Human-readable description.          |
+| `provenance` | string | no    | Human-authored source/provenance note. |
+| `review_status` | string | no | Registry trust state (`reviewed`, `pending`, or `unreviewed`). |
+
+## Catalog contract
+
+The public catalog is an `index.json` array of cheap entries. Entries include
+poster and metadata only; consumers load the full `.eikon` body lazily from
+`preview_url` when the item is focused, previewed, or installed.
+
+V1 entries preserve the legacy fields `name`, `author`, `glyph`, `w`, `h`,
+`poster`, and optional `source`. New consumers should normalize through the
+shared `src/catalog.ts` client, which exposes:
+
+- `identityKey`: stable entry identity. It is the normalized source directory
+  when available; name-only matching is only a compatibility fallback.
+- `sourceKey`: normalized source directory for install-state/collision checks.
+- `previewUrl`: full `.eikon` body URL.
+- `installUrl`: manifest/source base used by install resolution.
+- `provenanceUrl`: human/source provenance URL, distinct from preview and
+  install URLs.
+- `trust`: optional `license`, `provenance`, and `reviewStatus` metadata.
+
+Name/author search is a pure case-insensitive helper over normalized entries.
+Missing trust fields remain absent for old catalog compatibility.
+
+Public catalog URLs must use `http` or `https`, stay under the catalog asset
+root, and must not target localhost, private network hosts, `file:` URLs, or
+parent/root path escapes. Registry-local tooling may opt into private/file URLs
+for local tests only.
+
+Catalog strings are untrusted. The shared normalizer strips terminal control
+characters from scalar metadata and leaves HTML-sensitive characters intact;
+terminal and browser renderers must still escape text in their own output
+contexts rather than injecting normalized strings as markup.
 
 ## State Declaration
 

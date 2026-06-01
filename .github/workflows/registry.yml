@@ -13,13 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
       - run: bun install
       - run: |
           set -e
           for f in $(git diff --name-only origin/main...HEAD -- 'eikons/*/*.eikon' 'eikons/*/manifest.json'); do
-            bun src/cli.tsx lint "$f"
+            bun src/cli.tsx lint --registry "$f"
           done
+          EIKON_REGISTRY=1 bun src/cli.tsx index
+          git diff --exit-code -- eikons/index.json 'eikons/*/*.eikon'
 
   index:
     if: github.event_name == 'push'

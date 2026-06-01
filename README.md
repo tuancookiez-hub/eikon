@@ -65,12 +65,14 @@ Studio tab.
 ## Publish one
 
 ```sh
-eikon publish mine.eikon   # opens a PR: eikons/mine/mine.eikon
+eikon publish mine.eikon --license MIT --provenance "made by Kaio"
 ```
 
-PR source media to `eikons/<name>/` alongside it. CI lints both; on merge,
-`eikon index` regenerates `eikons/index.json` and stamps `source_url` into
-the header.
+This submits a review bundle to `eikons/<name>/`: the packed `.eikon`,
+`manifest.json` when present, referenced source files, license, provenance, and
+catalog metadata. The CLI previews and allowlists bundle paths, skips hidden or
+secret-like extras by default, rejects path/symlink escapes, and reports setup
+or validation errors before creating the review request.
 
 ## States
 
@@ -89,4 +91,37 @@ the header.
 import { parse, serialize, lint, install, peek, STATES } from "eikon"
 ```
 
-See [`src/index.ts`](src/index.ts) for the full export surface.
+For browser-safe catalog consumers, import `eikon/catalog`. For renderer-neutral
+playback helpers, import `eikon/player`.
+
+## Browser gallery and launch gate
+
+The static catalog gallery builds with:
+
+```sh
+bun run web:build
+```
+
+The page is discovery-only: it reads the public catalog, filters by eikon name
+or author, previews selected `.eikon` files, and exposes copyable Herm
+install/open-detail instructions. It has no browser-native publish, auth,
+install, or activation path. Install/use/publish happen in Herm or through the
+`eikon` CLI.
+
+Before promoting `eikon.liftaris.dev`, verify:
+
+- the Vercel project is owned from this repo and serves `dist/web` from the
+  `main` branch build
+- DNS maps `eikon.liftaris.dev` to that Vercel project, not another repo or
+  deployment
+- `/eikons/index.json`, posters, manifests, and packed `.eikon` assets are
+  hosted by the eikon registry path with `Access-Control-Allow-Origin: *`
+- catalog JSON uses a short revalidation cache, while packed assets/posters can
+  use long immutable cache headers
+- staging and production smoke both load the catalog, preview an eikon, and keep
+  the page limited to copy instructions and Herm detail links
+
+Repo ownership is split deliberately: eikon owns the registry, gallery, catalog
+client, install resolver, publish preflight, and shared player primitives; Herm
+owns the native Marketplace UI, local install/use state, sidebar preview, and
+submit dialog.
