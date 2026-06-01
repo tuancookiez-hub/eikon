@@ -82,11 +82,6 @@ export function safePublicUrl(raw: string): string {
   }
 }
 
-export function safeHermUrl(entry: CatalogEntry): string {
-  const url = safePublicUrl(entry.installUrl || entry.previewUrl)
-  return `herm://eikon/detail?url=${encodeURIComponent(url)}`
-}
-
 export function browserInstructions(entry: CatalogEntry) {
   const install = safePublicUrl(entry.installUrl || entry.previewUrl)
   const preview = safePublicUrl(entry.previewUrl)
@@ -95,7 +90,6 @@ export function browserInstructions(entry: CatalogEntry) {
   return {
     command,
     manual: `Preview file: ${preview}`,
-    hermUrl: safeHermUrl(entry),
   }
 }
 
@@ -205,8 +199,8 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
     selected() { return entryFor(state.selectedKey ?? "") },
     actions() {
       if (state.status === "error") return ["retry"]
-      if (state.preview.status === "error") return ["copy-instructions", "open-herm-detail", "retry-preview"]
-      return ["copy-instructions", "open-herm-detail"]
+      if (state.preview.status === "error") return ["copy-instructions", "retry-preview"]
+      return ["copy-instructions"]
     },
     fetchText,
     loadPreview,

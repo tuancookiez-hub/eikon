@@ -20,6 +20,8 @@ test("public page copy stays gallery-focused and avoids placeholder names", () =
   expect(html).not.toMatch(/\bmirror\b/i)
   expect(html).toContain("<code>herm eikon install &lt;url&gt;</code>")
   expect(html).not.toContain("<code>eikon install &lt;url&gt;</code>")
+  expect(html).not.toContain("Open Herm detail")
+  expect(html).not.toContain("herm://")
   expect(html).not.toContain("eikon.liftaris.dev")
   expect(html).not.toMatch(/ares,\s*kaio|kaio,\s*nous|nous…/i)
 })
@@ -46,6 +48,7 @@ test("install instructions use Herm instead of the standalone eikon executable",
 
   expect(instructions.command).toBe("herm eikon install https://eikon.liftaris.dev/eikons/ares/")
   expect(instructions.command).not.toStartWith("eikon install ")
+  expect(instructions).not.toHaveProperty("hermUrl")
 })
 
 const cardEntry = {
