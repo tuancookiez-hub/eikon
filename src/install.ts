@@ -11,6 +11,7 @@ import { join, extname, basename } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { STATES, FORMAT_VERSION, DEFAULT_CATALOG, type State } from "./ui/spec"
+import { loadCatalogEntries } from "./catalog"
 import type { Manifest } from "./ui/lint"
 
 export type Role = State | "base"
@@ -88,16 +89,20 @@ function checkRequires(spec: string | undefined): void {
   if (!ok) throw new Error(`eikon_requires ${spec}: this build supports format ${cur}`)
 }
 
-type IndexEntry = { name: string; source?: string; [k: string]: unknown }
+type IndexEntry = { name: string; source?: string; packageUrl?: string; installUrl?: string; [k: string]: unknown }
 
 async function catalog(name: string, url: string): Promise<string> {
   const base = url.replace(/\/?$/, "/")
+  const entries = await loadCatalogEntries(base)
+  const entry = entries.find(e => e.name === name || e.id === name)
+  if (entry) return (entry.installUrl ?? entry.packageUrl).replace(/manifest\.json$/, "")
+
   const res = await fetch(base + "index.json")
   if (!res.ok) throw new Error(`catalog: HTTP ${res.status}`)
   const idx = await res.json() as IndexEntry[]
   const hit = idx.find(e => e.name === name)
   if (!hit) throw new Error(`catalog: no eikon named "${name}"`)
-  // Entry dir sits beside index.json; manifest.json is inside it.
+  if (typeof hit.packageUrl === "string") return new URL(hit.packageUrl, base).href.replace(/manifest\.json$/, "")
   return base + (hit.source ?? `${name}/`)
 }
 

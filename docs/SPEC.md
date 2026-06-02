@@ -1,151 +1,178 @@
-# .eikon File Format Specification
+# Eikon Launch Contract
 
-**Version:** 1
-**Status:** Draft
-**Media Type:** `application/x-eikon`
-**Extension:** `.eikon`
+**Version:** 2.0 launch contract
+**Status:** Draft for launch implementation
+**Stream media type:** `application/vnd.eikon.stream+jsonl`
+**Launch stream extension:** `.eikonl`
+**Legacy extension:** `.eikon` v1 compatibility input
 
-## Overview
+This document defines the release contract that browser gallery, registry tooling, Herm marketplace, and future hosts consume. Legacy `.eikon` v1 remains readable through an explicit compatibility/migration path; its implicit NDJSON quirks do not define the launch format.
 
-`.eikon` is a text-based file format for stateful ASCII animation. It encodes
-named animation states (e.g. idle, thinking, speaking) each containing a
-sequence of ASCII art frames with per-state and per-frame metadata.
+## Contract split
 
-Unlike terminal recordings (`.cast`), `.eikon` files are authored content with
-first-class support for behavioral states, looping, and frame-level control.
+Eikon launch uses four separate shapes:
 
-## Format
+1. **Stream/document**: line-oriented rendering data. It is enough to play an eikon without registry or platform state.
+2. **Package manifest**: package-local entrypoints, files, compatibility, source media, poster/preview assets, signal mappings, fallback rules, and optional extension declarations.
+3. **Registry/catalog entry**: cheap, normalized, browser-safe discovery metadata with stable identity/source keys and URLs to package/detail assets.
+4. **Platform metadata**: mutable or policy data such as review state, provenance text, license display, download counts, likes, moderation, and account data.
 
-NDJSON (newline-delimited JSON). Each line is a self-contained JSON object.
-UTF-8 encoded. Lines are separated by `\n` (LF).
+Local rendering must not depend on catalog or platform metadata. Catalog and platform fields may help users find, trust, or install an eikon, but they do not mutate artifact bytes.
 
-## Structure
+## Stream/document shape
 
-```
-line 1:      header
-line 2..N:   state declarations and frame data (interleaved)
-```
+A launch stream is UTF-8 NDJSON. Every line is a typed record with a `type` field. Unknown fields are ignored unless required by an unsupported required extension.
 
-A state declaration is always followed by its frames in order.
-States appear in the recommended display order.
-
-## Header (line 1)
-
-```json
-{"eikon":1,"name":"nous","width":48,"height":24,"author":"kaio","license":"MIT","created":"2026-04-14T23:02:15Z"}
-```
-
-| Field      | Type   | Required | Description                          |
-|------------|--------|----------|--------------------------------------|
-| `eikon`    | int    | yes      | Format version. Currently `1`.       |
-| `name`     | string | yes      | Avatar/animation name.               |
-| `width`    | int    | yes      | Frame width in columns.              |
-| `height`   | int    | yes      | Frame height in rows.                |
-| `glyph`    | string | no       | Single grapheme; inline stand-in.    |
-| `author`   | string | no       | Creator name or handle.              |
-| `license`  | string | no       | License identifier (SPDX).           |
-| `created`  | string | no       | ISO 8601 creation timestamp.         |
-| `source_url` | string | no     | Base URL of this eikon's `manifest.json` + media. See `docs/MANIFEST.md`. Absent ⇒ no editable source. |
-| `description` | string | no   | Human-readable description.          |
-
-## State Declaration
-
-```json
-{"state":"idle","fps":8,"color":"#7aa2f7","frame_count":48,"loop":true}
-```
-
-| Field         | Type   | Required | Description                                |
-|---------------|--------|----------|--------------------------------------------|
-| `state`       | string | yes      | State name. Unique within the file.        |
-| `fps`         | number | yes      | Playback frame rate for this state.        |
-| `color`       | string | no       | Default display color (hex).               |
-| `frame_count` | int    | yes      | Number of frame lines that follow.         |
-| `loop_from`   | int    | no       | First frame of the loop segment. See below.|
-| `loop`        | bool   | no       | Deprecated alias: `false` ⇔ `loop_from: frame_count`. |
-
-### `loop_from`
-
-Splits the state's frames into an **intro** (`0 .. loop_from-1`) played once,
-and a **loop** (`loop_from .. frame_count-1`) repeated indefinitely.
-
-| Value                 | Behavior                                        |
-|-----------------------|-------------------------------------------------|
-| absent or `0`         | Loop the whole sequence (no intro).             |
-| `0 < N < frame_count` | Play intro `0..N-1` once, then loop `N..end`.   |
-| `N == frame_count`    | Play once, hold the last frame. No loop.        |
-
-This maps directly to the common `start.mp4` + `loop.mp4` authoring pattern:
-concatenate both clips' frames into one state and set `loop_from` to the
-intro's frame count.
-
-## Frame
-
-```json
-{"f":0,"data":"line1\nline2\nline3\n..."}
-```
-
-| Field     | Type   | Required | Description                                      |
-|-----------|--------|----------|--------------------------------------------------|
-| `f`       | int    | yes      | Frame index (0-based, sequential).               |
-| `data`    | string | yes      | Frame content. Lines joined by `\n`.             |
-| `pause`   | number | no       | Reserved. Players MAY ignore.                    |
-| `color`   | string | no       | Reserved. Players MAY ignore.                    |
-
-### Frame Ordering
-
-Frames MUST appear in order (`f`: 0, 1, 2, ...) immediately after their
-parent state declaration. `frame_count` in the state MUST match the number
-of frame lines that follow.
-
-## Example
+Minimal stream:
 
 ```jsonl
-{"eikon":1,"name":"nous","width":48,"height":24,"author":"kaio","glyph":"⬡"}
-{"state":"idle","fps":16,"frame_count":3,"loop_from":0}
-{"f":0,"data":"     .---.\n    ( o.o )\n     |   |\n     '---'"}
-{"f":1,"data":"     .---.\n    ( o.o )\n     | - |\n     '---'"}
-{"f":2,"data":"     .---.\n    ( o.o )\n     |   |\n     '---'"}
-{"state":"error","fps":12,"frame_count":2,"loop_from":0}
-{"f":0,"data":"     .---.\n    ( x.x )\n     |   |\n     '---'"}
-{"f":1,"data":"     .---.\n    ( X.X )\n     | ! |\n     '---'"}
+{"type":"header","asset":{"version":"2.0","minVersion":"2.0","width":48,"height":24,"mediaType":"application/vnd.eikon.stream+jsonl"},"name":"nous","glyph":"⬡"}
+{"type":"clip","name":"idle","fps":16,"frameCount":1,"loopFrom":0}
+{"type":"frame","clip":"idle","index":0,"rows":["                                                "]}
 ```
 
-## Playback Rules
+### `header`
 
-1. **Loop:** After the last frame, playback returns to `loop_from` (default
-   `0`). If `loop_from == frame_count`, playback holds the last frame.
-2. **Pause:** When a frame has `pause`, the player holds that frame for the
-   specified duration (in seconds) before advancing. This is additive to the
-   normal frame timing from `fps`.
-3. **State switching:** The consumer controls which state is active. Switching
-   states restarts playback from frame 0 of the new state — the intro always
-   plays on state entry.
-4. **Color precedence:** Frame `color` > State `color` > consumer default.
+```ts
+type HeaderRecord = {
+  type: "header"
+  asset: {
+    version: string
+    minVersion?: string
+    width: number
+    height: number
+    mediaType?: "application/vnd.eikon.stream+jsonl"
+  }
+  name?: string
+  glyph?: string
+  extensions?: {
+    used?: string[]
+    required?: string[]
+  }
+}
+```
 
-## Reserved State Names
+- `asset.version` is the stream contract version. Launch uses `2.0`.
+- `asset.width` and `asset.height` define every frame's grid dimensions.
+- `name` and `glyph` are render-adjacent hints only. Author, license, provenance, review, install, and source URLs belong in package/catalog/platform shapes.
 
-These state names have conventional meaning for agent avatars:
+### `clip`
 
-| State       | Meaning                        |
-|-------------|--------------------------------|
-| `idle`      | Default/resting state          |
-| `listening` | Receiving user input           |
-| `thinking`  | Processing/reasoning           |
-| `speaking`  | Generating output              |
-| `working`   | Executing tools/actions        |
-| `error`     | Error or failure state         |
+```ts
+type ClipRecord = {
+  type: "clip"
+  name: string
+  fps: number
+  frameCount?: number
+  loopFrom?: number
+  fallback?: string
+  color?: string
+  extensions?: ExtensionSet
+}
+```
 
-Other state names are allowed. Consumers SHOULD fall back to `idle` for
-unknown states.
+A clip is a named playback target. The six canonical lifecycle clips are reserved baseline names, but packages may define additional clips when they provide package-level signal mappings and fallbacks.
 
-## Design Notes
+`loopFrom` preserves the v1 playback model:
 
-- **Why NDJSON:** Human-inspectable, line-oriented tooling (grep, head, wc),
-  streamable, git-diffable at the line level.
-- **Why frames are separate lines:** Per-frame extensibility (pause, color
-  overrides, future fields) without touching the state schema.
-- **Why text over binary:** ASCII art is text. The format should be native
-  to its content. Compression is left to the transport layer (gzip).
-- **Newlines in frame data:** The `data` field uses literal `\n` (JSON
-  escaped) to encode line breaks within a frame. Each frame is exactly
-  `height` lines.
+- absent or `0`: loop the whole sequence.
+- `0 < N < frameCount`: play intro frames once, then loop from `N`.
+- `N == frameCount`: play once and hold the final frame.
+
+### `frame`
+
+```ts
+type FrameRecord = {
+  type: "frame"
+  clip: string
+  index: number
+  rows: string[]
+  pause?: number
+  color?: string
+  extensions?: ExtensionSet
+}
+```
+
+`rows` must contain exactly `asset.height` strings, each renderable to `asset.width` columns. Frames for a clip are ordered by `index`. Streaming readers may render as frames arrive after seeing the header and current clip descriptor.
+
+## Canonical lifecycle states
+
+These six names are canonical and must remain the baseline lifecycle for Herm and basic players:
+
+| State | Meaning |
+|---|---|
+| `idle` | Default/resting state |
+| `listening` | Receiving user input |
+| `thinking` | Processing/reasoning |
+| `speaking` | Generating output |
+| `working` | Executing tools/actions |
+| `error` | Error or failure state |
+
+Players that only understand the baseline lifecycle resolve `state.<name>` signals to these clips and fall back to `state.idle` when no more specific fallback exists. New package behavior must not extend this global enum ad hoc; use package-level signal mappings instead.
+
+## Signals and fallbacks
+
+Package manifests map runtime signals to clips, states, decorators, or other signals. Canonical lifecycle signals use the `state.*` namespace:
+
+```json
+{
+  "signals": {
+    "state.working": { "clip": "working", "fallback": "state.thinking" },
+    "approval.waiting": { "clip": "thinking", "fallback": "state.thinking" }
+  }
+}
+```
+
+Rules:
+
+- A basic launch player must support the six `state.*` signals.
+- Custom signals must be namespaced, for example `approval.waiting` or `tool.running`.
+- Every custom signal mapping must declare a fallback to a canonical signal, canonical clip, or another resolvable mapping.
+- Unsupported optional mappings degrade through fallback.
+- Unsupported required extension behavior fails before rendering.
+
+## Extension and version behavior
+
+Extensions are declared as `extensions.used` and `extensions.required` on stream or package shapes.
+
+- Same-major optional unknown extensions are ignored and playback proceeds through fallback behavior.
+- Same-major required unknown extensions fail cleanly with a structured compatibility error.
+- Higher major stream versions fail unless the consumer explicitly declares compatibility.
+- Lower/legacy versions are not silently reinterpreted as launch streams. They enter through the legacy adapter or migration tooling.
+
+Reserved extension namespaces for launch:
+
+- `eikon.signals.v1`: package-level signal mappings and fallback semantics.
+- `eikon.triggers.v1`: optional trigger-rule declarations. This reserves schema space only; no Hermes plugin bridge is required for launch.
+
+## Conformance classes
+
+- **Stream decoder/player:** validates header, typed records, version/extension behavior, frame dimensions, clip order, loop behavior, and baseline lifecycle fallback.
+- **Package reader:** validates package manifest shape, entrypoints, files, compatibility, source/poster/preview descriptors, signal mappings, and optional triggers.
+- **Catalog client:** loads cheap entries only, treats package/detail/install URLs as data, and avoids host-only imports.
+- **Registry generator:** verifies package descriptors, URL/path safety, digest/size policy, poster/preview constraints, metadata escaping, and compatibility before publication.
+- **Editor/migrator:** can read legacy `.eikon` v1, report moved/dropped metadata, and produce launch stream/package output or an explicit failure.
+
+## Legacy migration expectations
+
+Legacy `.eikon` v1 used implicit line roles: header lines had `eikon:1`, state lines had `state`, frame lines had `f`. That shape is now a compatibility input, not the long-term launch contract.
+
+Migration/adaptation must:
+
+- Convert header/state/frame records into typed `header`/`clip`/`frame` records.
+- Preserve the six canonical lifecycle states when present and provide explicit fallback behavior for missing states.
+- Move author, license, source URL, provenance, trust, and discovery metadata into package/catalog/platform shapes where appropriate.
+- Report metadata that was moved, dropped, or could not be represented.
+- Keep current bundled/public assets readable until they are converted.
+
+## Browser-safe boundary
+
+Browser-safe consumers may import contract shapes, stream/package/catalog validators, catalog loading/search, and preview helpers that do not touch host APIs. Browser code must not import install, publish, GitHub, filesystem, SSH, OpenTUI, or Herm-specific modules.
+
+## Non-goals
+
+- No arbitrary plugin code is required inside an Eikon artifact to render it.
+- No Hermes plugin bridge is part of the release contract; triggers are only reserved optional extension data.
+- No browser-native install, use, publish, account, or auth workflow is implied by the stream/package contract.
+- No platform statistics or moderation data are required for local rendering.
+- No superseded 2026-05-30 marketplace/sharing CE document is active authority for this contract.

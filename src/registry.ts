@@ -1,10 +1,9 @@
-// Registry maintenance — `eikon index` / `eikon manifest`. Run by CI
-// on push to main; runnable locally from the repo root.
-
 import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs"
 import { join, dirname } from "node:path"
-import { STATES, DEFAULT_CATALOG } from "./ui/spec"
+import { DEFAULT_CATALOG } from "./ui/spec"
 import { parse, poster } from "./ui/eikon"
+import { migrateLegacyEikon } from "./stream/legacy"
+import { normalizeCatalogEntry, validateCatalogEntry } from "./catalog"
 
 const root = () => {
   let d = import.meta.dir
@@ -12,10 +11,6 @@ const root = () => {
   return join(d, "eikons")
 }
 
-/** Regenerate eikons/index.json from eikons/<name>/<name>.eikon and
- *  re-stamp each header's `source_url` to point at its own dir under
- *  `base` (default: DEFAULT_CATALOG). An entry with `manifest.json`
- *  gets `source: "<name>/"` so install() knows media exists. */
 export async function index(base = DEFAULT_CATALOG) {
   const dir = root()
   const out = []
@@ -27,38 +22,35 @@ export async function index(base = DEFAULT_CATALOG) {
     const doc = parse(body)
     const src = existsSync(join(dir, e.name, "manifest.json")) ? `${e.name}/` : undefined
     const nl = body.indexOf("\n")
-    const head = { ...JSON.parse(body.slice(0, nl)),
-                   source_url: `${base.replace(/\/?$/, "/")}${e.name}/` }
+    const head = { ...JSON.parse(body.slice(0, nl)), source_url: `${base.replace(/\/?$/, "/")}${e.name}/` }
     writeFileSync(path, JSON.stringify(head) + body.slice(nl))
-    out.push({
-      name: doc.meta.name, author: doc.meta.author, glyph: doc.meta.glyph,
-      w: doc.meta.width, h: doc.meta.height,
-      ...(src ? { source: src } : {}), poster: poster(doc),
-    })
+    const entry = normalizeCatalogEntry({
+      name: doc.meta.name,
+      author: doc.meta.author,
+      glyph: doc.meta.glyph,
+      ...(src ? { source: src } : {}),
+      poster: poster(doc),
+    }, base)
+    out.push(validateCatalogEntry(entry))
   }
   out.sort((a, b) => a.name.localeCompare(b.name))
   await Bun.write(join(dir, "index.json"), JSON.stringify(out, null, 2) + "\n")
   return out.length
 }
 
-/** Emit eikons/<name>/manifest.json for every dir with a states/ tree.
- *  Prefers loop.mp4 over start.mp4. */
 export function manifest() {
   const dir = root()
   let n = 0
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (!e.isDirectory()) continue
-    const d = join(dir, e.name), sd = join(d, "states")
-    if (!existsSync(sd)) continue
-    const states: Record<string, { file: string }> = {}
-    for (const st of STATES) {
-      const pick = ["loop.mp4", "start.mp4"].find(f => existsSync(join(sd, st, f)))
-      if (pick) states[st] = { file: `states/${st}/${pick}` }
+    const d = join(dir, e.name)
+    const packed = join(d, `${e.name}.eikon`)
+    if (existsSync(packed)) {
+      const migrated = migrateLegacyEikon(readFileSync(packed, "utf8"), { id: e.name, entrypoint: `${e.name}.eikonl` })
+      writeFileSync(join(d, `${e.name}.eikonl`), migrated.stream)
+      writeFileSync(join(d, "manifest.json"), JSON.stringify(migrated.manifest, null, 2) + "\n")
+      n++
     }
-    const base = readdirSync(d).find(f => /\.(png|jpe?g|webp)$/i.test(f))
-    writeFileSync(join(d, "manifest.json"),
-      JSON.stringify({ name: e.name, version: 1, ...(base ? { source: base } : {}), states }, null, 2) + "\n")
-    n++
   }
   return n
 }
