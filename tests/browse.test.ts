@@ -9,6 +9,8 @@ const dir = resolve(import.meta.dir, "../eikons")
 test("parse: real catalog files round-trip via list+parse", () => {
   const found = list([dir])
   expect(found.length).toBeGreaterThanOrEqual(3)
+  expect(found.map(f => f.path).filter(p => p.endsWith(".eikonl")).length).toBeGreaterThanOrEqual(3)
+  expect(found.map(f => f.path)).not.toContain(resolve(dir, "ares/ares.eikon"))
   for (const f of found) {
     expect(f.meta.width).toBe(48)
     expect(f.meta.height).toBe(24)

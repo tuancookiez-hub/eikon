@@ -9,9 +9,10 @@
  * Spec: docs/SPEC.md
  */
 
-import { readdirSync, openSync, readSync, closeSync } from "node:fs"
+import { readdirSync, openSync, readSync, closeSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { STATES, type State } from "./spec"
+import { parseLaunchStream } from "../stream/parse"
 
 export { STATES, type State }
 
@@ -65,6 +66,7 @@ export function parse(text: string): Eikon {
   if (!lines[0]?.trim()) throw new Error("eikon: empty file (no header on line 1)")
 
   const head = row(lines[0], 1)
+  if (head.type === "header" && head.asset && typeof head.asset === "object") return parseLaunchStream(text)
   const meta: Meta = {
     ...head,
     version: num(head.eikon ?? head.version, 1),
@@ -133,6 +135,20 @@ export function peek(path: string): Meta | null {
     const n = readSync(fd, buf, 0, buf.length, 0)
     const first = buf.toString("utf8", 0, n).split("\n", 1)[0]
     if (!first) return null
+    const head = row(first, 1)
+    if (head.type === "header" && head.asset && typeof head.asset === "object") {
+      const asset = head.asset as Row
+      return {
+        ...head,
+        version: num(typeof asset.version === "string" ? Number(asset.version.split(".")[0]) : asset.version, 2),
+        name: str(head.name, "unnamed"),
+        author: typeof head.author === "string" ? head.author : undefined,
+        glyph: typeof head.glyph === "string" ? head.glyph : undefined,
+        width: num(asset.width, 0),
+        height: num(asset.height, 0),
+        states: [],
+      }
+    }
     return parse(first).meta
   } catch {
     return null
@@ -150,10 +166,17 @@ export function list(dirs: string[]): { path: string; meta: Meta }[] {
     let ents: string[]
     try { ents = readdirSync(dir, { recursive: true }) as string[] }
     catch { return [] }
-    return ents
-      .filter(e => e.endsWith(".eikon"))
+    const files = ents
+      .filter(e => e.endsWith(".eikon") || e.endsWith(".eikonl"))
       .map(e => join(dir, e))
-      .map(path => ({ path, meta: peek(path) }))
+    const launchKeys = new Set(files.filter(path => path.endsWith(".eikonl")).map(formatKey))
+    return files
+      .filter(path => path.endsWith(".eikonl") || !launchKeys.has(formatKey(path)))
+      .map(path => ({ path, meta: path.endsWith(".eikonl") ? parse(readFileSync(path, "utf8")).meta : peek(path) }))
       .filter((x): x is { path: string; meta: Meta } => x.meta !== null)
   })
+}
+
+function formatKey(path: string): string {
+  return path.replace(/\.eikonl?$/, "")
 }
