@@ -6,7 +6,7 @@
 
 The package manifest is the launch package contract for an eikon. It describes how to find renderable streams, editable source media, poster/preview assets, compatibility, signal mappings, and optional extension data. It is separate from the stream format and from the public catalog entry.
 
-Legacy source manifests are still accepted by compatibility code during migration, but the launch manifest below is the shape gallery, registry, Herm marketplace, and package readers should target.
+Older source-only manifests are still accepted by the legacy manifest reader during migration, but the launch manifest below is the shape gallery, registry, Herm marketplace, and package readers should target.
 
 ## Minimal manifest
 
@@ -178,7 +178,7 @@ The previous manifest shape described editable source media only:
 }
 ```
 
-Compatibility code may still read that shape to install or migrate existing assets. Launch migration should produce an `eikon.package` manifest and report moved/dropped metadata:
+Installers and migration tools may still read that legacy shape to preserve existing assets. Launch migration should produce an `eikon.package` manifest and report moved/dropped metadata:
 
 - `eikon_requires` becomes `compatibility.eikon`.
 - source and state media move under `source` and file descriptors.
