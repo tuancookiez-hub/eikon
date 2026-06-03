@@ -75,3 +75,7 @@ test("unknown required extension fails with structured error", () => {
 test("higher major version fails with structured error", () => {
   expect(() => assertLaunchCompatibility("3.0")).toThrow(EikonCompatibilityError)
 })
+
+test("legacy major version fails as non-launch input", () => {
+  expect(() => assertLaunchCompatibility("1.0")).toThrow(EikonCompatibilityError)
+})

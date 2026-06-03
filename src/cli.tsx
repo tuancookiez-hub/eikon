@@ -13,6 +13,8 @@ import { Browser } from "./browse/Browser"
 import { local, resolve as cat } from "./browse/catalog"
 import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
+import { PACKAGE_KIND } from "./contract/shape"
+import { validatePackageManifest } from "./package/manifest"
 
 const REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 const root = () => join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "eikons")
@@ -43,6 +45,12 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     const path = argv[0] ?? die("usage: eikon lint <file.eikon|manifest.json>")
     const raw = await Bun.file(resolve(path)).text()
     if (basename(path) === "manifest.json") {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (parsed.kind === PACKAGE_KIND) {
+        const m = validatePackageManifest(parsed)
+        console.log(`✓ ${m.name} · ${m.entrypoints.default} · ${m.compatibility.eikon}`)
+        return
+      }
       const m = lintManifest(resolve(path), raw)
       console.log(`✓ ${m.name} · ${Object.keys(m.states).length} states${m.source ? ` · ${m.source}` : ""}`)
       return

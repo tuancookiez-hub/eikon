@@ -53,9 +53,14 @@ test("launch streams validate frame dimensions and required record extensions", 
     JSON.stringify({ type: "header", asset: { version: LAUNCH_FORMAT_VERSION, width: 4, height: 2 } }),
     JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 0, extensions: { required: ["eikon.future.v1"] } }),
   ].join("\n")
+  const legacyMajor = [
+    JSON.stringify({ type: "header", asset: { version: "1.0", width: 4, height: 2 } }),
+    JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 0 }),
+  ].join("\n")
   expect(() => parseLaunchStream(wrongHeight)).toThrow(/height/)
   expect(() => parseLaunchStream(wrongWidth)).toThrow(/width/)
   expect(() => parseLaunchStream(requiredClipExtension)).toThrow(/unknown required/)
+  expect(() => parseLaunchStream(legacyMajor)).toThrow(/unsupported Eikon stream version 1.0/)
 })
 
 test("legacy eikon converts to launch stream and package manifest", () => {

@@ -48,6 +48,13 @@ export function validatePackageManifest(value: unknown): EikonPackageManifest {
   for (const file of man.files ?? []) {
     if (!file || typeof file !== "object" || typeof file.path !== "string" || !isSafeRelativePath(file.path)) errs.push(problem("files.path", "safe relative path required"))
   }
+  if (man.source?.base && !isSafeRelativePath(man.source.base)) errs.push(problem("source.base", "safe relative path required"))
+  for (const [key, value] of Object.entries(man.source?.states ?? {})) {
+    if (!value || typeof value !== "object" || typeof value.file !== "string" || !isSafeRelativePath(value.file)) errs.push(problem(`source.states.${key}.file`, "safe relative path required"))
+  }
+  for (const ext of man.extensions?.required ?? []) {
+    errs.push(problem("extensions.required", `unknown required Eikon extension ${ext}`))
+  }
   if (man.poster && !isSafeRelativePath(man.poster)) errs.push(problem("poster", "safe relative path required"))
   if (man.preview && !isSafeRelativePath(man.preview)) errs.push(problem("preview", "safe relative path required"))
   for (const [key, value] of Object.entries(man.display ?? {})) {

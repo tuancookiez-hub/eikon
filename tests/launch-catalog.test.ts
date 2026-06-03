@@ -26,6 +26,9 @@ test("package manifest validates launch fields and signal fallbacks", () => {
   expect(validatePackageManifest(manifest).signals?.["state.working"]?.clip).toBe("working")
   expect(() => validatePackageManifest({ ...manifest, schemaVersion: undefined })).toThrow(/schemaVersion/)
   expect(() => validatePackageManifest({ ...manifest, entrypoints: { default: "../escape.eikonl" } })).toThrow(/entrypoints.default.*safe relative path/)
+  expect(() => validatePackageManifest({ ...manifest, source: { base: "../escape.png" } })).toThrow(/source.base.*safe relative path/)
+  expect(() => validatePackageManifest({ ...manifest, source: { states: { idle: { file: "/abs/idle.mp4" } } } })).toThrow(/source.states.idle.file.*safe relative path/)
+  expect(() => validatePackageManifest({ ...manifest, extensions: { required: ["eikon.future.v1"] } })).toThrow(/extensions.required.*unknown required/)
   expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: "<2" } })).toThrow(/compatibility.eikon/)
   expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=1 <2" } })).toThrow(/compatibility.eikon/)
   expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=99" } })).toThrow(/compatibility.eikon/)
@@ -85,4 +88,15 @@ test("catalog client loads and normalizes remote index entries", async () => {
 test("browser-safe catalog module does not import host-only modules", async () => {
   const source = await Bun.file(new URL("../src/catalog.ts", import.meta.url)).text()
   expect(source).not.toMatch(/node:fs|node:child_process|\.\/install|\.\/registry|@opentui|ssh2/)
+})
+
+test("checked-in public index points launch package previews under the catalog base", async () => {
+  const index = JSON.parse(await Bun.file(new URL("../eikons/index.json", import.meta.url)).text()) as Array<{ id: string; packageUrl: string; preview: string; compatibility: { eikon: string } }>
+  expect(index.length).toBeGreaterThan(0)
+  for (const entry of index) {
+    expect(entry.id).toMatch(/^liftaris\//)
+    expect(entry.packageUrl).toMatch(/^https:\/\/eikon\.liftaris\.dev\/eikons\/[^/]+\/manifest\.json$/)
+    expect(entry.preview).toMatch(/^https:\/\/eikon\.liftaris\.dev\/eikons\/[^/]+\/[^/]+\.eikonl$/)
+    expect(entry.compatibility.eikon).toBe(">=2 <3")
+  }
 })

@@ -185,7 +185,7 @@ export function defaultSignalMappings(): Record<`state.${CanonicalState}`, Signa
 export function validateLaunchCompatibility(version: string, extensions: ExtensionSet = {}, support: ExtensionSupport = {}): CompatibilityProblem[] {
   const problems: CompatibilityProblem[] = []
   const major = Number(version.split(".")[0])
-  if (!Number.isFinite(major) || major > LAUNCH_MAJOR_VERSION) {
+  if (!Number.isFinite(major) || major !== LAUNCH_MAJOR_VERSION) {
     problems.push({ code: "unsupported-version", version, message: `unsupported Eikon stream version ${version}` })
   }
   const known = new Set([...(support.optional ?? []), ...(support.required ?? [])])

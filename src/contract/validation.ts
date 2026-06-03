@@ -4,7 +4,7 @@ import { LAUNCH_MAJOR_VERSION } from "./shape"
 
 export function validateVersionCompatibility(version: string): void {
   const major = Number(version.split(".")[0])
-  if (!Number.isFinite(major) || major > LAUNCH_MAJOR_VERSION) {
+  if (!Number.isFinite(major) || major !== LAUNCH_MAJOR_VERSION) {
     throw new EikonValidationError([{ code: "unsupported-version", path: "version", message: `unsupported Eikon version ${version}` }])
   }
 }
