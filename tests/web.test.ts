@@ -14,7 +14,7 @@ const legacy = [
 ].join("\n")
 
 const launch = [
-  JSON.stringify({ type: "header", asset: { version: "2.0", width: 2, height: 1 }, name: "cycle" }),
+  JSON.stringify({ type: "header", asset: { version: "2.0", width: 1, height: 1 }, name: "cycle" }),
   JSON.stringify({ type: "clip", name: "idle", fps: 2, frameCount: 2, loopFrom: 0 }),
   JSON.stringify({ type: "frame", clip: "idle", index: 0, rows: ["A"] }),
   JSON.stringify({ type: "frame", clip: "idle", index: 1, rows: ["B"] }),
@@ -61,6 +61,27 @@ describe("web gallery model", () => {
     expect(loaded.status).toBe("ready")
     if (loaded.status !== "ready") throw new Error("preview not ready")
     expect(webPlaybackFrame(loaded.eikon, "idle", 1000, 0)).toEqual(["C"])
+  })
+
+  test("loads legacy registry previews from the checked-in index shape", async () => {
+    const seen: string[] = []
+    const catalog = createWebCatalog({
+      base: "https://eikon.liftaris.dev/eikons",
+      fetch: (async (input: string | URL | Request) => {
+        const url = new URL(String(input))
+        seen.push(url.pathname)
+        if (url.pathname === "/eikons/index.json") {
+          return Response.json([{ name: "ares", author: "kaio", glyph: "⚔", source: "ares/", poster: "A" }])
+        }
+        if (url.pathname === "/eikons/ares/ares.eikon") return new Response(legacy)
+        return new Response("missing", { status: 404 })
+      }) as unknown as typeof fetch,
+    })
+    await catalog.refresh()
+    const loaded = await catalog.preview(catalog.state.entries[0]!.sourceKey)
+    expect(loaded.status).toBe("ready")
+    expect(seen).toContain("/eikons/ares/ares.eikon")
+    expect(seen).not.toContain("/eikons/ares/manifest.json")
   })
 
   test("parses launch stream previews from public exports", () => {

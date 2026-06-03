@@ -46,6 +46,24 @@ function readHeader(record: Row, n: number): LaunchHeaderRecord {
   return record as LaunchHeaderRecord
 }
 
+function checkCompatibility(version: string, extensions: LaunchStreamRecord["extensions"], n: number): void {
+  try {
+    assertLaunchCompatibility(version, extensions)
+  } catch (err) {
+    if (err instanceof EikonCompatibilityError) {
+      throw new EikonValidationError(err.problems.map(problem => ({ code: problem.code, path: `line ${n}`, message: `line ${n}: ${problem.message}` })))
+    }
+    throw err
+  }
+}
+
+function checkFrameSize(record: LaunchFrameRecord, header: LaunchHeaderRecord, n: number): void {
+  if (record.rows.length !== header.asset.height) fail(n, `frame height ${record.rows.length} does not match asset.height ${header.asset.height}`)
+  for (const r of record.rows) {
+    if (Array.from(r).length !== header.asset.width) fail(n, `frame width ${Array.from(r).length} does not match asset.width ${header.asset.width}`)
+  }
+}
+
 function readClip(record: Row, n: number): LaunchClipRecord {
   if (!isStr(record.name)) fail(n, "clip.name string required")
   if (!isNum(record.fps) || record.fps <= 0) fail(n, "clip.fps positive number required")
@@ -81,20 +99,14 @@ export function parseLaunchStream(text: string): ParsedLaunchStream {
     const rec = row(line, n)
     if (!head) {
       head = readHeader(rec, n)
-      try {
-        assertLaunchCompatibility(head.asset.version, head.extensions)
-      } catch (err) {
-        if (err instanceof EikonCompatibilityError) {
-          throw new EikonValidationError(err.problems.map(problem => ({ code: problem.code, path: `line ${n}`, message: `line ${n}: ${problem.message}` })))
-        }
-        throw err
-      }
+      checkCompatibility(head.asset.version, head.extensions, n)
       records.push(head)
       continue
     }
     if (rec.type === "header") fail(n, "duplicate header record")
     if (rec.type === "clip") {
       const item = readClip(rec, n)
+      checkCompatibility(head.asset.version, item.extensions, n)
       if (building.has(item.name)) fail(n, `duplicate clip "${item.name}"`)
       building.set(item.name, { record: item, frames: [], seen: new Set() })
       records.push(item)
@@ -102,6 +114,8 @@ export function parseLaunchStream(text: string): ParsedLaunchStream {
     }
     if (rec.type === "frame") {
       const item = readFrame(rec, n)
+      checkCompatibility(head.asset.version, item.extensions, n)
+      checkFrameSize(item, head, n)
       const state = getState(building, item.clip, n)
       if (state.seen.has(item.index)) fail(n, `duplicate frame ${item.index} for clip "${item.clip}"`)
       if (item.index !== state.frames.length) fail(n, `frame index ${item.index} out of order for clip "${item.clip}"`)

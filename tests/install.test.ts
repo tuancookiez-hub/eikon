@@ -13,6 +13,27 @@ const man = (name: string, extra = {}) => JSON.stringify({
   states: { idle: { file: "idle.mp4" }, error: { file: "error.mp4" } }, ...extra,
 }, null, 2)
 
+const launch = [
+  JSON.stringify({ type: "header", asset: { version: "2.0", width: 4, height: 2 }, name: "launch" }),
+  JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 1 }),
+  JSON.stringify({ type: "frame", clip: "idle", index: 0, rows: ["abcd", "efgh"] }),
+].join("\n") + "\n"
+
+const pkg = (name: string) => JSON.stringify({
+  kind: "eikon.package",
+  schemaVersion: "1.0",
+  id: `liftaris/${name}`,
+  name,
+  compatibility: { eikon: ">=2 <3" },
+  entrypoints: { default: `streams/${name}.eikonl` },
+  files: [
+    { path: `streams/${name}.eikonl`, role: "stream" },
+    { path: "source/base.png", role: "source" },
+    { path: "source/idle.mp4", role: "source" },
+  ],
+  source: { base: "source/base.png", states: { idle: { file: "source/idle.mp4" } } },
+}, null, 2)
+
 function seed(dir: string, name: string, extra = {}) {
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, "manifest.json"), man(name, extra))
@@ -26,6 +47,11 @@ describe("entries", () => {
     expect(entries(JSON.parse(man("x")))).toEqual([["base", "base.png"], ["idle", "idle.mp4"], ["error", "error.mp4"]])
     expect(entries({ files: ["base.png", "thinking.png", "odd.jpg"] }))
       .toEqual([["base", "base.png"], ["thinking", "thinking.png"], ["base", "odd.jpg"]])
+  })
+
+  test("launch package source descriptors map to editable source roles", () => {
+    expect(entries(JSON.parse(pkg("launch"))))
+      .toEqual([["base", "source/base.png"], ["idle", "source/idle.mp4"]])
   })
 })
 
@@ -94,6 +120,11 @@ describe("resolve + install: http base", () => {
     expect(r.name).toBe("remote"); expect(r.base).toBe(url); expect(r.staged).toBe("")
   })
 
+  test("resolve() accepts explicit http manifest URLs", async () => {
+    const r = await resolve(url + "manifest.json")
+    expect(r.name).toBe("remote"); expect(r.base).toBe(url); expect(r.staged).toBe("")
+  })
+
   test("install() fetches each file in parallel", async () => {
     const out = await install(url, dest)
     expect(out.n).toBe(3); expect(out.bytes).toBe(2004)
@@ -125,6 +156,28 @@ describe("resolve + install: git", () => {
     const out = await install(repo, dest)
     expect(existsSync(join(dest, "fromgit", "source", "idle.mp4"))).toBe(true)
     expect(out.origin.sha).toBeDefined()
+  })
+})
+
+describe("resolve + install: launch package", () => {
+  const src = join(root, "launch-pkg")
+  beforeAll(() => {
+    mkdirSync(join(src, "streams"), { recursive: true })
+    mkdirSync(join(src, "source"), { recursive: true })
+    writeFileSync(join(src, "manifest.json"), pkg("launch"))
+    writeFileSync(join(src, "streams", "launch.eikonl"), launch)
+    writeFileSync(join(src, "source", "base.png"), Buffer.from([137, 80, 78, 71]))
+    writeFileSync(join(src, "source", "idle.mp4"), Buffer.alloc(1024))
+  })
+
+  test("install() stages the launch stream and compatibility packed file", async () => {
+    const out = await install(src, dest, { name: "launch-local" })
+    expect(out.n).toBe(2)
+    expect(out.sources).toEqual({ base: "base.png", idle: "idle.mp4" })
+    expect(existsSync(join(out.dir, "launch-local.eikonl"))).toBe(true)
+    expect(existsSync(join(out.dir, "launch-local.eikon"))).toBe(true)
+    const packed = readFileSync(join(out.dir, "launch-local.eikon"), "utf8")
+    expect(JSON.parse(packed.split("\n", 1)[0]!).eikon).toBe(1)
   })
 })
 

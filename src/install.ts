@@ -11,7 +11,11 @@ import { join, extname, basename } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { STATES, FORMAT_VERSION, DEFAULT_CATALOG, type State } from "./ui/spec"
+import { serialize, type Doc } from "./ui/format"
 import { loadCatalogEntries } from "./catalog"
+import { PACKAGE_KIND, type EikonPackageManifest } from "./contract/shape"
+import { validatePackageManifest } from "./package/manifest"
+import { parseLaunchStream } from "./stream"
 import type { Manifest } from "./ui/lint"
 
 export type Role = State | "base"
@@ -20,7 +24,7 @@ export type Origin = { source: string; at: string; sha?: string }
 
 export type Resolved = {
   name: string
-  manifest: Manifest
+  manifest: Manifest | EikonPackageManifest
   /** Local dir where manifest.json + any staged media live. */
   staged: string
   /** When staged came from an http base (no local tree). */
@@ -42,17 +46,33 @@ export type Opts = {
 
 /** Role-tagged (role, relpath) pairs from either manifest shape. */
 export function entries(man: Manifest | Record<string, unknown>): Array<[Role, string]> {
+  if ((man as Record<string, unknown>).kind === PACKAGE_KIND) {
+    const pkg = validatePackageManifest(man)
+    const xs: Array<[Role, string]> = []
+    if (pkg.source?.base) xs.push(["base", pkg.source.base])
+    for (const k of STATES) {
+      const f = pkg.source?.states?.[k]?.file
+      if (f) xs.push([k, f])
+    }
+    return xs
+  }
   const xs: Array<[Role, string]> = []
   const src = (man as Manifest).source
   if (typeof src === "string") xs.push(["base", src])
   const st = (man as Manifest).states as Record<string, { file?: string }> | undefined
   if (st) for (const k of STATES) { const f = st[k]?.file; if (f) xs.push([k, f]) }
   if (xs.length === 0 && Array.isArray((man as Record<string, unknown>).files))
-    for (const f of (man as { files: string[] }).files) {
+    for (const f of (man as { files: unknown[] }).files) {
+      if (typeof f !== "string") continue
       const stem = basename(f, extname(f)).toLowerCase() as Role
       xs.push([stem === "base" || (STATES as readonly string[]).includes(stem) ? stem : "base", f])
     }
   return xs
+}
+
+function manifest(value: unknown): Manifest | EikonPackageManifest {
+  if ((value as Record<string, unknown>).kind === PACKAGE_KIND) return validatePackageManifest(value)
+  return value as Manifest
 }
 
 const gitish = (s: string) =>
@@ -89,6 +109,25 @@ function checkRequires(spec: string | undefined): void {
   if (!ok) throw new Error(`eikon_requires ${spec}: this build supports format ${cur}`)
 }
 
+function legacy(text: string, name: string): string {
+  const eikon = parseLaunchStream(text)
+  const doc: Doc = {
+    header: { eikon: 1, name, width: eikon.meta.width, height: eikon.meta.height, glyph: eikon.meta.glyph },
+    states: eikon.meta.states.flatMap(state => {
+      const clip = eikon.clips.get(state)
+      if (!clip) return []
+      return [{
+        state,
+        fps: clip.fps,
+        frame_count: clip.frames.length,
+        loop_from: clip.loopFrom,
+        frames: clip.frames.map((rows, i) => ({ f: i, data: rows.join("\n") })),
+      }]
+    }),
+  }
+  return serialize(doc)
+}
+
 type IndexEntry = { name: string; source?: string; packageUrl?: string; installUrl?: string; [k: string]: unknown }
 
 async function catalog(name: string, url: string): Promise<string> {
@@ -117,7 +156,7 @@ export async function resolve(src: string, opts?: Pick<Opts, "catalog">): Promis
   const local = src.replace(/^file:\/\//, "")
   if (!gitish(src) && existsSync(local) && statSync(local).isDirectory()) {
     const staged = locate(local)
-    const man = JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8")) as Manifest
+    const man = manifest(JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8")))
     return { name: man.name, manifest: man, staged, origin: { source: src, at } }
   }
 
@@ -126,16 +165,18 @@ export async function resolve(src: string, opts?: Pick<Opts, "catalog">): Promis
     const tmp = mkdtempSync(join(tmpdir(), "eikon-"))
     const sha = await clone(src, tmp)
     const staged = locate(tmp)
-    const man = JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8")) as Manifest
+    const man = manifest(JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8")))
     return { name: man.name, manifest: man, staged, tmp: true, origin: { source: src, at, sha } }
   }
 
   // http(s) manifest base.
   if (/^https?:\/\//.test(src)) {
-    const base = src.replace(/\/?$/, "/")
-    const res = await fetch(base + "manifest.json")
+    const raw = new URL(src)
+    const href = raw.pathname.endsWith("/manifest.json") ? raw.href : new URL("manifest.json", src.replace(/\/?$/, "/")).href
+    const base = new URL(".", href).href
+    const res = await fetch(href)
     if (!res.ok) throw new Error(`manifest: HTTP ${res.status}`)
-    const man = await res.json() as Manifest
+    const man = manifest(await res.json())
     return { name: man.name, manifest: man, staged: "", base, origin: { source: src, at } }
   }
 
@@ -173,6 +214,19 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
   const dst = join(root, name)
   const srcd = join(dst, "source")
   mkdirSync(srcd, { recursive: true })
+
+  if ((r.manifest as Record<string, unknown>).kind === PACKAGE_KIND) {
+    const man = validatePackageManifest(r.manifest)
+    const rel = man.entrypoints.default
+    const text = r.base
+      ? await fetch(new URL(rel, r.base).href).then(res => {
+          if (!res.ok) throw new Error(`${rel}: HTTP ${res.status}`)
+          return res.text()
+        })
+      : readFileSync(join(r.staged, rel), "utf8")
+    writeFileSync(join(dst, `${name}.eikonl`), text)
+    writeFileSync(join(dst, `${name}.eikon`), legacy(text, name))
+  }
 
   // The packed .eikon travels when present in the source.
   const packed = `${r.name}.eikon`

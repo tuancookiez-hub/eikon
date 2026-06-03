@@ -2,6 +2,7 @@ import { EikonValidationError } from "../contract/errors"
 import {
   LAUNCH_MAJOR_VERSION,
   PACKAGE_KIND,
+  PACKAGE_SCHEMA_VERSION,
   type EikonPackageManifest,
 } from "../contract/shape"
 
@@ -19,14 +20,16 @@ export function isSafeRelativePath(path: string): boolean {
 }
 
 function supportsLaunch(range: string): boolean {
-  const numbers = [...range.matchAll(/\d+/g)].map(match => Number(match[0]))
-  if (!numbers.length) return true
-  if (/^>=?99/.test(range)) return false
-  const lower = range.match(/>=?\s*(\d+)/)
-  if (lower && Number(lower[1]) > LAUNCH_MAJOR_VERSION) return false
-  const exact = range.match(/^\s*(\d+)(?:\.\d+)?\s*$/)
-  if (exact && Number(exact[1]) !== LAUNCH_MAJOR_VERSION) return false
-  return true
+  const parts = [...range.matchAll(/(>=|>|<=|<|==|=)?\s*(\d+)(?:\.\d+)?/g)]
+  if (!parts.length) return true
+  return parts.every(([, op = "=", raw]) => {
+    const n = Number(raw)
+    if (op === ">=") return LAUNCH_MAJOR_VERSION >= n
+    if (op === ">") return LAUNCH_MAJOR_VERSION > n
+    if (op === "<=") return LAUNCH_MAJOR_VERSION <= n
+    if (op === "<") return LAUNCH_MAJOR_VERSION < n
+    return LAUNCH_MAJOR_VERSION === n
+  })
 }
 
 export function validatePackageManifest(value: unknown): EikonPackageManifest {
@@ -34,6 +37,7 @@ export function validatePackageManifest(value: unknown): EikonPackageManifest {
   if (!isObj(value)) throw new EikonValidationError([problem("manifest", "object required")])
   const man = value as EikonPackageManifest
   if (man.kind !== PACKAGE_KIND) errs.push(problem("kind", `must be ${PACKAGE_KIND}`))
+  if (man.schemaVersion !== PACKAGE_SCHEMA_VERSION) errs.push(problem("schemaVersion", `must be ${PACKAGE_SCHEMA_VERSION}`))
   if (!NAME_RE.test(String(man.name ?? ""))) errs.push(problem("name", "safe package name required"))
   if (!man.id || typeof man.id !== "string" || !isSafeText(man.id)) errs.push(problem("id", "safe id required"))
   if (!isObj(man.compatibility) || typeof man.compatibility.eikon !== "string" || !supportsLaunch(man.compatibility.eikon)) errs.push(problem("compatibility.eikon", "must support launch major version 2"))

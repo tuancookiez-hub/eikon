@@ -24,7 +24,10 @@ const manifest: EikonPackageManifest = {
 
 test("package manifest validates launch fields and signal fallbacks", () => {
   expect(validatePackageManifest(manifest).signals?.["state.working"]?.clip).toBe("working")
+  expect(() => validatePackageManifest({ ...manifest, schemaVersion: undefined })).toThrow(/schemaVersion/)
   expect(() => validatePackageManifest({ ...manifest, entrypoints: { default: "../escape.eikonl" } })).toThrow(/entrypoints.default.*safe relative path/)
+  expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: "<2" } })).toThrow(/compatibility.eikon/)
+  expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=1 <2" } })).toThrow(/compatibility.eikon/)
   expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=99" } })).toThrow(/compatibility.eikon/)
 })
 

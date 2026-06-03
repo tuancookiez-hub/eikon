@@ -38,6 +38,26 @@ test("malformed launch streams report line and record context", () => {
   expect(() => parseLaunchStream("{nope")).toThrow(/malformed JSON on line 1/)
 })
 
+test("launch streams validate frame dimensions and required record extensions", () => {
+  const wrongHeight = [
+    JSON.stringify({ type: "header", asset: { version: LAUNCH_FORMAT_VERSION, width: 4, height: 2 } }),
+    JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 1 }),
+    JSON.stringify({ type: "frame", clip: "idle", index: 0, rows: ["abcd"] }),
+  ].join("\n")
+  const wrongWidth = [
+    JSON.stringify({ type: "header", asset: { version: LAUNCH_FORMAT_VERSION, width: 4, height: 2 } }),
+    JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 1 }),
+    JSON.stringify({ type: "frame", clip: "idle", index: 0, rows: ["abcd", "x"] }),
+  ].join("\n")
+  const requiredClipExtension = [
+    JSON.stringify({ type: "header", asset: { version: LAUNCH_FORMAT_VERSION, width: 4, height: 2 } }),
+    JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 0, extensions: { required: ["eikon.future.v1"] } }),
+  ].join("\n")
+  expect(() => parseLaunchStream(wrongHeight)).toThrow(/height/)
+  expect(() => parseLaunchStream(wrongWidth)).toThrow(/width/)
+  expect(() => parseLaunchStream(requiredClipExtension)).toThrow(/unknown required/)
+})
+
 test("legacy eikon converts to launch stream and package manifest", () => {
   const legacy = [
     JSON.stringify({ eikon: 1, name: "legacy", author: "t", glyph: "◆", width: 4, height: 2, license: "MIT" }),

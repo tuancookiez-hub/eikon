@@ -256,6 +256,7 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string): CatalogEntry {
   if (/^file:|^javascript:|^data:/i.test(source)) throw new EikonValidationError([problem("packageUrl", "http(s) URL required")])
   const packageUrl = /^https?:\/\//.test(source) ? url(source) : base ? joinUrl(base, source) : source
   const manifest = packageUrl.endsWith("manifest.json") ? packageUrl : joinUrl(packageUrl, "manifest.json")
+  const root = packageUrl.endsWith("manifest.json") ? packageUrl.slice(0, packageUrl.lastIndexOf("/") + 1) : packageUrl
   return validateCatalogEntry({
     kind: CATALOG_KIND,
     schemaVersion: CATALOG_SCHEMA_VERSION,
@@ -265,9 +266,9 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string): CatalogEntry {
     author: input.author,
     glyph: input.glyph,
     poster: input.poster,
-    preview: typeof input.preview_url === "string" ? relativeUrl(packageUrl, input.preview_url) : undefined,
+    preview: typeof input.preview_url === "string" ? relativeUrl(root, input.preview_url) : joinUrl(root, `${input.name}.eikon`),
     packageUrl: manifest,
-    installUrl: typeof input.install_url === "string" ? relativeUrl(packageUrl, input.install_url) : manifest,
+    installUrl: typeof input.install_url === "string" ? relativeUrl(root, input.install_url) : root,
     compatibility: { eikon: ">=1 <3", available: true },
     trust: { source: input.provenance, reviewed: input.reviewed === true },
   })
