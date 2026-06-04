@@ -228,6 +228,10 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptio
   const preview = typeof input.preview === "string" ? relativeUrl(root, input.preview) : typeof input.preview_url === "string" ? relativeUrl(root, input.preview_url) : runtimeUrl
   const review = clean(input.review_status) ?? (input.reviewed === true ? "reviewed" : undefined)
   const reviewStatus = review && REVIEWED.has(review) ? review : review
+  const trust = {
+    ...(reviewStatus === "reviewed" ? { reviewed: true } : {}),
+    ...(reviewStatus ? { source: reviewStatus } : {}),
+  }
   return validateCatalogEntry({
     kind: CATALOG_KIND,
     schemaVersion: CATALOG_SCHEMA_VERSION,
@@ -246,7 +250,7 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptio
     detailUrl: typeof input.detailUrl === "string" ? url(input.detailUrl, root) : typeof input.detail_url === "string" ? url(input.detail_url, root) : undefined,
     description: clean(input.description),
     compatibility: { eikon: ">=1 <2", available: true },
-    trust: { reviewed: input.reviewed === true, ...(reviewStatus ? { source: reviewStatus } : {}) },
+    trust,
   })
 }
 

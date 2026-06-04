@@ -4,8 +4,31 @@ import { join, resolve } from "node:path"
 import { renderToStaticMarkup } from "react-dom/server"
 import { App, WEB_PREVIEW_FPS, WEB_PREVIEW_FRAME_MS } from "../src/web/App"
 import { browserInstructions, EntryCard } from "../src/web/player"
+import type { CatalogEntry } from "../src/browser"
 
 const repo = resolve(import.meta.dir, "..")
+
+function entry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
+  return {
+    kind: "eikon.catalog.entry",
+    schemaVersion: "1.0",
+    id: "liftaris/ares",
+    name: "ares",
+    title: "ares",
+    author: "kaio",
+    glyph: "⚔",
+    poster: "STATIC",
+    preview: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
+    runtimeUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
+    packageUrl: "https://eikon.liftaris.dev/eikons/ares/manifest.json",
+    sourceKey: "registry:eikon.liftaris.dev:liftaris/ares@1.0.0",
+    compatibility: { eikon: ">=1 <2", available: true },
+    trust: {},
+    ...overrides,
+  }
+}
+
+const cardEntry = entry()
 
 test("public page copy stays gallery-focused and avoids placeholder names", () => {
   const html = renderToStaticMarkup(<App />)
@@ -27,46 +50,12 @@ test("public page copy stays gallery-focused and avoids placeholder names", () =
 })
 
 test("install instructions use Herm instead of the standalone eikon executable", () => {
-  const entry = {
-    name: "ares",
-    author: "kaio",
-    glyph: "⚔",
-    width: 48,
-    height: 24,
-    w: 48,
-    h: 24,
-    poster: "██",
-    trust: {},
-    previewUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
-    installUrl: "https://eikon.liftaris.dev/eikons/ares/",
-    sourceKey: "https://eikon.liftaris.dev/eikons/ares/",
-    identityKey: "ares-id",
-    raw: { name: "ares" },
-  }
+  const instructions = browserInstructions(cardEntry)
 
-  const instructions = browserInstructions(entry)
-
-  expect(instructions.command).toBe("herm eikon install https://eikon.liftaris.dev/eikons/ares/")
+  expect(instructions.command).toBe("herm eikon install https://eikon.liftaris.dev/eikons/ares/manifest.json")
   expect(instructions.command).not.toStartWith("eikon install ")
   expect(instructions).not.toHaveProperty("hermUrl")
 })
-
-const cardEntry = {
-  name: "ares",
-  author: "kaio",
-  glyph: "⚔",
-  width: 48,
-  height: 24,
-  w: 48,
-  h: 24,
-  poster: "STATIC",
-  trust: {},
-  previewUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
-  installUrl: "https://eikon.liftaris.dev/eikons/ares/",
-  sourceKey: "https://eikon.liftaris.dev/eikons/ares/",
-  identityKey: "ares-id",
-  raw: { name: "ares" },
-}
 
 test("catalog cards omit fixed dimensions", () => {
   const html = renderToStaticMarkup(

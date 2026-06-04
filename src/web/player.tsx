@@ -45,12 +45,13 @@ export function AsciiPreview(props: { lines: string[] }) {
   return <pre className="ascii" aria-label="Eikon ASCII preview"><span className="asciiArt">{props.lines.join("\n")}</span></pre>
 }
 
-export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPick: () => void }) {
+export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPick: () => void; frame?: string[] }) {
   const title = props.entry.title || props.entry.name
+  const preview = props.frame?.length ? props.frame.join("\n") : props.entry.poster || ""
   return (
     <button type="button" className={props.selected ? "card selected" : "card"} onClick={props.onPick}>
       <span className="cardPreview" aria-hidden="true">
-        <span className="cardPoster">{props.entry.poster || ""}</span>
+        <span className="cardPoster">{preview}</span>
       </span>
       <span className="name">{props.entry.glyph ?? "⬡"} {title}</span>
       <span className="meta">{props.entry.author ?? "unknown"}</span>

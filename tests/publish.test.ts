@@ -74,8 +74,10 @@ describe("submitForReview", () => {
 
     expect(res.kind).toBe("review-created")
     expect(be.calls).toHaveLength(1)
-    const req = be.calls[0] as { bundle: { files: Array<{ path: string }>, catalog: { license?: string, provenance?: string } } }
-    expect(req.bundle.catalog).toMatchObject({ name: "demo", trust: { license: "MIT", provenance: "human-made" } })
+    const req = be.calls[0] as { bundle: { files: Array<{ path: string }>, catalog: Record<string, unknown>, license: string, provenance: string } }
+    expect(req.bundle).toMatchObject({ license: "MIT", provenance: "human-made" })
+    expect(req.bundle.catalog).toMatchObject({ name: "demo", trust: { source: "pending" } })
+    expect(JSON.stringify(req.bundle.catalog)).not.toMatch(/license|provenance/)
     expect(req.bundle.files.map(f => f.path)).toEqual(["demo.eikon"])
   })
 })

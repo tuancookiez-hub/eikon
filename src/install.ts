@@ -74,6 +74,11 @@ function manifest(value: unknown): Manifest | EikonPackageManifest {
   return value as Manifest
 }
 
+function installManifest(man: Manifest | EikonPackageManifest, origin: Origin): Manifest | EikonPackageManifest {
+  const { license: _license, provenance: _provenance, ...clean } = man as Record<string, unknown>
+  return { ...clean, origin } as Manifest | EikonPackageManifest
+}
+
 const gitish = (s: string) =>
   /^git@|^ssh:\/\/|^git:\/\/|\.git$/.test(s) ||
   /^(https?:\/\/)?(github|gitlab|bitbucket)\.com\/[\w.-]+\/[\w.-]+\/?$/.test(s)
@@ -238,7 +243,7 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
     sources[role] = fname; tick()
   }))
 
-  const out = { ...r.manifest, origin: r.origin }
+  const out = installManifest(r.manifest, r.origin)
   writeFileSync(join(dst, "manifest.json"), JSON.stringify(out, null, 2) + "\n")
 
   if (r.tmp) rmSync(r.staged, { recursive: true, force: true })

@@ -109,8 +109,6 @@ export async function previewReviewBundle(opts: BundleOpts): Promise<ReviewBundl
     width: eikon.meta.width,
     height: eikon.meta.height,
     poster: poster(eikon),
-    license,
-    provenance,
     review_status: "pending",
     source: `${eikon.meta.name}/`,
     preview_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,

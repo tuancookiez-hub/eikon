@@ -28,8 +28,8 @@ bunx eikon info ares                 # what's installed, where it came from
 ```
 
 Lands in `$HERMES_HOME/eikons/<name>/`. herm's Gallery tab does the same
-in-process; its Studio tab fetches source on demand via the `source_url`
-baked into the `.eikon` header.
+in-process; its Studio tab fetches package source from the package/catalog
+metadata. Runtime `.eikon` streams stay standalone and do not carry source URLs.
 
 ## Make one
 
