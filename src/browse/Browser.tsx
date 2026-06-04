@@ -86,7 +86,7 @@ export function Browser(props: {
                           <span> </span>
                           <strong>{trunc(e.name, listW - 6)}</strong>
                         </text>
-                        <text fg={C.faint}>{`  ${e.author ?? "—"} · ${e.w}×${e.h}`}</text>
+                        <text fg={C.faint}>{`  ${e.author ?? "—"}`}</text>
                       </box>
                     )
                   })}
