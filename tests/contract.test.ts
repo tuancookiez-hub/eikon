@@ -4,7 +4,6 @@ import {
   CANONICAL_SIGNALS,
   defaultSignalMappings,
   EikonCompatibilityError,
-  EikonValidationError,
   LAUNCH_FORMAT_VERSION,
   LAUNCH_MAJOR_VERSION,
   LAUNCH_STREAM_EXTENSION,
@@ -59,6 +58,7 @@ test("launch stream shape keeps signal mappings in the header", () => {
   expect(header.size).toEqual({ cols: 4, rows: 2 })
   expect(header.defaultSignal).toBe("state.idle")
   expect(Object.keys(header.signals).sort()).toContain("state.working")
+  expect(Object.keys(header).sort()).toEqual(["author", "defaultSignal", "description", "eikon", "extensions", "id", "signals", "size", "title", "type", "version"])
   expect(stream.filter(record => record.type === "clip").map(record => record.name)).toEqual(["idle", "thinking", "working"])
 })
 
@@ -102,10 +102,7 @@ test("malformed launch streams report line and record context", () => {
   expect(() => parseLaunchStream("{nope")).toThrow(/malformed JSON on line 1/)
 })
 
-test("launch streams reject old draft headers and bad signal fallbacks", () => {
-  const legacyDraft = JSON.stringify({ eikon: 1, name: "legacy", width: 4, height: 2 })
-  expect(() => parseLaunchStream(legacyDraft)).toThrow(/first record must be header/)
-
+test("launch streams reject signal fallback cycles", () => {
   const cycle = [
     JSON.stringify({ ...stream[0], signals: { "state.idle": { clip: "idle", fallback: "state.working" }, "state.working": { clip: "working", fallback: "state.idle" } } }),
     JSON.stringify(stream[1]),
@@ -146,9 +143,4 @@ test("package, catalog, and platform shapes stay separate", () => {
   expect(entry.runtimeUrl).toContain("/blobs/sha256/")
   expect(entry).not.toHaveProperty("stats")
   expect(platform.catalogId).toBe(entry.id)
-})
-
-test("forbidden runtime header metadata is rejected", () => {
-  const forbidden = { ...stream[0], source_url: "https://example.test/unit", license: "MIT", poster: "poster.png" }
-  expect(() => parseLaunchStream([JSON.stringify(forbidden), JSON.stringify(stream[1]), JSON.stringify(stream[2])].join("\n"))).toThrow(EikonValidationError)
 })

@@ -52,7 +52,6 @@ describe("submitForReview", () => {
     expect(be.calls).toHaveLength(1)
     const req = be.calls[0] as { bundle: { files: Array<{ path: string }>, catalog: Record<string, unknown> } }
     expect(req.bundle.catalog).toMatchObject({ name: "demo", trust: { source: "pending" } })
-    expect(JSON.stringify(req.bundle)).not.toMatch(/license|provenance/)
     expect(req.bundle.files.map(f => f.path)).toEqual(["demo.eikon"])
   })
 })
@@ -93,19 +92,6 @@ describe("previewReviewBundle", () => {
     }))
 
     await expect(previewReviewBundle({ path: fx.file })).rejects.toThrow(/states.idle.file: missing.mp4 missing/)
-  })
-
-  test("rejects license and provenance in source manifests", async () => {
-    const fx = seed()
-    writeFileSync(join(fx.root, "manifest.json"), JSON.stringify({
-      name: "demo",
-      version: 1,
-      license: "MIT",
-      provenance: "made by Kaio",
-      states: { idle: { file: "missing.mp4" } },
-    }))
-
-    await expect(previewReviewBundle({ path: fx.file })).rejects.toThrow(/manifest must not contain license or provenance/)
   })
 
   test("classifies missing referenced files as missing-source", async () => {

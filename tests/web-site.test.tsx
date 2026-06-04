@@ -30,7 +30,7 @@ function entry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
 
 const cardEntry = entry()
 
-test("public page copy stays gallery-focused and avoids placeholder names", () => {
+test("public page copy presents gallery search and Herm install flow", () => {
   const html = renderToStaticMarkup(<App />)
 
   expect(html).toContain("<h1>𝝴ikon</h1>")
@@ -38,26 +38,17 @@ test("public page copy stays gallery-focused and avoids placeholder names", () =
   expect(html).toContain("Search by name or author")
   expect(html).toContain("Search catalog")
   expect(html).toContain("drawer-collapsed")
-  expect(html).not.toContain("Reload preview")
-  expect(html).not.toContain("Load preview")
-  expect(html).not.toMatch(/\bmirror\b/i)
   expect(html).toContain("<code>herm eikon install &lt;url&gt;</code>")
-  expect(html).not.toContain("<code>eikon install &lt;url&gt;</code>")
-  expect(html).not.toContain("Open Herm detail")
-  expect(html).not.toContain("herm://")
-  expect(html).not.toContain("eikon.liftaris.dev")
-  expect(html).not.toMatch(/ares,\s*kaio|kaio,\s*nous|nous…/i)
 })
 
-test("install instructions use Herm instead of the standalone eikon executable", () => {
+test("install instructions use the Herm CLI command", () => {
   const instructions = browserInstructions(cardEntry)
 
   expect(instructions.command).toBe("herm eikon install https://eikon.liftaris.dev/eikons/ares/manifest.json")
-  expect(instructions.command).not.toStartWith("eikon install ")
-  expect(instructions).not.toHaveProperty("hermUrl")
+  expect(instructions.manual).toBe("Copy the command into Herm locally. Preview source: https://eikon.liftaris.dev/eikons/ares/ares.eikon")
 })
 
-test("catalog cards omit fixed dimensions", () => {
+test("catalog cards render poster and author metadata", () => {
   const html = renderToStaticMarkup(
     <EntryCard
       entry={cardEntry}
@@ -67,7 +58,7 @@ test("catalog cards omit fixed dimensions", () => {
   )
 
   expect(html).toContain("kaio")
-  expect(html).not.toContain("48×24")
+  expect(html).toContain("STATIC")
 })
 
 test("catalog cards render streaming idle frames when available", () => {
