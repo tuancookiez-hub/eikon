@@ -20,13 +20,13 @@ test("remote catalog: index + load round-trip over http", async () => {
   expect(xs.length).toBe(3)
   expect(xs.find(e => e.name === "ares")?.glyph).toBe("⚔")
   const raw = await cat.load("mono")
-  expect(raw.startsWith('{"eikon"')).toBe(true)
+  expect(raw.startsWith('{"type":"header","eikon":1')).toBe(true)
 })
 
-test("lint: accepts valid, rejects missing glyph", async () => {
+test("lint: accepts valid launch streams, rejects missing author", async () => {
   const good = await Bun.file(resolve(dir, "ares/ares.eikon")).text()
   expect(lint(good).meta.name).toBe("ares")
 
-  const bad = good.replace('"glyph":"⚔"', '"x":1')
-  expect(() => lint(bad)).toThrow(/glyph required/)
+  const bad = good.replace('"author":{"name":"kaio"}', '"author":{}')
+  expect(() => lint(bad)).toThrow(/author required/)
 })

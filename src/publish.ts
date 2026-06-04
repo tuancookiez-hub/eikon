@@ -114,7 +114,7 @@ export async function previewReviewBundle(opts: BundleOpts): Promise<ReviewBundl
     review_status: "pending",
     source: `${eikon.meta.name}/`,
     preview_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
-    install_url: manifest ? `${eikon.meta.name}/manifest.json` : `${eikon.meta.name}/${eikon.meta.name}.eikon`,
+    package_url: manifest ? `${eikon.meta.name}/manifest.json` : undefined,
   }, "https://eikon.liftaris.dev/eikons/", { allowPrivate: true })
   return { root, packed, files, meta: eikon.meta, ...(manifest ? { manifest } : {}), catalog, license, provenance }
 }

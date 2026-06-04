@@ -5,6 +5,7 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
+    "./browser": "./src/browser.ts",
     "./catalog": "./src/catalog.ts",
     "./player": "./src/web/player.tsx"
   },

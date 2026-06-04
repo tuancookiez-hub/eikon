@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { CatalogEntry } from "../contract/shape"
-import { CANONICAL_STATES } from "../contract/shape"
+import type { CatalogEntry } from "../browser"
+import { CANONICAL_STATES } from "../browser"
 import { AsciiPreview, EntryCard, browserInstructions, createWebCatalog, webPlaybackFrame, type PreviewState } from "./player"
 
 const loc = typeof location === "undefined" ? undefined : location

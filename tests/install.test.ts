@@ -14,7 +14,7 @@ const man = (name: string, extra = {}) => JSON.stringify({
 }, null, 2)
 
 const launch = [
-  JSON.stringify({ type: "header", asset: { version: "2.0", width: 4, height: 2 }, name: "launch" }),
+  JSON.stringify({ type: "header", eikon: 1, title: "launch", size: { cols: 4, rows: 2 }, defaultSignal: "state.idle", signals: { "state.idle": { clip: "idle" } } }),
   JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 1 }),
   JSON.stringify({ type: "frame", clip: "idle", index: 0, rows: ["abcd", "efgh"] }),
 ].join("\n") + "\n"
@@ -24,12 +24,12 @@ const pkg = (name: string) => JSON.stringify({
   schemaVersion: "1.0",
   id: `liftaris/${name}`,
   name,
-  compatibility: { eikon: ">=2 <3" },
-  entrypoints: { default: `streams/${name}.eikonl` },
+  compatibility: { eikon: ">=1 <2" },
+  entrypoints: { default: `streams/${name}.eikon` },
   files: [
-    { path: `streams/${name}.eikonl`, role: "stream" },
-    { path: "source/base.png", role: "source" },
-    { path: "source/idle.mp4", role: "source" },
+    { path: `streams/${name}.eikon`, role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl" },
+    { path: "source/base.png", role: "source.base", mediaType: "image/png" },
+    { path: "source/idle.mp4", role: "source.clip", mediaType: "video/mp4", signal: "state.idle" },
   ],
   source: { base: "source/base.png", states: { idle: { file: "source/idle.mp4" } } },
 }, null, 2)
@@ -165,7 +165,7 @@ describe("resolve + install: launch package", () => {
     mkdirSync(join(src, "streams"), { recursive: true })
     mkdirSync(join(src, "source"), { recursive: true })
     writeFileSync(join(src, "manifest.json"), pkg("launch"))
-    writeFileSync(join(src, "streams", "launch.eikonl"), launch)
+    writeFileSync(join(src, "streams", "launch.eikon"), launch)
     writeFileSync(join(src, "source", "base.png"), Buffer.from([137, 80, 78, 71]))
     writeFileSync(join(src, "source", "idle.mp4"), Buffer.alloc(1024))
   })
@@ -174,10 +174,11 @@ describe("resolve + install: launch package", () => {
     const out = await install(src, dest, { name: "launch-local" })
     expect(out.n).toBe(2)
     expect(out.sources).toEqual({ base: "base.png", idle: "idle.mp4" })
-    expect(existsSync(join(out.dir, "launch-local.eikonl"))).toBe(true)
     expect(existsSync(join(out.dir, "launch-local.eikon"))).toBe(true)
     const packed = readFileSync(join(out.dir, "launch-local.eikon"), "utf8")
-    expect(JSON.parse(packed.split("\n", 1)[0]!).eikon).toBe(1)
+    const first = JSON.parse(packed.split("\n", 1)[0]!)
+    expect(first.type).toBe("header")
+    expect(first.eikon).toBe(1)
   })
 })
 
@@ -212,7 +213,7 @@ describe("resolve: catalog name", () => {
   test("bare name → catalog → source URL → install", async () => {
     const out = await install("ares", dest, { name: "ares-cat", catalog: base })
     expect(out.n).toBe(3)
-    expect(out.origin.source).toMatch(/\/eikons\/ares\/$/)
+    expect(out.origin.source).toMatch(/\/eikons\/ares\/manifest\.json$/)
   })
 
   test("unknown name throws", async () => {

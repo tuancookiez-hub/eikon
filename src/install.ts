@@ -11,7 +11,6 @@ import { join, extname, basename } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { STATES, FORMAT_VERSION, DEFAULT_CATALOG, type State } from "./ui/spec"
-import { serialize, type Doc } from "./ui/format"
 import { loadCatalogEntries } from "./catalog"
 import { PACKAGE_KIND, type EikonPackageManifest } from "./contract/shape"
 import { validatePackageManifest } from "./package/manifest"
@@ -109,32 +108,13 @@ function checkRequires(spec: string | undefined): void {
   if (!ok) throw new Error(`eikon_requires ${spec}: this build supports format ${cur}`)
 }
 
-function legacy(text: string, name: string): string {
-  const eikon = parseLaunchStream(text)
-  const doc: Doc = {
-    header: { eikon: 1, name, width: eikon.meta.width, height: eikon.meta.height, glyph: eikon.meta.glyph },
-    states: eikon.meta.states.flatMap(state => {
-      const clip = eikon.clips.get(state)
-      if (!clip) return []
-      return [{
-        state,
-        fps: clip.fps,
-        frame_count: clip.frames.length,
-        loop_from: clip.loopFrom,
-        frames: clip.frames.map((rows, i) => ({ f: i, data: rows.join("\n") })),
-      }]
-    }),
-  }
-  return serialize(doc)
-}
-
-type IndexEntry = { name: string; source?: string; packageUrl?: string; installUrl?: string; [k: string]: unknown }
+type IndexEntry = { name: string; source?: string; packageUrl?: string; [k: string]: unknown }
 
 async function catalog(name: string, url: string): Promise<string> {
   const base = url.replace(/\/?$/, "/")
   const entries = await loadCatalogEntries(base)
   const entry = entries.find(e => e.name === name || e.id === name)
-  if (entry) return (entry.installUrl ?? entry.packageUrl).replace(/manifest\.json$/, "")
+  if (entry) return entry.packageUrl
 
   const res = await fetch(base + "index.json")
   if (!res.ok) throw new Error(`catalog: HTTP ${res.status}`)
@@ -172,7 +152,7 @@ export async function resolve(src: string, opts?: Pick<Opts, "catalog">): Promis
   // http(s) manifest base.
   if (/^https?:\/\//.test(src)) {
     const raw = new URL(src)
-    const href = raw.pathname.endsWith("/manifest.json") ? raw.href : new URL("manifest.json", src.replace(/\/?$/, "/")).href
+    const href = raw.pathname.endsWith(".json") ? raw.href : new URL("manifest.json", src.replace(/\/?$/, "/")).href
     const base = new URL(".", href).href
     const res = await fetch(href)
     if (!res.ok) throw new Error(`manifest: HTTP ${res.status}`)
@@ -224,8 +204,8 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
           return res.text()
         })
       : readFileSync(join(r.staged, rel), "utf8")
-    writeFileSync(join(dst, `${name}.eikonl`), text)
-    writeFileSync(join(dst, `${name}.eikon`), legacy(text, name))
+    parseLaunchStream(text)
+    writeFileSync(join(dst, `${name}.eikon`), text)
   }
 
   // The packed .eikon travels when present in the source.

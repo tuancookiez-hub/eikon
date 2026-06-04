@@ -1,12 +1,16 @@
 /** @jsxImportSource react */
-import type { CatalogEntry } from "../contract/shape"
-import { parseLaunchStream } from "../stream"
-import { parse, type Clip, type Eikon } from "../ui/eikon"
+import {
+  loadCatalogEntries,
+  parseLaunchStream,
+  type BrowserClip,
+  type BrowserEikon,
+  type CatalogEntry,
+} from "../browser"
 
 export type PreviewState =
   | { status: "idle" }
   | { status: "loading"; entry: CatalogEntry }
-  | { status: "ready"; entry: CatalogEntry; raw: string; eikon: Eikon }
+  | { status: "ready"; entry: CatalogEntry; raw: string; eikon: BrowserEikon }
   | { status: "error"; entry?: CatalogEntry; error: string }
 
 export type WebState = {
@@ -35,7 +39,7 @@ export type WebCatalogOptions = Partial<WebPolicy> & {
 const defaults: WebPolicy = { maxBytes: 5_000_000, timeoutMs: 8_000, concurrency: 3, cacheEntries: 24 }
 const blocked = /\b(publish|auth|login|token|activate|use)\b|herm:\/\//i
 const keyFor = (entry: CatalogEntry) => entry.sourceKey || entry.id || entry.name
-const previewFor = (entry: CatalogEntry) => entry.preview || entry.installUrl || entry.packageUrl
+const previewFor = (entry: CatalogEntry) => entry.runtimeUrl
 
 export function AsciiPreview(props: { lines: string[] }) {
   return <pre className="ascii" aria-label="Eikon ASCII preview"><span className="asciiArt">{props.lines.join("\n")}</span></pre>
@@ -54,17 +58,15 @@ export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPic
   )
 }
 
-export function parsePreview(text: string): Eikon {
-  const first = text.split("\n", 1)[0]
-  if (first?.includes('"type":"header"') || first?.includes('"type": "header"')) return parseLaunchStream(text)
-  return parse(text)
+export function parsePreview(text: string): BrowserEikon {
+  return parseLaunchStream(text)
 }
 
-export function stateClip(eikon: Eikon, state: string): Clip | undefined {
+export function stateClip(eikon: BrowserEikon, state: string): BrowserClip | undefined {
   return eikon.clips.get(state) ?? eikon.clips.get("idle") ?? eikon.clips.values().next().value
 }
 
-export function webPlaybackFrame(eikon: Eikon, state: string, tickMs: number, startedAtMs = 0): string[] {
+export function webPlaybackFrame(eikon: BrowserEikon, state: string, tickMs: number, startedAtMs = 0): string[] {
   const clip = stateClip(eikon, state)
   const n = clip?.frames.length ?? 0
   if (!clip || n === 0) return []
@@ -85,7 +87,7 @@ export function safePublicUrl(raw: string): string {
 }
 
 export function browserInstructions(entry: CatalogEntry) {
-  const target = safePublicUrl(entry.installUrl || entry.packageUrl)
+  const target = safePublicUrl(entry.packageUrl)
   const preview = safePublicUrl(previewFor(entry))
   const command = `herm eikon install ${target}`
   if (blocked.test(command)) throw new Error("unsafe Herm instructions")
@@ -184,11 +186,7 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
       state.error = undefined
       try {
         const base = opts.base ?? "/eikons"
-        if (loader) state.entries = await loader(base, fetcher)
-        else {
-          const { loadCatalogEntries } = await import("../catalog")
-          state.entries = await loadCatalogEntries(base, fetcher)
-        }
+        state.entries = loader ? await loader(base, fetcher) : await loadCatalogEntries(base, fetcher)
         state.status = "ready"
       } catch (err) {
         state.status = "error"

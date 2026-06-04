@@ -1,2 +1,2 @@
-export { parseLaunchStream, serializeLaunchStream, type ParsedLaunchStream } from "./parse"
+export { parseLaunchStream, resolveSignal, serializeLaunchStream, type ParsedClip, type ParsedLaunchMeta, type ParsedLaunchStream, type ResolvedSignal } from "./parse"
 export { legacyToLaunchStream, migrateLegacyEikon, type LegacyMigration, type MigratedEikon } from "./legacy"

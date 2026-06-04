@@ -2,6 +2,7 @@ import { EikonValidationError } from "./contract/errors"
 import {
   CATALOG_KIND,
   CATALOG_SCHEMA_VERSION,
+  LAUNCH_MEDIA_TYPE,
   type CatalogEntry,
   type EikonPackageManifest,
 } from "./contract/shape"
@@ -13,14 +14,16 @@ export const DEFAULT_PUBLIC_CATALOG = DEFAULT_CATALOG
 
 export type CatalogOptions = { allowPrivate?: boolean }
 export type CatalogTrust = {
-  license?: string
-  provenance?: string
   reviewStatus?: string
+  manifestDigest?: string
+  runtimeDigest?: string
 }
 export type CatalogIndexEntry = {
   name: string
+  version?: string
   author?: string
   glyph?: string
+  tags?: string[]
   w?: number
   h?: number
   width?: number
@@ -28,13 +31,17 @@ export type CatalogIndexEntry = {
   poster?: string
   source?: string
   preview_url?: string
-  install_url?: string
+  preview?: string
+  runtime_url?: string
+  runtimeUrl?: string
+  package_url?: string
+  packageUrl?: string
+  detail_url?: string
+  detailUrl?: string
   source_url?: string
   description?: string
-  license?: string
-  provenance?: string
-  review_status?: string
   reviewed?: boolean
+  review_status?: string
   [key: string]: unknown
 }
 export type PublicCatalogEntry = CatalogEntry & {
@@ -43,8 +50,6 @@ export type PublicCatalogEntry = CatalogEntry & {
   width: number
   height: number
   previewUrl: string
-  installUrl: string
-  provenanceUrl?: string
   identityKey: string
   raw: CatalogIndexEntry | CatalogEntry
   trust: CatalogTrust & NonNullable<CatalogEntry["trust"]>
@@ -62,7 +67,6 @@ type PackageCatalogEntry = {
   packageUrl: string
   sourceKey?: string
   detailUrl?: string
-  installUrl?: string
 }
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
@@ -79,6 +83,7 @@ const clean = (value: unknown) => typeof value === "string" ? value.replace(/[\u
 const cleanTextBlock = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, "") : undefined
 const safeName = (value: unknown, fallback = "unnamed") => clean(value) || fallback
 const safeNum = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : 0
+const isRuntimeUrl = (value: string) => value.endsWith(".eikon") || /\/blobs\/sha256\/[A-Fa-f0-9]{16,}(?:\.eikon)?$/.test(new URL(value).pathname)
 
 const privateIpv4 = (a: number, b: number) => {
   if (a === 10) return true
@@ -138,8 +143,8 @@ function relativeUrl(base: string, path?: string): string | undefined {
 }
 
 function assetUrl(raw: string | undefined, base: string, fallback: string, opts: CatalogOptions = {}) {
-  if (!raw) return publicCatalogUrl(new URL(fallback, slash(base)).href, undefined, opts)
-  const out = publicCatalogUrl(raw, raw.includes("://") ? undefined : slash(base), opts)
+  const input = raw || fallback
+  const out = publicCatalogUrl(input, input.includes("://") ? undefined : slash(base), opts)
   const root = new URL(slash(base))
   const parsed = new URL(out)
   if (parsed.host !== root.host) throw new Error(`public catalog URL host must match catalog host: ${out}`)
@@ -151,59 +156,20 @@ function sourceDir(entry: CatalogIndexEntry, base: string, name: string, opts: C
   return assetUrl(typeof entry.source === "string" ? entry.source : undefined, base, `${name}/`, opts)
 }
 
-function entryAssetUrl(raw: unknown, base: string, dir: string, fallback: string, opts: CatalogOptions) {
-  if (typeof raw !== "string") return assetUrl(undefined, dir, fallback, opts)
-  if (raw.includes("://") || raw.startsWith("/")) return assetUrl(raw, base, fallback, opts)
-  if (raw.startsWith("./")) return assetUrl(raw, dir, fallback, opts)
-  const prefix = new URL(dir).pathname.replace(new URL(slash(base)).pathname, "").replace(/^\//, "")
-  const relativeBase = raw === prefix || raw.startsWith(prefix) ? base : dir
-  return assetUrl(raw, relativeBase, fallback, opts)
+function digestFor(man: EikonPackageManifest, path: string): string | undefined {
+  return man.files?.find(file => file.path === path)?.digest
+}
+
+function runtimePath(man: EikonPackageManifest): string {
+  return man.entrypoints.default
 }
 
 export function catalogEntry(entry: CatalogIndexEntry, base = DEFAULT_PUBLIC_CATALOG, opts: CatalogOptions = {}): PublicCatalogEntry {
-  const name = safeName(entry.name)
-  const author = clean(entry.author)
-  const desc = clean(entry.description)
-  const dir = sourceDir(entry, base, name, opts)
-  const previewUrl = entryAssetUrl(entry.preview_url, base, dir, `${name}.eikon`, opts)
-  const installUrl = entryAssetUrl(entry.install_url, base, dir, "", opts)
-  const sourceUrl = typeof entry.source_url === "string" ? publicCatalogUrl(entry.source_url, slash(base), opts) : undefined
-  const review = clean(entry.review_status) ?? (entry.reviewed === true ? "reviewed" : undefined)
-  const reviewStatus = review && REVIEWED.has(review) ? review : review
-  const trust = {
-    ...(clean(entry.license) ? { license: clean(entry.license) } : {}),
-    ...(clean(entry.provenance) ? { provenance: clean(entry.provenance) } : {}),
-    ...(reviewStatus ? { reviewStatus } : {}),
-  }
-  return {
-    kind: CATALOG_KIND,
-    schemaVersion: CATALOG_SCHEMA_VERSION,
-    id: name,
-    sourceKey: dir,
-    name,
-    ...(author ? { author } : {}),
-    ...(clean(entry.glyph) ? { glyph: clean(entry.glyph) } : {}),
-    w: safeNum(entry.width ?? entry.w),
-    h: safeNum(entry.height ?? entry.h),
-    width: safeNum(entry.width ?? entry.w),
-    height: safeNum(entry.height ?? entry.h),
-    poster: cleanTextBlock(entry.poster) ?? "",
-    ...(desc ? { description: desc } : {}),
-    trust,
-    previewUrl,
-    preview: previewUrl,
-    packageUrl: installUrl.endsWith("manifest.json") ? installUrl : joinUrl(installUrl, "manifest.json"),
-    installUrl,
-    compatibility: { eikon: ">=1 <3", available: true },
-    ...(sourceUrl ? { provenanceUrl: sourceUrl } : {}),
-    identityKey: sourceUrl ?? dir,
-    raw: entry,
-  }
+  return publicFromEntry(fromLegacy(entry, base, opts), entry)
 }
 
 function publicFromEntry(entry: CatalogEntry, raw: CatalogEntry | CatalogIndexEntry = entry): PublicCatalogEntry {
-  const previewUrl = entry.preview ?? entry.installUrl ?? entry.packageUrl
-  const installUrl = entry.installUrl ?? entry.packageUrl
+  const previewUrl = entry.preview ?? entry.runtimeUrl
   const trust = entry.trust ?? {}
   const reviewStatus = "reviewStatus" in trust && typeof trust.reviewStatus === "string" ? trust.reviewStatus : entry.trust?.reviewed ? "reviewed" : undefined
   return {
@@ -211,12 +177,10 @@ function publicFromEntry(entry: CatalogEntry, raw: CatalogEntry | CatalogIndexEn
     trust: {
       ...trust,
       ...(reviewStatus ? { reviewStatus } : {}),
-      ...(entry.trust?.source ? { provenance: entry.trust.source } : {}),
     },
     poster: entry.poster ?? "",
     preview: previewUrl,
     previewUrl,
-    installUrl,
     w: 0,
     h: 0,
     width: 0,
@@ -230,11 +194,14 @@ function fromPackage(input: PackageCatalogEntry, root?: string): CatalogEntry {
   const man = validatePackageManifest(input.manifest)
   const packageUrl = url(input.packageUrl, root)
   const base = packageUrl.slice(0, packageUrl.lastIndexOf("/") + 1)
+  const runtime = runtimePath(man)
+  const runtimeUrl = relativeUrl(base, runtime)!
   return validateCatalogEntry({
     kind: CATALOG_KIND,
     schemaVersion: CATALOG_SCHEMA_VERSION,
     id: man.id,
-    sourceKey: input.sourceKey ?? packageUrl,
+    version: man.version,
+    sourceKey: input.sourceKey ?? `registry:${new URL(packageUrl).host}:${man.id}${man.version ? `@${man.version}` : ""}`,
     name: man.name,
     title: man.display?.title,
     author: man.display?.author,
@@ -242,35 +209,44 @@ function fromPackage(input: PackageCatalogEntry, root?: string): CatalogEntry {
     glyph: man.display?.glyph,
     tags: man.display?.tags,
     poster: relativeUrl(base, man.poster),
-    preview: relativeUrl(base, man.preview ?? man.entrypoints.default),
+    preview: relativeUrl(base, man.preview) ?? runtimeUrl,
+    runtimeUrl,
     packageUrl,
     detailUrl: input.detailUrl ? url(input.detailUrl, base) : undefined,
-    installUrl: input.installUrl ? url(input.installUrl, base) : packageUrl,
     compatibility: { eikon: man.compatibility.eikon, hosts: man.compatibility.hosts, available: true },
+    trust: { manifestDigest: digestFor(man, "manifest.json"), runtimeDigest: digestFor(man, runtime) },
   })
 }
 
-function fromLegacy(input: LegacyCatalogEntry, base?: string): CatalogEntry {
+function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptions = {}): CatalogEntry {
   if (!NAME_RE.test(input.name)) throw new EikonValidationError([problem("name", "safe catalog name required")])
   const source = input.source ?? `${input.name}/`
   if (/^file:|^javascript:|^data:/i.test(source)) throw new EikonValidationError([problem("packageUrl", "http(s) URL required")])
-  const packageUrl = /^https?:\/\//.test(source) ? url(source) : base ? joinUrl(base, source) : source
-  const manifest = packageUrl.endsWith("manifest.json") ? packageUrl : joinUrl(packageUrl, "manifest.json")
-  const root = packageUrl.endsWith("manifest.json") ? packageUrl.slice(0, packageUrl.lastIndexOf("/") + 1) : packageUrl
+  const root = /^https?:\/\//.test(source) ? publicCatalogUrl(source, undefined, opts) : base ? joinUrl(base, source) : source
+  const runtimeUrl = typeof input.runtimeUrl === "string" ? url(input.runtimeUrl, root) : typeof input.runtime_url === "string" ? url(input.runtime_url, root) : joinUrl(root, `${input.name}.eikon`)
+  const packageUrl = typeof input.packageUrl === "string" ? url(input.packageUrl, root) : typeof input.package_url === "string" ? url(input.package_url, root) : joinUrl(root, "manifest.json")
+  const preview = typeof input.preview === "string" ? relativeUrl(root, input.preview) : typeof input.preview_url === "string" ? relativeUrl(root, input.preview_url) : runtimeUrl
+  const review = clean(input.review_status) ?? (input.reviewed === true ? "reviewed" : undefined)
+  const reviewStatus = review && REVIEWED.has(review) ? review : review
   return validateCatalogEntry({
     kind: CATALOG_KIND,
     schemaVersion: CATALOG_SCHEMA_VERSION,
     id: input.name,
-    sourceKey: /^https?:\/\//.test(packageUrl) ? packageUrl : input.name,
+    version: input.version,
+    sourceKey: /^https?:\/\//.test(root) ? root : input.name,
     name: input.name,
-    author: input.author,
-    glyph: input.glyph,
-    poster: input.poster,
-    preview: typeof input.preview_url === "string" ? relativeUrl(root, input.preview_url) : joinUrl(root, `${input.name}.eikon`),
-    packageUrl: manifest,
-    installUrl: typeof input.install_url === "string" ? relativeUrl(root, input.install_url) : root,
-    compatibility: { eikon: ">=1 <3", available: true },
-    trust: { source: input.provenance, reviewed: input.reviewed === true },
+    title: clean(input.name),
+    author: clean(input.author),
+    glyph: clean(input.glyph),
+    tags: Array.isArray(input.tags) ? input.tags.filter(text) as string[] : undefined,
+    poster: cleanTextBlock(input.poster),
+    preview,
+    runtimeUrl,
+    packageUrl,
+    detailUrl: typeof input.detailUrl === "string" ? url(input.detailUrl, root) : typeof input.detail_url === "string" ? url(input.detail_url, root) : undefined,
+    description: clean(input.description),
+    compatibility: { eikon: ">=1 <2", available: true },
+    trust: { reviewed: input.reviewed === true, ...(reviewStatus ? { source: reviewStatus } : {}) },
   })
 }
 
@@ -282,11 +258,14 @@ export function validateCatalogEntry(entry: CatalogEntry): CatalogEntry {
     if (value != null && !text(value)) errs.push(problem(key, "unsafe text"))
   }
   try { url(entry.packageUrl) } catch { errs.push(problem("packageUrl", "http(s) URL required")) }
-  for (const key of ["poster", "preview", "detailUrl", "installUrl"] as const) {
+  try { url(entry.runtimeUrl) } catch { errs.push(problem("runtimeUrl", "http(s) URL required")) }
+  if (entry.runtimeUrl && !isRuntimeUrl(entry.runtimeUrl)) errs.push(problem("runtimeUrl", "must point at launch .eikon stream or content-addressed blob"))
+  for (const key of ["poster", "preview", "detailUrl"] as const) {
     const value = entry[key]
     if (value && /^file:|^javascript:|^data:/i.test(value)) errs.push(problem(key, "unsafe URL"))
   }
   if (!entry.compatibility?.eikon) errs.push(problem("compatibility.eikon", "required"))
+  if (entry.compatibility?.eikon && !/>=?\s*1/.test(entry.compatibility.eikon)) errs.push(problem("compatibility.eikon", "must support launch major version 1"))
   if (errs.length) throw new EikonValidationError(errs)
   return entry
 }
@@ -331,9 +310,9 @@ export async function loadCatalog(base = DEFAULT_PUBLIC_CATALOG, fetcher: Fetche
     base: root,
     entries,
     async load(entry) {
-      const item = typeof entry === "string" ? entries.find(e => e.identityKey === entry || e.sourceKey === entry || e.name === entry) : entry
+      const item = typeof entry === "string" ? entries.find(e => e.identityKey === entry || e.sourceKey === entry || e.id === entry || e.name === entry) : entry
       if (!item) throw new Error(`catalog: unknown eikon "${entry}"`)
-      const out = await fetcher(item.previewUrl)
+      const out = await fetcher(item.runtimeUrl)
       if (!out.ok) throw new Error(`catalog: HTTP ${out.status}`)
       return out.text()
     },

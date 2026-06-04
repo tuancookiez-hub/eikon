@@ -1,0 +1,112 @@
+{
+  "kind": "eikon.package",
+  "schemaVersion": "1.0",
+  "id": "liftaris/ares",
+  "name": "ares",
+  "version": "1.0.0",
+  "display": {
+    "title": "ares",
+    "author": "kaio",
+    "glyph": "⚔"
+  },
+  "compatibility": {
+    "eikon": ">=1 <2"
+  },
+  "legacy": {
+    "sourceFormat": "pre-launch .eikon draft",
+    "migration": "converted",
+    "notes": [
+      "moved legacy metadata: author, created, source_url"
+    ]
+  },
+  "source": {
+    "base": "blobs/sha256/fc7ec459ba9b6e434b9c402c54aaed0d86d26dccaaa8143ab75ac7adb20e8add",
+    "states": {
+      "idle": {
+        "file": "blobs/sha256/cb375fc6d3e51dc895bbaee36c492b7852b36b98962e5ac4797612a7625c0003"
+      },
+      "listening": {
+        "file": "blobs/sha256/00faabfa18eb181a6d8a5863c23573d90cb43aeb3ef11ec962e2478598ea9775"
+      },
+      "thinking": {
+        "file": "blobs/sha256/90ba7919a10214fc6b0c2e7a848b2c99f3f37d268b9486cce76ee87e8f472ab4"
+      },
+      "speaking": {
+        "file": "blobs/sha256/2e833bc6f73cb2f70341e08b0995caf80e7a2e28f2eaca491bca886c0e0b0a2f"
+      },
+      "working": {
+        "file": "blobs/sha256/d16e2886089fd45383ffe1062d401e355d8efdf7c4f01c4981774c63f01e2ab6"
+      },
+      "error": {
+        "file": "blobs/sha256/c0fdccb5720b715b2df9e403390d3da5c5c6fe73bade314efd583e2f787d6649"
+      }
+    }
+  },
+  "entrypoints": {
+    "default": "blobs/sha256/f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6"
+  },
+  "files": [
+    {
+      "path": "blobs/sha256/f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6",
+      "role": "runtime",
+      "mediaType": "application/vnd.eikon.stream+jsonl",
+      "size": 1290412,
+      "digest": "sha256:f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6"
+    },
+    {
+      "path": "blobs/sha256/fc7ec459ba9b6e434b9c402c54aaed0d86d26dccaaa8143ab75ac7adb20e8add",
+      "role": "source.base",
+      "mediaType": "image/png",
+      "size": 208419,
+      "digest": "sha256:fc7ec459ba9b6e434b9c402c54aaed0d86d26dccaaa8143ab75ac7adb20e8add"
+    },
+    {
+      "path": "blobs/sha256/cb375fc6d3e51dc895bbaee36c492b7852b36b98962e5ac4797612a7625c0003",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 351562,
+      "digest": "sha256:cb375fc6d3e51dc895bbaee36c492b7852b36b98962e5ac4797612a7625c0003",
+      "signal": "state.idle"
+    },
+    {
+      "path": "blobs/sha256/00faabfa18eb181a6d8a5863c23573d90cb43aeb3ef11ec962e2478598ea9775",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 206305,
+      "digest": "sha256:00faabfa18eb181a6d8a5863c23573d90cb43aeb3ef11ec962e2478598ea9775",
+      "signal": "state.listening"
+    },
+    {
+      "path": "blobs/sha256/90ba7919a10214fc6b0c2e7a848b2c99f3f37d268b9486cce76ee87e8f472ab4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 209422,
+      "digest": "sha256:90ba7919a10214fc6b0c2e7a848b2c99f3f37d268b9486cce76ee87e8f472ab4",
+      "signal": "state.thinking"
+    },
+    {
+      "path": "blobs/sha256/2e833bc6f73cb2f70341e08b0995caf80e7a2e28f2eaca491bca886c0e0b0a2f",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 132738,
+      "digest": "sha256:2e833bc6f73cb2f70341e08b0995caf80e7a2e28f2eaca491bca886c0e0b0a2f",
+      "signal": "state.speaking"
+    },
+    {
+      "path": "blobs/sha256/d16e2886089fd45383ffe1062d401e355d8efdf7c4f01c4981774c63f01e2ab6",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 445208,
+      "digest": "sha256:d16e2886089fd45383ffe1062d401e355d8efdf7c4f01c4981774c63f01e2ab6",
+      "signal": "state.working"
+    },
+    {
+      "path": "blobs/sha256/c0fdccb5720b715b2df9e403390d3da5c5c6fe73bade314efd583e2f787d6649",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 165010,
+      "digest": "sha256:c0fdccb5720b715b2df9e403390d3da5c5c6fe73bade314efd583e2f787d6649",
+      "signal": "state.error"
+    }
+  ]
+}

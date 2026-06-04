@@ -15,6 +15,7 @@ export {
   defaultSignalMappings,
   isCanonicalState,
   validateLaunchCompatibility,
+  CANONICAL_SIGNALS,
   CANONICAL_STATES,
   CATALOG_KIND,
   CATALOG_SCHEMA_VERSION,
@@ -34,6 +35,7 @@ export {
   type LaunchClipRecord,
   type LaunchFrameRecord,
   type LaunchHeaderRecord,
+  type LaunchExtensionRecord,
   type LaunchStreamDocument,
   type LaunchStreamRecord,
   type PackageFileDescriptor,
@@ -44,8 +46,8 @@ export {
   type TriggerRule,
 } from "./contract/shape"
 export { validateVersionCompatibility, validateExtensionCompatibility } from "./contract/validation"
-export { parseLaunchStream, serializeLaunchStream, legacyToLaunchStream, migrateLegacyEikon,
-         type ParsedLaunchStream, type LegacyMigration, type MigratedEikon } from "./stream"
+export { parseLaunchStream, serializeLaunchStream, resolveSignal, legacyToLaunchStream, migrateLegacyEikon,
+         type ParsedLaunchStream, type ParsedClip, type ParsedLaunchMeta, type ResolvedSignal, type LegacyMigration, type MigratedEikon } from "./stream"
 export { validatePackageManifest, isSafeRelativePath } from "./package"
 export { loadCatalogEntries, normalizeCatalogEntry, searchCatalogEntries, validateCatalogEntry,
          CATALOG_VERSION, DEFAULT_PUBLIC_CATALOG, catalogEntry, loadCatalog, publicCatalogUrl, searchCatalog,

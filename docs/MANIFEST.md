@@ -4,9 +4,9 @@
 **Schema version:** `1.0`
 **Status:** Draft for launch implementation
 
-The package manifest is the launch package contract for an eikon. It describes how to find renderable streams, editable source media, poster/preview assets, compatibility, signal mappings, and optional extension data. It is separate from the stream format and from the public catalog entry.
+The package manifest is the launch install/edit/source contract for an eikon. It describes how to find renderable streams, optional editable source media, poster/preview assets, compatibility, content-addressed file descriptors, and optional edit metadata. It is separate from the `.eikon` stream format and from the public catalog entry.
 
-Older source-only manifests are still accepted by the legacy manifest reader during migration, but the launch manifest below is the shape gallery, registry, Herm marketplace, and package readers should target.
+Older source-only manifests are still accepted by migration tooling during conversion, but the launch manifest below is the shape gallery, registry, Herm marketplace, and package readers should target.
 
 ## Minimal manifest
 
@@ -16,8 +16,12 @@ Older source-only manifests are still accepted by the legacy manifest reader dur
   "schemaVersion": "1.0",
   "id": "liftaris/nous",
   "name": "nous",
-  "compatibility": { "eikon": ">=2 <3" },
-  "entrypoints": { "default": "streams/nous.eikonl" }
+  "version": "1.0.0",
+  "compatibility": { "eikon": ">=1 <2" },
+  "entrypoints": { "default": "streams/nous.eikon" },
+  "files": [
+    { "path": "streams/nous.eikon", "role": "runtime", "mediaType": "application/vnd.eikon.stream+jsonl", "size": 12345, "digest": "sha256:..." }
+  ]
 }
 ```
 
@@ -38,46 +42,39 @@ Older source-only manifests are still accepted by the legacy manifest reader dur
     "tags": ["monochrome"]
   },
   "compatibility": {
-    "eikon": ">=2 <3",
+    "eikon": ">=1 <2",
     "hosts": { "herm": ">=0.0.0" }
   },
   "entrypoints": {
-    "default": "streams/nous.eikonl"
+    "default": "streams/nous.eikon"
   },
   "files": [
-    { "path": "streams/nous.eikonl", "role": "stream", "mediaType": "application/vnd.eikon.stream+jsonl", "size": 12345, "digest": "sha256:..." },
-    { "path": "poster.txt", "role": "poster", "mediaType": "text/plain" },
-    { "path": "preview.mp4", "role": "preview", "mediaType": "video/mp4" }
+    { "path": "streams/nous.eikon", "role": "runtime", "mediaType": "application/vnd.eikon.stream+jsonl", "size": 12345, "digest": "sha256:..." },
+    { "path": "sources/base.png", "role": "source.base", "mediaType": "image/png", "size": 45678, "digest": "sha256:..." },
+    { "path": "sources/states/thinking/loop.mp4", "role": "source.clip", "signal": "state.thinking", "mediaType": "video/mp4", "size": 456789, "digest": "sha256:..." },
+    { "path": "posters/default.png", "role": "poster", "mediaType": "image/png", "size": 12345, "digest": "sha256:..." },
+    { "path": "preview.mp4", "role": "preview", "mediaType": "video/mp4", "size": 234567, "digest": "sha256:..." }
   ],
-  "source": {
-    "base": "source/base.png",
-    "states": {
-      "idle": { "file": "source/states/idle/loop.mp4", "role": "loop" },
-      "thinking": { "file": "source/states/thinking/start.mp4", "role": "start" }
-    }
+  "editability": {
+    "sourcesIncluded": true,
+    "mode": "full"
   },
-  "poster": "poster.txt",
+  "poster": "posters/default.png",
   "preview": "preview.mp4",
-  "signals": {
-    "state.idle": { "clip": "idle", "fallback": "state.idle" },
-    "state.listening": { "clip": "listening", "fallback": "state.idle" },
-    "state.thinking": { "clip": "thinking", "fallback": "state.idle" },
-    "state.speaking": { "clip": "speaking", "fallback": "state.thinking" },
-    "state.working": { "clip": "working", "fallback": "state.thinking" },
-    "state.error": { "clip": "error", "fallback": "state.idle" },
-    "approval.waiting": { "clip": "thinking", "fallback": "state.thinking" }
-  },
+  "bundles": [
+    { "format": "zip", "role": "full-source-export", "url": "downloads/liftaris-nous-1.0.0.zip", "size": 999999, "digest": "sha256:..." }
+  ],
   "triggers": [
     { "signal": "approval.waiting", "when": "reserved.host-rule", "fallback": "state.thinking" }
   ],
   "extensions": {
-    "used": ["eikon.signals.v1", "eikon.triggers.v1"],
+    "used": ["eikon.triggers.v1"],
     "required": []
   },
   "legacy": {
-    "sourceFormat": ".eikon",
+    "sourceFormat": "pre-launch .eikon draft",
     "migration": "converted",
-    "notes": ["author/license moved from v1 header to display/catalog metadata"]
+    "notes": ["author/license moved from draft header to display/catalog metadata"]
   }
 }
 ```
@@ -90,55 +87,72 @@ Older source-only manifests are still accepted by the legacy manifest reader dur
 | `schemaVersion` | yes | Package schema version. Launch uses `1.0`. |
 | `id` | yes | Stable package identity, distinct from display title. |
 | `name` | yes | Local install/display-safe slug. |
-| `version` | no | Package content version. Registry policy may require it later. |
-| `display` | no | Human-facing title, author, glyph, description, and tags. |
-| `compatibility.eikon` | yes | Eikon contract range, for example `>=2 <3`. |
+| `version` | yes for registry packages | Package content version. Registry-published versions should be immutable. |
+| `display` | no | Human-facing title, author, glyph, description, and tags. Display text is untrusted. |
+| `compatibility.eikon` | yes | Eikon contract range, for example `>=1 <2`. |
 | `compatibility.hosts` | no | Optional host ranges. Host incompatibility must not affect generic stream rendering. |
-| `entrypoints.default` | yes | Relative path to the default launch stream. |
-| `files` | no | Relative file descriptors with optional media type, size, digest, and role. |
-| `source` | no | Editable source media. It is not required for playback. |
-| `poster` | no | Relative poster asset for cheap grid/catalog display. |
+| `entrypoints.default` | yes | Relative path to the default launch `.eikon` stream. |
+| `files` | yes for registry packages | Relative file descriptors with role, media type, size, and digest. Registry-served remote files require `size` and `digest`. |
+| `editability` | no | Whether editable source/project files are included and how complete they are. |
+| `poster` | no | Relative cached poster asset for cheap grid/catalog display. Standalone `.eikon` posters are derived from frames. |
 | `preview` | no | Relative selected-preview asset. |
-| `signals` | no | Package-level runtime signal mappings with fallbacks. |
-| `triggers` | no | Reserved optional trigger-rule extension data. |
+| `bundles` | no | Optional generated import/export/offline bundles such as ZIP. Bundles are not the canonical install protocol. |
+| `triggers` | no | Reserved optional trigger-rule extension data. Trigger support is not required for launch playback. |
 | `extensions` | no | Optional and required extension declarations. |
-| `legacy` | no | Compatibility/migration notes for packages derived from v1 `.eikon`. |
+| `legacy` | no | Migration notes for packages derived from pre-launch `.eikon` drafts. |
 
-All file paths are package-relative. Package readers and registry tooling must reject parent escapes, absolute paths, private/file URLs in remote contexts, and unsafe metadata before rendering or installing.
+All file paths are package-relative. Package readers and registry tooling must reject parent escapes, absolute paths, private/file URLs in remote contexts, symlinks/special files in archive imports, and unsafe metadata before rendering or installing.
 
-## Catalog entry shape
+The package manifest does not own runtime signal-to-clip mappings. Those mappings live in the `.eikon` stream header so a standalone stream can render without a package manifest. Package tooling may validate, index, or cache derived signal information, but playback must not depend on package metadata.
 
-A catalog entry is not a package manifest. It is cheap discovery data that points at package/detail assets:
+## Registry/catalog entry shape
+
+A catalog entry is not a package manifest. It is cheap discovery data that points at package/detail/runtime assets:
 
 ```json
 {
   "kind": "eikon.catalog.entry",
   "schemaVersion": "1.0",
   "id": "liftaris/nous",
-  "sourceKey": "github:liftaris/eikon:eikons/nous",
+  "version": "1.0.0",
+  "sourceKey": "registry:eikon.liftaris.dev:liftaris/nous@1.0.0",
   "name": "nous",
   "title": "Nous",
   "author": "kaio",
   "description": "Monochrome sidebar avatar",
   "glyph": "⬡",
   "tags": ["monochrome"],
-  "poster": "https://eikon.liftaris.dev/eikons/nous/poster.txt",
-  "preview": "https://eikon.liftaris.dev/eikons/nous/preview.mp4",
-  "packageUrl": "https://eikon.liftaris.dev/eikons/nous/manifest.json",
-  "detailUrl": "https://eikon.liftaris.dev/eikons/nous",
-  "installUrl": "https://eikon.liftaris.dev/eikons/nous/manifest.json",
-  "compatibility": { "eikon": ">=2 <3", "hosts": { "herm": ">=0.0.0" }, "available": true },
-  "trust": { "reviewed": true, "reviewer": "registry", "source": "github.com/liftaris/eikon", "digest": "sha256:..." }
+  "poster": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<poster-digest>",
+  "preview": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<preview-digest>",
+  "runtimeUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<runtime-digest>",
+  "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/1.0.0.json",
+  "detailUrl": "https://eikon.liftaris.dev/eikons/liftaris/nous",
+  "compatibility": { "eikon": ">=1 <2", "hosts": { "herm": ">=0.0.0" }, "available": true },
+  "trust": { "reviewed": true, "reviewer": "registry", "manifestDigest": "sha256:...", "runtimeDigest": "sha256:..." }
 }
 ```
 
-Catalog clients may search by `name`, `title`, `author`, and `tags`. Installed-state matching should prefer `id` and `sourceKey`; name-only matching is a legacy fallback.
+Catalog clients may search by `name`, `title`, `author`, and `tags`. Installed-state matching should prefer validated registry identity, version, source key, and digest. Name-only matching is a local legacy migration fallback and must not decide remote install/active state.
+
+A shadcn-like registry may expose:
+
+```text
+registry.json
+packages/<namespace>/<name>/index.json
+packages/<namespace>/<name>/<version>.json
+packages/<namespace>/<name>/blobs/sha256/<digest>
+downloads/<namespace>-<name>-<version>.zip
+```
+
+Herm's normal marketplace flow resolves `id`/`version` through configured trusted registries, fetches the package manifest, verifies descriptor/path/size/digest/security policy, downloads the runtime `.eikon` by default, and fetches source/edit files lazily or selectively when needed.
 
 ## Platform metadata
 
 Platform metadata is mutable service or policy state. Examples include canonical detail URL, source URL, license/provenance display, review records, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback and must not be embedded as required rendering data.
 
 ## Signal mappings and triggers
+
+Runtime signal mappings live in the `.eikon` stream header. Package manifests may declare optional trigger-rule extension data for future host/plugin integrations, but trigger support is not part of launch playback.
 
 The six canonical lifecycle signals are:
 
@@ -149,9 +163,7 @@ The six canonical lifecycle signals are:
 - `state.working`
 - `state.error`
 
-Packages may declare custom namespaced signals such as `approval.waiting` or `tool.running`. Every custom signal must have a fallback to a canonical signal, canonical clip, or another resolvable package mapping.
-
-`triggers` reserves future host rules for when signals happen. Launch packages may include trigger declarations only as optional extension data. No Hermes plugin bridge, semantic classifier, or arbitrary host-code transport is required by the release contract.
+Packages may include trigger declarations only as optional extension data. Launch package readers treat unsupported trigger, decorator, layer, semantic-classifier, and host-transport extensions according to the declared extension fallback rules.
 
 ## Extension behavior
 
@@ -159,14 +171,23 @@ Packages may declare custom namespaced signals such as `approval.waiting` or `to
 - Unknown required extensions listed in `extensions.required` fail cleanly before rendering/installing.
 - Required trigger support is not part of launch.
 
-Reserved launch extension names:
+Reserved launch/future extension names:
 
-- `eikon.signals.v1`
 - `eikon.triggers.v1`
+- `eikon.decorators.v1`
+- `eikon.layers.v1`
+
+## Archive import/export
+
+Archives are convenience transports, not the canonical package protocol. Registry upload, Studio export, offline transfer, and “download all” may use ZIP bundles, but a registry should validate and normalize the uploaded contents into package manifests plus registry-controlled files/blobs.
+
+Archive import must reject path traversal, absolute paths, symlinks, hardlinks, special files, unsafe file modes, nested archive surprises, excessive file counts, oversized files, and decompression bombs. Uploaded manifests must not preserve arbitrary external URLs; registry tooling should rewrite descriptors to registry-controlled paths and recompute sizes/digests.
+
+ORAS/OCI is not an active launch dependency. The descriptor model should stay transport-neutral enough to map elsewhere later, but current launch direction is shadcn-like static/dynamic HTTPS registries.
 
 ## Legacy manifest migration
 
-The previous manifest shape described editable source media only:
+The previous source-only manifest shape described editable source media only:
 
 ```json
 {
@@ -178,20 +199,13 @@ The previous manifest shape described editable source media only:
 }
 ```
 
-Installers and migration tools may still read that legacy shape to preserve existing assets. Launch migration should produce an `eikon.package` manifest and report moved/dropped metadata:
+Installers and migration tools may read that legacy shape only to preserve existing assets during conversion. Launch migration should produce an `eikon.package` manifest and report moved/dropped metadata:
 
 - `eikon_requires` becomes `compatibility.eikon`.
-- source and state media move under `source` and file descriptors.
-- packed `.eikon` data converts to a launch stream entrypoint or remains behind a `legacy.migration: "adapt"` note.
+- source and state media move under file descriptors and optional editability metadata.
+- draft `.eikon` data converts to a launch `.eikon` stream entrypoint.
 - author, license, provenance, source URL, and trust data move to display/catalog/platform fields as appropriate.
 
 ## Browser-safe boundary
 
 Browser-safe exports may expose contract types, catalog normalization/search, package read validation, and preview helpers. They must not import host-only install, publish, GitHub, filesystem, SSH, OpenTUI, or Herm-specific code.
-
-## Non-goals
-
-- This manifest does not define browser-native install/use/publish/auth.
-- This manifest does not require plugin code inside packages.
-- This manifest does not make a Hermes plugin bridge part of launch.
-- This manifest does not treat the superseded 2026-05-30 marketplace/sharing documents as active authority.
