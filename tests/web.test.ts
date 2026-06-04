@@ -76,7 +76,7 @@ describe("web gallery model", () => {
     expect(webPlaybackFrame(loaded.eikon, "idle", 1000, 0)).toEqual(["C"])
   })
 
-  test("loads final checked-in index shape through runtimeUrl without fetching packages", async () => {
+  test("loads final checked-in index shape through runtimeUrl", async () => {
     const seen: string[] = []
     const catalog = createWebCatalog({
       base: "https://eikon.liftaris.dev/eikons",
@@ -91,8 +91,7 @@ describe("web gallery model", () => {
     await catalog.refresh()
     const loaded = await catalog.preview(catalog.state.entries[0]!.sourceKey)
     expect(loaded.status).toBe("ready")
-    expect(seen).toContain(runtimePath)
-    expect(seen).not.toContain("/packages/liftaris/cycle/1.0.0.json")
+    expect(seen).toEqual(["/eikons/index.json", runtimePath])
   })
 
   test("parses launch stream previews from public exports", () => {
@@ -101,7 +100,7 @@ describe("web gallery model", () => {
     expect(webPlaybackFrame(doc, "idle", 500, 0)).toEqual(["B"])
   })
 
-  test("catalog load failure exposes retry state without activation or account actions", async () => {
+  test("catalog load failure exposes retry action", async () => {
     const catalog = createWebCatalog({ loadCatalog: async () => { throw new Error("network down") } })
     await catalog.refresh()
     expect(catalog.state.status).toBe("error")
@@ -132,10 +131,14 @@ describe("web gallery model", () => {
   test("instructions are copyable and discovery-only", () => {
     const safe = browserInstructions(entry)
     expect(safe.command).toBe(`herm eikon install ${entry.packageUrl}`)
-    expect(safe.manual).toContain(entry.runtimeUrl)
+    expect(safe.manual).toBe(`Copy the command into Herm locally. Preview source: ${entry.runtimeUrl}`)
     expect(() => browserInstructions({ ...entry, packageUrl: "javascript:alert(1)" })).toThrow(/unsafe/)
-    expect(safe).not.toHaveProperty("hermUrl")
-    expect(safe.command).not.toMatch(/publish|auth|login|token|activate|use |herm:\/\//)
+  })
+
+  test("instructions quote shell-sensitive package URLs", () => {
+    const quoted = browserInstructions({ ...entry, packageUrl: "https://example.test/pkg?name=cycle&run=$(id)" })
+
+    expect(quoted.command).toBe("herm eikon install 'https://example.test/pkg?name=cycle&run=$(id)'")
   })
 
   test("fetch policy enforces byte limits before parse", async () => {

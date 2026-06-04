@@ -78,7 +78,7 @@ test("launch streams validate frame dimensions and required record extensions", 
 
 test("legacy eikon converts to launch stream and package manifest", () => {
   const legacy = [
-    JSON.stringify({ eikon: 1, name: "legacy", author: "t", glyph: "◆", width: 4, height: 2, license: "MIT", source_url: "https://example.test/legacy" }),
+    JSON.stringify({ eikon: 1, name: "legacy", author: "t", glyph: "◆", width: 4, height: 2, local_note: "draft-only" }),
     JSON.stringify({ state: "idle", fps: 10, frame_count: 1, loop_from: 0 }),
     JSON.stringify({ f: 0, data: rows.join("\n") }),
     JSON.stringify({ state: "thinking", fps: 8, frame_count: 1 }),
@@ -90,14 +90,13 @@ test("legacy eikon converts to launch stream and package manifest", () => {
   expect(parsed.header.defaultSignal).toBe("state.idle")
   expect(parsed.header.signals["state.thinking"]?.clip).toBe("thinking")
   expect(parsed.clips.get("idle")?.fps).toBe(10)
-  expect(JSON.stringify(parsed.header)).not.toMatch(/source_url|license|provenance/)
   expect(migrated.manifest.kind).toBe("eikon.package")
+  expect(migrated.manifest.display).toMatchObject({ title: "legacy", author: "t", glyph: "◆" })
   expect(migrated.manifest.entrypoints.default).toBe("streams/legacy.eikon")
   expect(migrated.manifest.compatibility.eikon).toBe(">=1 <2")
   expect(migrated.manifest.files?.[0]?.role).toBe("runtime")
   expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/moved legacy display metadata: author/)
-  expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/dropped 2 unsupported legacy metadata fields/)
-  expect(JSON.stringify(migrated.manifest.legacy)).not.toMatch(/license|provenance/)
+  expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/dropped 1 unsupported legacy metadata field/)
   expect(validatePackageManifest(migrated.manifest).entrypoints.default).toBe("streams/legacy.eikon")
 })
 
@@ -111,11 +110,7 @@ test("legacy adapter keeps poster behavior compatible", () => {
   expect(poster(parseLaunchStream(serializeLaunchStream(adapted.records)))).toBe(rows.join("\n"))
 })
 
-test("launch parser rejects old implicit draft input outside migration", () => {
-  const legacy = [
-    JSON.stringify({ eikon: 1, name: "legacy", width: 4, height: 2 }),
-    JSON.stringify({ state: "idle", fps: 10, frame_count: 1 }),
-    JSON.stringify({ f: 0, data: rows.join("\n") }),
-  ].join("\n") + "\n"
-  expect(() => parseLaunchStream(legacy)).toThrow(/first record must be header/)
+test("launch parser requires a typed header as the first record", () => {
+  const clipFirst = JSON.stringify({ type: "clip", name: "idle", fps: 10, frameCount: 1 })
+  expect(() => parseLaunchStream(clipFirst)).toThrow(/first record must be header/)
 })

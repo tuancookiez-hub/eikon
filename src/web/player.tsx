@@ -37,9 +37,14 @@ export type WebCatalogOptions = Partial<WebPolicy> & {
 }
 
 const defaults: WebPolicy = { maxBytes: 5_000_000, timeoutMs: 8_000, concurrency: 3, cacheEntries: 24 }
-const blocked = /\b(publish|auth|login|token|activate|use)\b|herm:\/\//i
 const keyFor = (entry: CatalogEntry) => entry.sourceKey || entry.id || entry.name
 const previewFor = (entry: CatalogEntry) => entry.runtimeUrl
+const shellSafe = /^[A-Za-z0-9_/@%+=:,.-]+$/
+
+function shellArg(value: string): string {
+  if (shellSafe.test(value)) return value
+  return `'${value.replaceAll("'", "'\\''")}'`
+}
 
 export function AsciiPreview(props: { lines: string[] }) {
   return <pre className="ascii" aria-label="Eikon ASCII preview"><span className="asciiArt">{props.lines.join("\n")}</span></pre>
@@ -90,8 +95,7 @@ export function safePublicUrl(raw: string): string {
 export function browserInstructions(entry: CatalogEntry) {
   const target = safePublicUrl(entry.packageUrl)
   const preview = safePublicUrl(previewFor(entry))
-  const command = `herm eikon install ${target}`
-  if (blocked.test(command)) throw new Error("unsafe Herm instructions")
+  const command = `herm eikon install ${shellArg(target)}`
   return {
     command,
     manual: `Copy the command into Herm locally. Preview source: ${preview}`,

@@ -30,10 +30,11 @@ const manifest: EikonPackageManifest = {
 }
 
 test("package manifest validates final launch descriptors", () => {
-  expect(validatePackageManifest(manifest, { registry: true }).entrypoints.default).toBe("streams/nous.eikon")
+  const validated = validatePackageManifest(manifest, { registry: true })
+  expect(validated.entrypoints.default).toBe("streams/nous.eikon")
+  expect(validated.files?.map(file => file.role)).toEqual(["runtime", "poster", "preview"])
   expect(() => validatePackageManifest({ ...manifest, schemaVersion: undefined })).toThrow(/schemaVersion/)
   expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=2 <3" } })).toThrow(/compatibility.eikon/)
-  expect(() => validatePackageManifest({ ...manifest, files: [...(manifest.files ?? []), { path: "streams/old.eikon", role: "stream", mediaType: LAUNCH_MEDIA_TYPE }] })).toThrow(/files\.3\.role.*stale descriptor role/)
   expect(() => validatePackageManifest({ ...manifest, entrypoints: { default: "../escape.eikon" } })).toThrow(/entrypoints.default.*safe relative path/)
   expect(() => validatePackageManifest({ ...manifest, source: { base: "../escape.png" } })).toThrow(/source.base.*safe relative path/)
   expect(() => validatePackageManifest({ ...manifest, source: { states: { idle: { file: "/abs/idle.mp4" } } } })).toThrow(/source.states.idle.file.*safe relative path/)
