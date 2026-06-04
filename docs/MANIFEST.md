@@ -74,7 +74,7 @@ Older source-only manifests are still accepted by migration tooling during conve
   "legacy": {
     "sourceFormat": "pre-launch .eikon draft",
     "migration": "converted",
-    "notes": ["author/license moved from draft header to display/catalog metadata"]
+    "notes": ["legacy draft metadata normalized for the launch contract"]
   }
 }
 ```
@@ -148,7 +148,7 @@ Herm's normal marketplace flow resolves `id`/`version` through configured truste
 
 ## Platform metadata
 
-Platform metadata is mutable service or policy state. Examples include canonical detail URL, source URL, license/provenance display, review records, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback and must not be embedded as required rendering data.
+Platform metadata is mutable service state. Examples include canonical detail URL, source URL, review records, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback and must not be embedded as required rendering data.
 
 ## Signal mappings and triggers
 
@@ -204,7 +204,7 @@ Installers and migration tools may read that legacy shape only to preserve exist
 - `eikon_requires` becomes `compatibility.eikon`.
 - source and state media move under file descriptors and optional editability metadata.
 - draft `.eikon` data converts to a launch `.eikon` stream entrypoint.
-- author, license, provenance, source URL, and trust data move to display/catalog/platform fields as appropriate.
+- author, source URL, and trust data move to display/catalog/platform fields as appropriate; unsupported license/provenance fields are dropped.
 
 ## Browser-safe boundary
 

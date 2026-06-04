@@ -222,10 +222,12 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptio
   if (!NAME_RE.test(input.name)) throw new EikonValidationError([problem("name", "safe catalog name required")])
   const source = input.source ?? `${input.name}/`
   if (/^file:|^javascript:|^data:/i.test(source)) throw new EikonValidationError([problem("packageUrl", "http(s) URL required")])
+  if (!/^https?:\/\//.test(source) && !isSafeRelativePath(source)) throw new EikonValidationError([problem("path", "path escape")])
   const root = /^https?:\/\//.test(source) ? publicCatalogUrl(source, undefined, opts) : base ? joinUrl(base, source) : source
-  const runtimeUrl = typeof input.runtimeUrl === "string" ? url(input.runtimeUrl, root) : typeof input.runtime_url === "string" ? url(input.runtime_url, root) : joinUrl(root, `${input.name}.eikon`)
-  const packageUrl = typeof input.packageUrl === "string" ? url(input.packageUrl, root) : typeof input.package_url === "string" ? url(input.package_url, root) : joinUrl(root, "manifest.json")
-  const preview = typeof input.preview === "string" ? relativeUrl(root, input.preview) : typeof input.preview_url === "string" ? relativeUrl(root, input.preview_url) : runtimeUrl
+  const catalogRoot = base ? slash(base) : root
+  const runtimeUrl = typeof input.runtimeUrl === "string" ? url(input.runtimeUrl, catalogRoot) : typeof input.runtime_url === "string" ? url(input.runtime_url, catalogRoot) : joinUrl(root, `${input.name}.eikon`)
+  const packageUrl = typeof input.packageUrl === "string" ? url(input.packageUrl, catalogRoot) : typeof input.package_url === "string" ? url(input.package_url, catalogRoot) : joinUrl(root, "manifest.json")
+  const preview = typeof input.preview === "string" ? assetUrl(input.preview, catalogRoot, "", opts) : typeof input.preview_url === "string" ? assetUrl(input.preview_url, catalogRoot, "", opts) : runtimeUrl
   const review = clean(input.review_status) ?? (input.reviewed === true ? "reviewed" : undefined)
   const reviewStatus = review && REVIEWED.has(review) ? review : review
   const trust = {

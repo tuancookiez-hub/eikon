@@ -12,7 +12,7 @@ The Eikon contract consists of four separate shapes:
 1. **Stream/document**: a line-oriented `.eikon` runtime artifact. It is enough to play an eikon without registry, package, network, or platform state.
 2. **Package manifest**: an `eikon.package` install/edit/source contract with entrypoints, content-addressed file descriptors, compatibility, source media, poster/preview assets, optional edit metadata, and optional extension declarations.
 3. **Registry/catalog entry**: cheap, normalized, browser-safe discovery metadata with stable identity/source keys and URLs to package manifests, runtime streams, poster/preview assets, and optional bundle exports.
-4. **Platform metadata**: mutable or policy data such as review state, provenance text, license display, download counts, likes, moderation, and account data.
+4. **Platform metadata**: mutable service data such as review state, download counts, likes, moderation, and account data.
 
 Local rendering must not depend on package, catalog, or platform metadata. Catalog and platform fields may help users find, trust, or install an eikon, but they do not mutate stream bytes.
 
@@ -184,7 +184,7 @@ Migration/adaptation must:
 - Detect old draft records by content/header shape, not by extension alone.
 - Convert header/state/frame records into typed `header`/`clip`/`frame` records.
 - Preserve the six canonical lifecycle signals when present and provide explicit/defaultSignal fallback behavior for missing states.
-- Move author, license, source URL, provenance, trust, and discovery metadata into package/catalog/platform shapes where appropriate.
+- Move author, source URL, trust, and discovery metadata into package/catalog/platform shapes where appropriate; drop unsupported license/provenance fields instead of relocating them.
 - Report metadata that was moved, dropped, or could not be represented.
 - Write launch `.eikon` output and keep a backup of the original draft input.
 

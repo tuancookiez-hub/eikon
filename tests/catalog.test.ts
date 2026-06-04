@@ -16,7 +16,22 @@ let srv: ReturnType<typeof Bun.serve>
 beforeAll(() => {
   srv = Bun.serve({
     port: 0,
-    fetch: req => new Response(Bun.file(resolve(dir, new URL(req.url).pathname.slice(1)))),
+    fetch: async req => {
+      const url = new URL(req.url)
+      const path = url.pathname
+      if (path === "/index.json") {
+        const entries = await Bun.file(resolve(dir, "index.json")).json() as Array<Record<string, unknown> & { name: string }>
+        return Response.json(entries.map(entry => ({
+          ...entry,
+          preview: new URL(`${entry.name}/${entry.name}.eikon`, `${url.origin}/`).href,
+          runtimeUrl: new URL(`${entry.name}/${entry.name}.eikon`, `${url.origin}/`).href,
+          packageUrl: new URL(`${entry.name}/manifest.json`, `${url.origin}/`).href,
+        })))
+      }
+      const pkg = path.match(/^\/packages\/liftaris\/([^/]+)\/blobs\/sha256\//)
+      const local = pkg ? `${pkg[1]}/${pkg[1]}.eikon` : path.slice(1)
+      return new Response(Bun.file(resolve(dir, local)))
+    },
   })
 })
 afterAll(() => srv.stop())

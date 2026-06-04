@@ -141,7 +141,7 @@ test("package, catalog, and platform shapes stay separate", () => {
     compatibility: { eikon: ">=1 <2", available: true },
     trust: { reviewed: true, runtimeDigest: "sha256:runtime", manifestDigest: "sha256:manifest" },
   }
-  const platform: PlatformMetadata = { kind: "eikon.platform", catalogId: entry.id, license: "MIT", stats: { downloads: 12 } }
+  const platform: PlatformMetadata = { kind: "eikon.platform", catalogId: entry.id, stats: { downloads: 12 } }
   expect(manifest).not.toHaveProperty("signals")
   expect(entry.runtimeUrl).toContain("/blobs/sha256/")
   expect(entry).not.toHaveProperty("stats")

@@ -28,7 +28,6 @@ const toEntry = (meta: Meta, p: string, path: string): Entry => {
     author: meta.author,
     glyph: meta.glyph,
     poster: p,
-    preview: runtimeUrl,
     runtimeUrl,
     packageUrl,
     compatibility: { eikon: ">=1 <2", available: true },

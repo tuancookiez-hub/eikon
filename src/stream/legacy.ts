@@ -50,7 +50,8 @@ function legacyMetadataWarnings(eikon: Eikon): string[] {
   const displayMoved = moved.filter(key => DISPLAY_META_KEYS.has(key))
   const nonDisplayMoved = moved.filter(key => !DISPLAY_META_KEYS.has(key))
   const warnings: string[] = []
-  if (displayMoved.length || nonDisplayMoved.length) warnings.push(`moved legacy metadata: ${[...displayMoved, ...nonDisplayMoved].join(", ")}`)
+  if (displayMoved.length) warnings.push(`moved legacy display metadata: ${displayMoved.join(", ")}`)
+  if (nonDisplayMoved.length) warnings.push(`dropped ${nonDisplayMoved.length} unsupported legacy metadata field${nonDisplayMoved.length === 1 ? "" : "s"}`)
   return warnings
 }
 

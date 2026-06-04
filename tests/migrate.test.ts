@@ -95,7 +95,9 @@ test("legacy eikon converts to launch stream and package manifest", () => {
   expect(migrated.manifest.entrypoints.default).toBe("streams/legacy.eikon")
   expect(migrated.manifest.compatibility.eikon).toBe(">=1 <2")
   expect(migrated.manifest.files?.[0]?.role).toBe("runtime")
-  expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/moved legacy metadata:.*author.*license.*source_url/)
+  expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/moved legacy display metadata: author/)
+  expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/dropped 2 unsupported legacy metadata fields/)
+  expect(JSON.stringify(migrated.manifest.legacy)).not.toMatch(/license|provenance/)
   expect(validatePackageManifest(migrated.manifest).entrypoints.default).toBe("streams/legacy.eikon")
 })
 

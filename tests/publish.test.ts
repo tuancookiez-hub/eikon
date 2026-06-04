@@ -31,32 +31,8 @@ function backend(): ReviewBackend & { calls: unknown[] } {
 }
 
 describe("submitForReview", () => {
-  test("requires license before backend invocation", async () => {
-    const fx = seed()
-    const be = backend()
-
-    const res = await submitForReview({ path: fx.file, provenance: "made by Kaio", backend: be })
-
-    expect(res.kind).toBe("validation-failed")
-    if (res.kind !== "validation-failed") throw new Error("expected validation failure")
-    expect(res.failures).toContainEqual({ code: "missing-license", message: "license required" })
-    expect(be.calls).toHaveLength(0)
-  })
-
-  test("requires provenance before backend invocation", async () => {
-    const fx = seed()
-    const be = backend()
-
-    const res = await submitForReview({ path: fx.file, license: "MIT", backend: be })
-
-    expect(res.kind).toBe("validation-failed")
-    if (res.kind !== "validation-failed") throw new Error("expected validation failure")
-    expect(res.failures).toContainEqual({ code: "missing-provenance", message: "provenance required" })
-    expect(be.calls).toHaveLength(0)
-  })
-
   test("returns setup-needed when backend auth preflight fails", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     const be = backend()
     be.check = async () => ({ ok: false as const, reason: "gh auth login --web" })
 
@@ -67,24 +43,23 @@ describe("submitForReview", () => {
   })
 
   test("valid file builds a submit/review request through backend boundary", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     const be = backend()
 
     const res = await submitForReview({ path: fx.file, backend: be })
 
     expect(res.kind).toBe("review-created")
     expect(be.calls).toHaveLength(1)
-    const req = be.calls[0] as { bundle: { files: Array<{ path: string }>, catalog: Record<string, unknown>, license: string, provenance: string } }
-    expect(req.bundle).toMatchObject({ license: "MIT", provenance: "human-made" })
+    const req = be.calls[0] as { bundle: { files: Array<{ path: string }>, catalog: Record<string, unknown> } }
     expect(req.bundle.catalog).toMatchObject({ name: "demo", trust: { source: "pending" } })
-    expect(JSON.stringify(req.bundle.catalog)).not.toMatch(/license|provenance/)
+    expect(JSON.stringify(req.bundle)).not.toMatch(/license|provenance/)
     expect(req.bundle.files.map(f => f.path)).toEqual(["demo.eikon"])
   })
 })
 
 describe("previewReviewBundle", () => {
   test("includes manifest source metadata and referenced source files", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     mkdirSync(join(fx.root, "states", "idle"), { recursive: true })
     writeFileSync(join(fx.root, "base.png"), "base")
     writeFileSync(join(fx.root, "states", "idle", "loop.mp4"), "loop")
@@ -102,7 +77,7 @@ describe("previewReviewBundle", () => {
   })
 
   test("does not require source media when no manifest references it", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
 
     const bundle = await previewReviewBundle({ path: fx.file })
 
@@ -110,7 +85,7 @@ describe("previewReviewBundle", () => {
   })
 
   test("blocks missing source files only when referenced by manifest", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     writeFileSync(join(fx.root, "manifest.json"), JSON.stringify({
       name: "demo",
       version: 1,
@@ -121,7 +96,7 @@ describe("previewReviewBundle", () => {
   })
 
   test("rejects license and provenance in source manifests", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     writeFileSync(join(fx.root, "manifest.json"), JSON.stringify({
       name: "demo",
       version: 1,
@@ -134,7 +109,7 @@ describe("previewReviewBundle", () => {
   })
 
   test("classifies missing referenced files as missing-source", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     writeFileSync(join(fx.root, "manifest.json"), JSON.stringify({
       name: "demo",
       version: 1,
@@ -149,7 +124,7 @@ describe("previewReviewBundle", () => {
   })
 
   test("excludes hidden and secret-like files", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     writeFileSync(join(fx.root, ".env"), "TOKEN=secret")
     writeFileSync(join(fx.root, "api.key"), "secret")
     writeFileSync(join(fx.root, "notes.txt"), "ok")
@@ -160,13 +135,13 @@ describe("previewReviewBundle", () => {
   })
 
   test("rejects parent path escapes", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
 
     await expect(previewReviewBundle({ path: fx.file, extraFiles: ["../secret.txt"] })).rejects.toThrow(/path escape/)
   })
 
   test("rejects symlinks", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     const outside = mkdtempSync(join(tmpdir(), "eikon-outside-"))
     writeFileSync(join(outside, "secret.txt"), "secret")
     symlinkSync(join(outside, "secret.txt"), join(fx.root, "link.txt"))
@@ -175,7 +150,7 @@ describe("previewReviewBundle", () => {
   })
 
   test("rejects in-root symlinks before backend upload", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     writeFileSync(join(fx.root, "note.txt"), "safe")
     symlinkSync(join(fx.root, "note.txt"), join(fx.root, "link.txt"))
 
@@ -183,7 +158,7 @@ describe("previewReviewBundle", () => {
   })
 
   test("bounds bundle size", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
 
     await expect(previewReviewBundle({ path: fx.file, maxBytes: 10 })).rejects.toThrow(/bundle too large/)
   })
@@ -191,7 +166,7 @@ describe("previewReviewBundle", () => {
 
 describe("githubReviewBackend", () => {
   test("updates existing files on rerun", async () => {
-    const fx = seed({ license: "MIT", provenance: "human-made" })
+    const fx = seed()
     const bundle = await previewReviewBundle({ path: fx.file })
     const puts: Array<Record<string, string>> = []
     const existing = new Set<string>()

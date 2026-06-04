@@ -177,8 +177,6 @@ export type PlatformMetadata = {
   catalogId: string
   canonicalUrl?: string
   sourceUrl?: string
-  license?: string
-  provenance?: string
   stats?: Record<string, number>
   review?: Record<string, unknown>
 }

@@ -26,7 +26,9 @@ test("parse: ares has 6 canonical states and a poster", async () => {
 test("catalog.local: list() returns entries with posters, load() returns raw bytes", async () => {
   const cat = local(dir)
   const xs = await cat.list()
-  expect(xs.find(e => e.name === "ares")?.poster.length).toBeGreaterThan(100)
+  const ares = xs.find(e => e.name === "ares")
+  expect(ares).toBeDefined()
+  expect(ares!.poster?.length ?? 0).toBeGreaterThan(100)
   const raw = await cat.load("ares")
   expect(raw.startsWith("{")).toBe(true)
   expect(parse(raw).meta.name).toBe("ares")
