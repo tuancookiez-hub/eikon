@@ -9,9 +9,10 @@
  * Spec: docs/SPEC.md
  */
 
-import { readdirSync, openSync, readSync, closeSync } from "node:fs"
+import { readdirSync, openSync, readSync, closeSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { STATES, type State } from "./spec"
+import { parseLaunchStream } from "../stream/parse"
 
 export { STATES, type State }
 
@@ -65,6 +66,7 @@ export function parse(text: string): Eikon {
   if (!lines[0]?.trim()) throw new Error("eikon: empty file (no header on line 1)")
 
   const head = row(lines[0], 1)
+  if (head.type === "header") return parseLaunchStream(text)
   const meta: Meta = {
     ...head,
     version: num(head.eikon ?? head.version, 1),
@@ -133,6 +135,23 @@ export function peek(path: string): Meta | null {
     const n = readSync(fd, buf, 0, buf.length, 0)
     const first = buf.toString("utf8", 0, n).split("\n", 1)[0]
     if (!first) return null
+    const head = row(first, 1)
+    if (head.type === "header") {
+      const size = head.size && typeof head.size === "object" && !Array.isArray(head.size) ? head.size as Row : {}
+      const author = head.author && typeof head.author === "object" && !Array.isArray(head.author) ? head.author as Row : undefined
+      return {
+        ...head,
+        version: num(head.eikon, 1),
+        name: str(head.title ?? head.id, "unnamed"),
+        author: typeof author?.name === "string" ? author.name : typeof head.author === "string" ? head.author : undefined,
+        glyph: typeof head.glyph === "string" ? head.glyph : undefined,
+        width: num(size.cols, 0),
+        height: num(size.rows, 0),
+        states: Object.values(head.signals && typeof head.signals === "object" && !Array.isArray(head.signals) ? head.signals as Record<string, Row> : {})
+          .map(signal => typeof signal.clip === "string" ? signal.clip : "")
+          .filter(Boolean),
+      }
+    }
     return parse(first).meta
   } catch {
     return null
@@ -150,9 +169,10 @@ export function list(dirs: string[]): { path: string; meta: Meta }[] {
     let ents: string[]
     try { ents = readdirSync(dir, { recursive: true }) as string[] }
     catch { return [] }
-    return ents
+    const files = ents
       .filter(e => e.endsWith(".eikon"))
       .map(e => join(dir, e))
+    return files
       .map(path => ({ path, meta: peek(path) }))
       .filter((x): x is { path: string; meta: Meta } => x.meta !== null)
   })

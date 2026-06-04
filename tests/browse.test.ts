@@ -9,6 +9,7 @@ const dir = resolve(import.meta.dir, "../eikons")
 test("parse: real catalog files round-trip via list+parse", () => {
   const found = list([dir])
   expect(found.length).toBeGreaterThanOrEqual(3)
+  expect(found.map(f => f.path)).toContain(resolve(dir, "ares/ares.eikon"))
   for (const f of found) {
     expect(f.meta.width).toBe(48)
     expect(f.meta.height).toBe(24)
@@ -25,7 +26,9 @@ test("parse: ares has 6 canonical states and a poster", async () => {
 test("catalog.local: list() returns entries with posters, load() returns raw bytes", async () => {
   const cat = local(dir)
   const xs = await cat.list()
-  expect(xs.find(e => e.name === "ares")?.poster.length).toBeGreaterThan(100)
+  const ares = xs.find(e => e.name === "ares")
+  expect(ares).toBeDefined()
+  expect(ares!.poster?.length ?? 0).toBeGreaterThan(100)
   const raw = await cat.load("ares")
   expect(raw.startsWith("{")).toBe(true)
   expect(parse(raw).meta.name).toBe("ares")

@@ -9,7 +9,6 @@ export interface Header {
   height: number
   author?: string
   glyph?: string
-  license?: string
   created?: string
   url?: string
   description?: string

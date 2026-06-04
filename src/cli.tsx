@@ -5,16 +5,18 @@ import { resolve, basename, join } from "node:path"
 import { homedir } from "node:os"
 import { existsSync, readFileSync } from "node:fs"
 import { parse, poster } from "./ui/eikon"
-import { lint, lintManifest, lintRegistry, type Manifest } from "./ui/lint"
+import { lint, lintManifest, type Manifest } from "./ui/lint"
 import { install, dirty, type Origin } from "./install"
 import { pack } from "./pack"
-import { submitForReview } from "./publish"
 import * as reg from "./registry"
 import { Browser } from "./browse/Browser"
 import { local, resolve as cat } from "./browse/catalog"
 import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
+import { PACKAGE_KIND } from "./contract/shape"
+import { validatePackageManifest } from "./package/manifest"
 
+const REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 const root = () => join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "eikons")
 const mb = (n: number) => n < 1 << 20 ? `${(n / 1024).toFixed(0)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`
 
@@ -31,29 +33,55 @@ function args(argv: string[]) {
   return { pos, kv, str: (k: string) => typeof kv[k] === "string" ? kv[k] as string : undefined }
 }
 
+async function gh(args: string[], input?: string) {
+  const p = Bun.spawn(["gh", ...args], { stdin: input ? new TextEncoder().encode(input) : undefined, stdout: "pipe", stderr: "pipe" })
+  const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
+  if (code !== 0) die(`gh ${args[0]} failed: ${err.trim() || out.trim()}`)
+  return out.trim()
+}
+
 const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async lint(argv) {
-    const registry = argv.includes("--registry")
-    const path = argv.find(a => a !== "--registry") ?? die("usage: eikon lint [--registry] <file.eikon|manifest.json>")
+    const path = argv[0] ?? die("usage: eikon lint <file.eikon|manifest.json>")
     const raw = await Bun.file(resolve(path)).text()
     if (basename(path) === "manifest.json") {
-      const m = lintManifest(resolve(path), raw, registry)
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (parsed.kind === PACKAGE_KIND) {
+        const m = validatePackageManifest(parsed)
+        console.log(`✓ ${m.name} · ${m.entrypoints.default} · ${m.compatibility.eikon}`)
+        return
+      }
+      const m = lintManifest(resolve(path), raw)
       console.log(`✓ ${m.name} · ${Object.keys(m.states).length} states${m.source ? ` · ${m.source}` : ""}`)
       return
     }
-    const e = registry ? lintRegistry(raw) : lint(raw)
+    const e = lint(raw)
     console.log(`✓ ${e.meta.name} · ${e.meta.width}×${e.meta.height} · ${e.clips.size} states`)
   },
 
   async publish(argv) {
-    const a = args(argv)
-    const path = a.pos[0] ?? die("usage: eikon publish <file> [--license SPDX] [--provenance TEXT]")
-    const res = await submitForReview({ path: resolve(path), license: a.str("license"), provenance: a.str("provenance") })
-    if (res.kind === "review-created") {
-      console.log(res.url)
-      return
-    }
-    die(res.failures.map(f => `${f.code}: ${f.message}`).join("\n"))
+    const path = argv[0] ?? die("usage: eikon publish <file>")
+    const raw = await Bun.file(resolve(path)).text()
+    const e = lint(raw)
+    const name = e.meta.name
+    const branch = `add/${name}`
+
+    await gh(["repo", "fork", REPO, "--clone=false"]).catch(() => {})
+    const user = await gh(["api", "user", "-q", ".login"])
+    const fork = `${user}/${REPO.split("/")[1]}`
+
+    // Create branch ref off upstream main, then PUT the file.
+    const main = await gh(["api", `repos/${REPO}/git/ref/heads/main`, "-q", ".object.sha"])
+    await gh(["api", "-X", "POST", `repos/${fork}/git/refs`, "-f", `ref=refs/heads/${branch}`, "-f", `sha=${main}`]).catch(() => {})
+    await gh(["api", "-X", "PUT", `repos/${fork}/contents/eikons/${name}/${name}.eikon`,
+      "-f", `message=eikons: add ${name}`,
+      "-f", `branch=${branch}`,
+      "-f", `content=${Buffer.from(raw).toString("base64")}`])
+
+    const url = await gh(["pr", "create", "-R", REPO, "-H", `${user}:${branch}`, "-B", "main",
+      "-t", `eikons: add ${name}`,
+      "-b", `Adds \`${name}\` by ${e.meta.author}. ${e.meta.width}×${e.meta.height}, ${e.clips.size} states.`])
+    console.log(url)
   },
 
   async install(argv) {

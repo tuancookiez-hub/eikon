@@ -12,8 +12,10 @@ import { spawnSync } from "node:child_process"
 import { existsSync, statSync, readdirSync, mkdtempSync, rmSync } from "node:fs"
 import { join, basename, extname } from "node:path"
 import { tmpdir } from "node:os"
-import { serialize, type Doc, type StateDecl } from "./ui/format"
+import { type Doc, type StateDecl } from "./ui/format"
 import { STATES } from "./ui/spec"
+import { defaultSignalMappings, type LaunchStreamRecord } from "./contract/shape"
+import { serializeLaunchStream } from "./stream"
 
 export const SYMBOLS = ["block", "ascii", "braille", "sextant", "all"] as const
 export const COLORS = ["none", "16", "256", "full"] as const
@@ -174,5 +176,34 @@ export function pack(src: string, opts: Opts = {}): { doc: Doc; text: string } {
     },
     states,
   }
-  return { doc, text: serialize(doc) }
+  const records: LaunchStreamRecord[] = [
+    {
+      type: "header",
+      eikon: 1,
+      title: name,
+      author: { name: doc.header.author },
+      size: { cols: k.width, rows: k.height },
+      defaultSignal: "state.idle",
+      signals: defaultSignalMappings(),
+    },
+    ...states.flatMap(state => [
+      {
+        type: "clip" as const,
+        name: state.state,
+        fps: state.fps,
+        frameCount: state.frame_count,
+        loopFrom: state.loop_from,
+        color: state.color,
+      },
+      ...state.frames.map(frame => ({
+        type: "frame" as const,
+        clip: state.state,
+        index: frame.f,
+        rows: frame.data.split("\n"),
+        ...(frame.pause != null ? { pause: frame.pause } : {}),
+        ...(frame.color ? { color: frame.color } : {}),
+      })),
+    ]),
+  ]
+  return { doc, text: serializeLaunchStream(records) }
 }

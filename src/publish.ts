@@ -2,12 +2,12 @@ import { existsSync, lstatSync, readFileSync } from "node:fs"
 import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { lint, lintManifest, type Manifest } from "./ui/lint"
 import { poster } from "./ui/eikon"
-import { catalogEntry, type CatalogEntry } from "./catalog"
+import { catalogEntry, type PublicCatalogEntry } from "./catalog"
 
 export const DEFAULT_REVIEW_REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 export const DEFAULT_MAX_BUNDLE_BYTES = 32 * 1024 * 1024
 
-export type FailureCode = "invalid-eikon" | "missing-license" | "missing-provenance" | "missing-auth" | "missing-source" | "backend-failed"
+export type FailureCode = "invalid-eikon" | "missing-auth" | "missing-source" | "backend-failed"
 export type ReviewFailure = { code: FailureCode; message: string }
 export type BundleFile = { path: string; abs: string; bytes: number }
 export type ReviewBundle = {
@@ -16,9 +16,7 @@ export type ReviewBundle = {
   files: BundleFile[]
   meta: ReturnType<typeof lint>["meta"]
   manifest?: Manifest
-  catalog: CatalogEntry
-  license: string
-  provenance: string
+  catalog: PublicCatalogEntry
 }
 export type ReviewRequest = { bundle: ReviewBundle; title: string; body: string }
 export type ReviewCreated = { kind: "review-created"; url: string; request: ReviewRequest }
@@ -33,8 +31,6 @@ export type SubmitResult = ReviewCreated
 
 export type BundleOpts = {
   path: string
-  license?: string
-  provenance?: string
   extraFiles?: string[]
   allowHidden?: boolean
   allowSecrets?: boolean
@@ -97,8 +93,6 @@ export async function previewReviewBundle(opts: BundleOpts): Promise<ReviewBundl
   let eikon
   try { eikon = lint(await Bun.file(packed).text()) }
   catch (err) { throw new Error(`invalid eikon: ${err instanceof Error ? err.message : String(err)}`) }
-  const license = opts.license ?? (typeof eikon.meta.license === "string" ? eikon.meta.license : "")
-  const provenance = opts.provenance ?? (typeof eikon.meta.provenance === "string" ? eikon.meta.provenance : "")
   const mf = join(root, "manifest.json")
   const manifest = existsSync(mf) ? lintManifest(mf, readFileSync(mf, "utf8")) : undefined
   const files = bundleFiles(root, packed, manifest, opts)
@@ -109,21 +103,12 @@ export async function previewReviewBundle(opts: BundleOpts): Promise<ReviewBundl
     width: eikon.meta.width,
     height: eikon.meta.height,
     poster: poster(eikon),
-    license,
-    provenance,
     review_status: "pending",
     source: `${eikon.meta.name}/`,
     preview_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
-    install_url: manifest ? `${eikon.meta.name}/manifest.json` : `${eikon.meta.name}/${eikon.meta.name}.eikon`,
+    package_url: manifest ? `${eikon.meta.name}/manifest.json` : undefined,
   }, "https://eikon.liftaris.dev/eikons/", { allowPrivate: true })
-  return { root, packed, files, meta: eikon.meta, ...(manifest ? { manifest } : {}), catalog, license, provenance }
-}
-
-function failures(bundle: ReviewBundle) {
-  const xs: ReviewFailure[] = []
-  if (!bundle.license.trim()) xs.push({ code: "missing-license", message: "license required" })
-  if (!bundle.provenance.trim()) xs.push({ code: "missing-provenance", message: "provenance required" })
-  return xs
+  return { root, packed, files, meta: eikon.meta, ...(manifest ? { manifest } : {}), catalog }
 }
 
 export async function submitForReview(opts: SubmitOpts): Promise<SubmitResult> {
@@ -134,8 +119,6 @@ export async function submitForReview(opts: SubmitOpts): Promise<SubmitResult> {
     const code = /missing source|\.file: .* missing/.test(message) ? "missing-source" : "invalid-eikon"
     return { kind: "validation-failed", failures: [{ code, message }] }
   }
-  const bad = failures(bundle)
-  if (bad.length) return { kind: "validation-failed", failures: bad }
   const backend = opts.backend ?? githubReviewBackend()
   const setup = await backend.check()
   if (!setup.ok) return { kind: "setup-needed", failures: [{ code: "missing-auth", message: redact(setup.reason) }] }
@@ -149,8 +132,6 @@ export function reviewRequest(bundle: ReviewBundle): ReviewRequest {
   const body = [
     `Submits \`${bundle.meta.name}\` by ${bundle.meta.author ?? "unknown"} for review.`,
     `${bundle.meta.width}×${bundle.meta.height}; ${bundle.files.length} bundled files.`,
-    `License: ${bundle.license}`,
-    `Provenance: ${bundle.provenance}`,
     "",
     "Review bundle:",
     ...bundle.files.map(f => `- ${f.path} (${f.bytes} bytes)`),

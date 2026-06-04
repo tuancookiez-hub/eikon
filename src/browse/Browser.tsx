@@ -54,8 +54,9 @@ export function Browser(props: {
     }
   })
 
-  const w = (cur?.w ?? 48) + 4
-  const h = (cur?.h ?? 24) + 2
+  const posterLines = cur?.poster?.split("\n") ?? []
+  const w = Math.max(48, ...posterLines.map(line => line.length)) + 4
+  const h = Math.max(24, posterLines.length || 24) + 2
   const listW = 34
 
   return (
@@ -101,7 +102,7 @@ export function Browser(props: {
                    alignItems="center" justifyContent="center" overflow="hidden">
                 {loaded
                   ? <Player key={cur.name + state} eikon={loaded.doc} state={state} fg={C.fg} />
-                  : <Poster text={cur.poster} />}
+                  : <Poster text={cur.poster ?? ""} />}
               </box>
               <box height={1} />
               <box height={1}>

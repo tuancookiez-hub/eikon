@@ -20,7 +20,7 @@ jobs:
       - run: |
           set -e
           for f in $(git diff --name-only origin/main...HEAD -- 'eikons/*/*.eikon' 'eikons/*/manifest.json'); do
-            bun src/cli.tsx lint --registry "$f"
+            bun src/cli.tsx lint "$f"
           done
           EIKON_REGISTRY=1 bun src/cli.tsx index
           git diff --exit-code -- eikons/index.json 'eikons/*/*.eikon'

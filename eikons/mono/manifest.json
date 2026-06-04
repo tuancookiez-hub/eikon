@@ -1,25 +1,112 @@
 {
+  "kind": "eikon.package",
+  "schemaVersion": "1.0",
+  "id": "liftaris/mono",
   "name": "mono",
-  "version": 1,
-  "source": "base.png",
-  "states": {
-    "idle": {
-      "file": "states/idle/loop.mp4"
-    },
-    "listening": {
-      "file": "states/listening/loop.mp4"
-    },
-    "thinking": {
-      "file": "states/thinking/start.mp4"
-    },
-    "speaking": {
-      "file": "states/speaking/loop.mp4"
-    },
-    "working": {
-      "file": "states/working/loop.mp4"
-    },
-    "error": {
-      "file": "states/error/start.mp4"
+  "version": "1.0.0",
+  "display": {
+    "title": "mono",
+    "author": "kaio",
+    "glyph": "◐"
+  },
+  "compatibility": {
+    "eikon": ">=1 <2"
+  },
+  "legacy": {
+    "sourceFormat": "pre-launch .eikon draft",
+    "migration": "converted",
+    "notes": [
+      "moved legacy metadata: author, created, source_url"
+    ]
+  },
+  "source": {
+    "base": "base.png",
+    "states": {
+      "idle": {
+        "file": "states/idle/loop.mp4"
+      },
+      "listening": {
+        "file": "states/listening/loop.mp4"
+      },
+      "thinking": {
+        "file": "states/thinking/start.mp4"
+      },
+      "speaking": {
+        "file": "states/speaking/loop.mp4"
+      },
+      "working": {
+        "file": "states/working/loop.mp4"
+      },
+      "error": {
+        "file": "states/error/start.mp4"
+      }
     }
-  }
+  },
+  "entrypoints": {
+    "default": "mono.eikon"
+  },
+  "files": [
+    {
+      "path": "mono.eikon",
+      "role": "runtime",
+      "mediaType": "application/vnd.eikon.stream+jsonl",
+      "size": 1390777,
+      "digest": "sha256:44b52ecb76df67c638c44556aa002975c76d7df36a887b390a85e2d83076b862"
+    },
+    {
+      "path": "base.png",
+      "role": "source.base",
+      "mediaType": "image/png",
+      "size": 173685,
+      "digest": "sha256:4f82a0b63f9fc41d18cdcc8e38664bb4a295eb121c8e672336fdd022a4d2e51c"
+    },
+    {
+      "path": "states/idle/loop.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 40273,
+      "digest": "sha256:251ffed0be6c3ad659429ba62c6f5c62a8943718a9bef98e346273ed9b8671af",
+      "signal": "state.idle"
+    },
+    {
+      "path": "states/listening/loop.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 32939,
+      "digest": "sha256:d749442ac54d84616d2085050da87676f22f436a90baf3be7a170041dd016113",
+      "signal": "state.listening"
+    },
+    {
+      "path": "states/thinking/start.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 50657,
+      "digest": "sha256:8d98a6798f93544dbcd4e2b5be64cf27180c444d2809d389c06ab1823611f933",
+      "signal": "state.thinking"
+    },
+    {
+      "path": "states/speaking/loop.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 117145,
+      "digest": "sha256:b8e230392683592a1f34d4065cc128e835a795b62520bca7652e60f7719deae1",
+      "signal": "state.speaking"
+    },
+    {
+      "path": "states/working/loop.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 116520,
+      "digest": "sha256:4af334687755377f73ab3c3b64bc9c403863393419fd75189fc44825773cbc71",
+      "signal": "state.working"
+    },
+    {
+      "path": "states/error/start.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 34281,
+      "digest": "sha256:6b97b698cbdc53977be8e630188ce7366c5ad339bbabc9a08395270100da3c62",
+      "signal": "state.error"
+    }
+  ]
 }

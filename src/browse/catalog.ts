@@ -3,7 +3,10 @@
 // and install. Local reads a directory; remote fetches index.json + files.
 
 import { list as scan, parse, poster, type Meta } from "../ui/eikon"
-import { loadCatalog, entryFromMeta, type CatalogEntry } from "../catalog"
+import { dirname } from "node:path"
+import { pathToFileURL } from "node:url"
+import { CATALOG_KIND, CATALOG_SCHEMA_VERSION, type CatalogEntry } from "../contract/shape"
+import { loadCatalog, validateCatalogEntry } from "../catalog"
 
 export type Entry = CatalogEntry
 
@@ -12,7 +15,24 @@ export type Catalog = {
   load: (name: string) => Promise<string>
 }
 
-const toEntry = (meta: Meta, p: string, base: string): Entry => entryFromMeta(meta, p, base, { allowPrivate: true })
+const toEntry = (meta: Meta, p: string, path: string): Entry => {
+  const runtimeUrl = pathToFileURL(path).href
+  const packageUrl = new URL("manifest.json", pathToFileURL(`${dirname(path)}/`)).href
+  return validateCatalogEntry({
+    kind: CATALOG_KIND,
+    schemaVersion: CATALOG_SCHEMA_VERSION,
+    id: meta.name,
+    sourceKey: runtimeUrl,
+    name: meta.name,
+    title: typeof meta.title === "string" ? meta.title : meta.name,
+    author: meta.author,
+    glyph: meta.glyph,
+    poster: p,
+    runtimeUrl,
+    packageUrl,
+    compatibility: { eikon: ">=1 <2", available: true },
+  })
+}
 
 export function local(dir: string): Catalog {
   const found = scan([dir])
@@ -22,7 +42,7 @@ export function local(dir: string): Catalog {
       const out: Entry[] = []
       for (const f of found) {
         const raw = await Bun.file(f.path).text()
-        out.push(toEntry(f.meta, poster(parse(raw)), `file://${f.path}`))
+        out.push(toEntry(f.meta, poster(parse(raw)), f.path))
       }
       return out
     },
