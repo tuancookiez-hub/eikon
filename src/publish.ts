@@ -4,13 +4,13 @@ import { lint, lintManifest, type Manifest } from "./ui/lint"
 import { poster } from "./ui/eikon"
 import { catalogEntry, type PublicCatalogEntry } from "./catalog"
 
-export const DEFAULT_REVIEW_REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
+export const DEFAULT_SUBMIT_REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 export const DEFAULT_MAX_BUNDLE_BYTES = 32 * 1024 * 1024
 
 export type FailureCode = "invalid-eikon" | "missing-auth" | "missing-source" | "backend-failed"
-export type ReviewFailure = { code: FailureCode; message: string }
+export type SubmitFailure = { code: FailureCode; message: string }
 export type BundleFile = { path: string; abs: string; bytes: number }
-export type ReviewBundle = {
+export type SubmitBundle = {
   root: string
   packed: string
   files: BundleFile[]
@@ -18,16 +18,16 @@ export type ReviewBundle = {
   manifest?: Manifest
   catalog: PublicCatalogEntry
 }
-export type ReviewRequest = { bundle: ReviewBundle; title: string; body: string }
-export type ReviewCreated = { kind: "review-created"; url: string; request: ReviewRequest }
-export type ReviewBackend = {
+export type SubmitRequest = { bundle: SubmitBundle; title: string; body: string }
+export type Submitted = { kind: "submitted"; url: string; request: SubmitRequest }
+export type SubmitBackend = {
   check: () => Promise<{ ok: true } | { ok: false; reason: string }>
-  create: (req: ReviewRequest) => Promise<ReviewCreated>
+  create: (req: SubmitRequest) => Promise<Submitted>
 }
-export type SubmitResult = ReviewCreated
-  | { kind: "validation-failed"; failures: ReviewFailure[] }
-  | { kind: "setup-needed"; failures: ReviewFailure[] }
-  | { kind: "backend-failed"; failures: ReviewFailure[] }
+export type SubmitResult = Submitted
+  | { kind: "validation-failed"; failures: SubmitFailure[] }
+  | { kind: "setup-needed"; failures: SubmitFailure[] }
+  | { kind: "backend-failed"; failures: SubmitFailure[] }
 
 export type BundleOpts = {
   path: string
@@ -37,7 +37,7 @@ export type BundleOpts = {
   maxBytes?: number
 }
 
-export type SubmitOpts = BundleOpts & { backend?: ReviewBackend }
+export type SubmitOpts = BundleOpts & { backend?: SubmitBackend }
 
 type Gh = (args: string[], input?: string) => Promise<string>
 
@@ -50,20 +50,20 @@ const posix = (s: string) => s.split(sep).join("/")
 
 function contain(root: string, rel: string) {
   if (rel.startsWith("/") || /^[A-Za-z]:[\\/]/.test(rel) || rel.split(/[\\/]/).some(p => p === ".."))
-    throw new Error(`review bundle path escape: ${rel}`)
+    throw new Error(`submission bundle path escape: ${rel}`)
   const abs = resolve(root, rel)
   const back = relative(root, abs)
-  if (back.startsWith("..") || back === "" || resolve(root, back) !== abs) throw new Error(`review bundle path escape: ${rel}`)
+  if (back.startsWith("..") || back === "" || resolve(root, back) !== abs) throw new Error(`submission bundle path escape: ${rel}`)
   return { abs, rel: posix(back) }
 }
 
 function add(root: string, rel: string, out: Map<string, BundleFile>, opts: BundleOpts) {
   const path = contain(root, rel)
-  if (!existsSync(path.abs)) throw new Error(`review bundle missing source: ${path.rel}`)
+  if (!existsSync(path.abs)) throw new Error(`submission bundle missing source: ${path.rel}`)
   if (!opts.allowHidden && hidden(path.rel)) return
   if (!opts.allowSecrets && secret(path.rel)) return
   const st = lstatSync(path.abs)
-  if (st.isSymbolicLink()) throw new Error(`review bundle symlink unsupported: ${path.rel}`)
+  if (st.isSymbolicLink()) throw new Error(`submission bundle symlink unsupported: ${path.rel}`)
   if (!st.isFile()) return
   const bytes = st.size
   out.set(path.rel, { path: path.rel, abs: path.abs, bytes })
@@ -83,11 +83,11 @@ function bundleFiles(root: string, packed: string, man: Manifest | undefined, op
   const files = [...out.values()].sort((a, b) => a.path.localeCompare(b.path))
   const bytes = files.reduce((n, f) => n + f.bytes, 0)
   const max = opts.maxBytes ?? DEFAULT_MAX_BUNDLE_BYTES
-  if (bytes > max) throw new Error(`review bundle too large: ${bytes} > ${max} bytes`)
+  if (bytes > max) throw new Error(`submission bundle too large: ${bytes} > ${max} bytes`)
   return files
 }
 
-export async function previewReviewBundle(opts: BundleOpts): Promise<ReviewBundle> {
+export async function previewSubmitBundle(opts: BundleOpts): Promise<SubmitBundle> {
   const packed = resolve(opts.path)
   const root = dirname(packed)
   let eikon
@@ -103,7 +103,6 @@ export async function previewReviewBundle(opts: BundleOpts): Promise<ReviewBundl
     width: eikon.meta.width,
     height: eikon.meta.height,
     poster: poster(eikon),
-    review_status: "pending",
     source: `${eikon.meta.name}/`,
     preview_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
     package_url: manifest ? `${eikon.meta.name}/manifest.json` : undefined,
@@ -111,29 +110,29 @@ export async function previewReviewBundle(opts: BundleOpts): Promise<ReviewBundl
   return { root, packed, files, meta: eikon.meta, ...(manifest ? { manifest } : {}), catalog }
 }
 
-export async function submitForReview(opts: SubmitOpts): Promise<SubmitResult> {
-  let bundle: ReviewBundle
-  try { bundle = await previewReviewBundle(opts) }
+export async function submit(opts: SubmitOpts): Promise<SubmitResult> {
+  let bundle: SubmitBundle
+  try { bundle = await previewSubmitBundle(opts) }
   catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     const code = /missing source|\.file: .* missing/.test(message) ? "missing-source" : "invalid-eikon"
     return { kind: "validation-failed", failures: [{ code, message }] }
   }
-  const backend = opts.backend ?? githubReviewBackend()
+  const backend = opts.backend ?? githubSubmitBackend()
   const setup = await backend.check()
   if (!setup.ok) return { kind: "setup-needed", failures: [{ code: "missing-auth", message: redact(setup.reason) }] }
-  const req = reviewRequest(bundle)
+  const req = submission(bundle)
   try { return await backend.create(req) }
   catch (err) { return { kind: "backend-failed", failures: [{ code: "backend-failed", message: redact(err instanceof Error ? err.message : String(err)) }] } }
 }
 
-export function reviewRequest(bundle: ReviewBundle): ReviewRequest {
-  const title = `eikons: submit ${bundle.meta.name} for review`
+export function submission(bundle: SubmitBundle): SubmitRequest {
+  const title = `eikons: submit ${bundle.meta.name}`
   const body = [
-    `Submits \`${bundle.meta.name}\` by ${bundle.meta.author ?? "unknown"} for review.`,
+    `Submits \`${bundle.meta.name}\` by ${bundle.meta.author ?? "unknown"}.`,
     `${bundle.meta.width}×${bundle.meta.height}; ${bundle.files.length} bundled files.`,
     "",
-    "Review bundle:",
+    "Submission bundle:",
     ...bundle.files.map(f => `- ${f.path} (${f.bytes} bytes)`),
   ].join("\n")
   return { bundle, title, body }
@@ -156,7 +155,7 @@ async function existingSha(run: Gh, fork: string, branch: string, path: string) 
   }
 }
 
-export function githubReviewBackend(repo = DEFAULT_REVIEW_REPO, run: Gh = gh): ReviewBackend {
+export function githubSubmitBackend(repo = DEFAULT_SUBMIT_REPO, run: Gh = gh): SubmitBackend {
   return {
     async check() {
       try { await run(["auth", "status"]); return { ok: true } }
@@ -175,12 +174,12 @@ export function githubReviewBackend(repo = DEFAULT_REVIEW_REPO, run: Gh = gh): R
         const content = Buffer.from(await Bun.file(file.abs).arrayBuffer()).toString("base64")
         const sha = await existingSha(run, fork, branch, dest)
         const args = ["api", "-X", "PUT", `repos/${fork}/contents/${dest}`,
-          "-f", `message=eikons: submit ${name} for review`, "-f", `branch=${branch}`, "-f", `content=${content}`]
+          "-f", `message=eikons: submit ${name}`, "-f", `branch=${branch}`, "-f", `content=${content}`]
         if (sha) args.push("-f", `sha=${sha}`)
         await run(args)
       }
       const url = await run(["pr", "create", "-R", repo, "-H", `${user}:${branch}`, "-B", "main", "-t", req.title, "-b", req.body])
-      return { kind: "review-created", url, request: req }
+      return { kind: "submitted", url, request: req }
     },
   }
 }

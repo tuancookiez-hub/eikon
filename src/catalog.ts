@@ -14,7 +14,6 @@ export const DEFAULT_PUBLIC_CATALOG = DEFAULT_CATALOG
 
 export type CatalogOptions = { allowPrivate?: boolean }
 export type CatalogTrust = {
-  reviewStatus?: string
   manifestDigest?: string
   runtimeDigest?: string
 }
@@ -40,8 +39,6 @@ export type CatalogIndexEntry = {
   detailUrl?: string
   source_url?: string
   description?: string
-  reviewed?: boolean
-  review_status?: string
   [key: string]: unknown
 }
 export type PublicCatalogEntry = CatalogEntry & {
@@ -72,7 +69,6 @@ type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Re
 
 const NAME_RE = /^[a-z0-9][a-z0-9-]{1,63}$/
 const PRIVATE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"])
-const REVIEWED = new Set(["reviewed", "pending", "unreviewed"])
 const text = (value: unknown) => typeof value === "string" && !/[<>\u0000-\u001f]/.test(value)
 const isObj = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
 const problem = (path: string, message: string) => ({ code: "catalog", path, message: `${path}: ${message}` })
@@ -170,14 +166,9 @@ export function catalogEntry(entry: CatalogIndexEntry, base = DEFAULT_PUBLIC_CAT
 
 function publicFromEntry(entry: CatalogEntry, raw: CatalogEntry | CatalogIndexEntry = entry): PublicCatalogEntry {
   const previewUrl = entry.preview ?? entry.runtimeUrl
-  const trust = entry.trust ?? {}
-  const reviewStatus = "reviewStatus" in trust && typeof trust.reviewStatus === "string" ? trust.reviewStatus : entry.trust?.reviewed ? "reviewed" : undefined
   return {
     ...entry,
-    trust: {
-      ...trust,
-      ...(reviewStatus ? { reviewStatus } : {}),
-    },
+    trust: entry.trust ?? {},
     poster: entry.poster ?? "",
     preview: previewUrl,
     previewUrl,
@@ -228,12 +219,6 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptio
   const runtimeUrl = typeof input.runtimeUrl === "string" ? url(input.runtimeUrl, catalogRoot) : typeof input.runtime_url === "string" ? url(input.runtime_url, catalogRoot) : joinUrl(root, `${input.name}.eikon`)
   const packageUrl = typeof input.packageUrl === "string" ? url(input.packageUrl, catalogRoot) : typeof input.package_url === "string" ? url(input.package_url, catalogRoot) : joinUrl(root, "manifest.json")
   const preview = typeof input.preview === "string" ? assetUrl(input.preview, catalogRoot, "", opts) : typeof input.preview_url === "string" ? assetUrl(input.preview_url, catalogRoot, "", opts) : runtimeUrl
-  const review = clean(input.review_status) ?? (input.reviewed === true ? "reviewed" : undefined)
-  const reviewStatus = review && REVIEWED.has(review) ? review : review
-  const trust = {
-    ...(reviewStatus === "reviewed" ? { reviewed: true } : {}),
-    ...(reviewStatus ? { source: reviewStatus } : {}),
-  }
   return validateCatalogEntry({
     kind: CATALOG_KIND,
     schemaVersion: CATALOG_SCHEMA_VERSION,
@@ -252,7 +237,7 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptio
     detailUrl: typeof input.detailUrl === "string" ? url(input.detailUrl, root) : typeof input.detail_url === "string" ? url(input.detail_url, root) : undefined,
     description: clean(input.description),
     compatibility: { eikon: ">=1 <2", available: true },
-    trust,
+    trust: {},
   })
 }
 

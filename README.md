@@ -68,11 +68,11 @@ Studio tab.
 eikon publish mine.eikon
 ```
 
-This submits a review bundle to `eikons/<name>/`: the packed `.eikon`,
+This submits a bundle to `eikons/<name>/`: the packed `.eikon`,
 `manifest.json` when present, referenced source files, and catalog metadata. The
 CLI previews and allowlists bundle paths, skips hidden or secret-like extras by
 default, rejects path/symlink escapes, and reports setup or validation errors
-before creating the review request.
+before creating the submission request.
 
 ## States
 
