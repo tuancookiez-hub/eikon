@@ -125,7 +125,7 @@ export function App() {
           </div>
           <div>
             <dt>create</dt>
-            <dd>Author a .eikon package locally, then submit it via Herm for review.</dd>
+            <dd>Author a .eikon package locally, then submit it via Herm.</dd>
           </div>
         </dl>
       </header>

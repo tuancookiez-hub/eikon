@@ -90,12 +90,11 @@ describe("shared catalog contract", () => {
     }
   })
 
-  test("normalizes review metadata and legacy URLs", () => {
+  test("normalizes legacy URLs", () => {
     const e = catalogEntry({
       name: "echo",
       author: "Nous",
       description: "speaker",
-      review_status: "reviewed",
       source: "echo/",
       preview_url: "echo/echo.eikon",
       package_url: "echo/manifest.json",
@@ -105,7 +104,7 @@ describe("shared catalog contract", () => {
     }, "https://eikon.liftaris.dev/eikons/")
     expect(e.name).toBe("echo")
     expect(e.description).toBe("speaker")
-    expect(e.trust).toMatchObject({ reviewed: true, source: "reviewed" })
+    expect(e.trust).toEqual({})
     expect(e.previewUrl).toBe("https://eikon.liftaris.dev/eikons/echo/echo.eikon")
     expect(e.packageUrl).toBe("https://eikon.liftaris.dev/eikons/echo/manifest.json")
     expect(e.sourceKey).toBe("https://eikon.liftaris.dev/eikons/echo/")
@@ -178,8 +177,8 @@ describe("shared catalog contract", () => {
 
   test("root export exposes submit primitives for Herm", async () => {
     const eikon = await import("eikon")
-    expect("submitForReview" in eikon).toBe(true)
-    expect("previewReviewBundle" in eikon).toBe(true)
+    expect("submit" in eikon).toBe(true)
+    expect("previewSubmitBundle" in eikon).toBe(true)
   })
 })
 

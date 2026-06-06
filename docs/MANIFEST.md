@@ -128,7 +128,7 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
   "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/1.0.0.json",
   "detailUrl": "https://eikon.liftaris.dev/eikons/liftaris/nous",
   "compatibility": { "eikon": ">=1 <2", "hosts": { "herm": ">=0.0.0" }, "available": true },
-  "trust": { "reviewed": true, "reviewer": "registry", "manifestDigest": "sha256:...", "runtimeDigest": "sha256:..." }
+  "trust": { "manifestDigest": "sha256:...", "runtimeDigest": "sha256:..." }
 }
 ```
 
@@ -148,7 +148,7 @@ Herm's normal marketplace flow resolves `id`/`version` through configured truste
 
 ## Platform metadata
 
-Platform metadata is mutable service state. Examples include canonical detail URL, source URL, review records, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback and must not be embedded as required rendering data.
+Platform metadata is mutable service state. Examples include canonical detail URL, source URL, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback and must not be embedded as required rendering data.
 
 ## Signal mappings and triggers
 

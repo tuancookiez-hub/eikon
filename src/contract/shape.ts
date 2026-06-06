@@ -163,8 +163,6 @@ export type CatalogEntry = {
     reason?: string
   }
   trust?: {
-    reviewed?: boolean
-    reviewer?: string
     manifestDigest?: string
     runtimeDigest?: string
     source?: string
@@ -178,7 +176,6 @@ export type PlatformMetadata = {
   canonicalUrl?: string
   sourceUrl?: string
   stats?: Record<string, number>
-  review?: Record<string, unknown>
 }
 
 export type ExtensionSupport = {

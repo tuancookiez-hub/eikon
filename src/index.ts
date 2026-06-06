@@ -52,5 +52,5 @@ export { validatePackageManifest, isSafeRelativePath } from "./package"
 export { loadCatalogEntries, normalizeCatalogEntry, searchCatalogEntries, validateCatalogEntry,
          CATALOG_VERSION, DEFAULT_PUBLIC_CATALOG, catalogEntry, loadCatalog, publicCatalogUrl, searchCatalog,
          type Catalog, type CatalogInput, type CatalogIndexEntry, type CatalogOptions, type CatalogTrust, type PublicCatalogEntry } from "./catalog"
-export { previewReviewBundle, reviewRequest, submitForReview, githubReviewBackend,
-         type BundleFile, type BundleOpts, type ReviewBackend, type ReviewBundle, type ReviewFailure, type ReviewRequest, type SubmitResult } from "./publish"
+export { previewSubmitBundle, submission, submit, githubSubmitBackend,
+         type BundleFile, type BundleOpts, type SubmitBackend, type SubmitBundle, type SubmitFailure, type SubmitRequest, type SubmitResult } from "./publish"
