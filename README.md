@@ -1,12 +1,13 @@
 # eikon
 
-Stateful terminal avatars. An `.eikon` is a single NDJSON file packing six
-named animation states; a host TUI plays the right state based on what the
-agent is doing.
+Stateful terminal avatars. An `.eikon` is a typed NDJSON runtime stream whose
+header maps lifecycle signals such as `state.idle` and `state.working` to
+clips; a host TUI plays the right signal based on what the agent is doing.
 
-This repo is the **format** ([SPEC.md](docs/SPEC.md)), the **TypeScript
-library** herm and other consumers import, the **`eikon` CLI**, and the
-**registry** of published eikons.
+This repo is the **runtime format** ([SPEC.md](docs/SPEC.md)), the
+**package/catalog contract** ([MANIFEST.md](docs/MANIFEST.md)), the
+**TypeScript library** Herm and other consumers import, the **`eikon` CLI**,
+and the **registry** of published eikons.
 
 ```
 eikons/
@@ -27,9 +28,10 @@ bunx eikon install ./my-eikon/       # from a local dir
 bunx eikon info ares                 # what's installed, where it came from
 ```
 
-Lands in `$HERMES_HOME/eikons/<name>/`. herm's Gallery tab does the same
-in-process; its Studio tab fetches package source from the package/catalog
-metadata. Runtime `.eikon` streams stay standalone and do not carry source URLs.
+Lands in `$HERMES_HOME/eikons/<name>/`. Herm's Marketplace tab does the same
+in-process without activating the eikon; its Studio tab can fetch package
+source from package/catalog metadata. Runtime `.eikon` streams stay standalone
+and do not carry source URLs.
 
 ## Make one
 
@@ -59,7 +61,7 @@ Flags: `--width 48 --height 24 --fps 16 --symbols block|braille|ascii|sextant
 --colors none|256|full --no-invert --author NAME`. Requires `chafa`;
 `ffmpeg` for video/gif.
 
-For interactive tuning (pan/zoom/knobs/live preview), open herm's Eikon →
+For interactive tuning (pan/zoom/knobs/live preview), open Herm's Eikon →
 Studio tab.
 
 ## Publish one
@@ -76,14 +78,14 @@ before creating the submission request.
 
 ## States
 
-| state | host plays it when |
+| signal | host plays it when |
 |---|---|
-| `idle` | nothing happening |
-| `listening` | user typing |
-| `thinking` | model streaming, no visible text yet |
-| `speaking` | model streaming with visible text |
-| `working` | tool call in flight |
-| `error` | one-shot, auto-returns to idle |
+| `state.idle` | nothing happening |
+| `state.listening` | user typing |
+| `state.thinking` | model streaming, no visible text yet |
+| `state.speaking` | model streaming with visible text |
+| `state.working` | tool call in flight |
+| `state.error` | one-shot, auto-returns to idle |
 
 ## As a library
 
@@ -103,8 +105,8 @@ bun run web:build
 ```
 
 The page is discovery-only: it reads the public catalog, filters by eikon name
-or author, previews selected `.eikon` files, and exposes copyable Herm
-install/open-detail instructions. It has no browser-native publish, auth,
+or author, previews selected `.eikon` files, and exposes copyable Herm install
+instructions. It has no browser-native publish, auth,
 install, or activation path. Install/use/publish happen in Herm or through the
 `eikon` CLI.
 
@@ -119,7 +121,7 @@ Before promoting `eikon.liftaris.dev`, verify:
 - catalog JSON uses a short revalidation cache, while packed assets/posters can
   use long immutable cache headers
 - staging and production smoke both load the catalog, preview an eikon, and keep
-  the page limited to copy instructions and Herm detail links
+  the page limited to copy instructions
 
 Repo ownership is split deliberately: eikon owns the registry, gallery, catalog
 client, install resolver, publish preflight, and shared player primitives; Herm
