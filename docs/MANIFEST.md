@@ -150,7 +150,7 @@ downloads/<namespace>-<name>-<version>.zip
 
 Inside a published package manifest, descriptor paths remain package-relative (`blobs/sha256/<digest>`). Catalog URLs expand those paths under the package root (`packages/<namespace>/<name>/blobs/sha256/<digest>`). A root-level `blobs/` mirror is not part of the launch registry shape unless a future registry explicitly chooses global deduplication.
 
-Herm's normal marketplace flow resolves `id`/`version` through configured trusted registries, fetches the package manifest, verifies descriptor/path/size/digest/security policy, downloads the runtime `.eikon` by default, and fetches source/edit files lazily or selectively when needed.
+Herm's normal marketplace flow resolves `id`/`version` through configured trusted registries, fetches the package manifest, verifies descriptor/path/size/digest/security policy, downloads the runtime `.eikon` by default, and fetches source/edit files lazily or selectively when needed. Direct GitHub sharing may use the same static registry shape: `github.com/owner/repo/name` selects a package from `eikons/index.json`, `registry.json`, root `index.json`, or an unambiguous `packages/<namespace>/<name>/index.json`; `github.com/owner/repo` remains the single-package fallback when no selector is provided.
 
 ## Platform metadata
 

@@ -6,8 +6,8 @@ export { parse, poster, list, peek as header,
 export { serialize, type Doc, type Header, type StateDecl, type Frame } from "./ui/format"
 export { lint, lintManifest, NAME_RE, type Manifest } from "./ui/lint"
 export { STATES, FORMAT_VERSION, LAUNCH_VERSION, DEFAULT_CATALOG, type State } from "./ui/spec"
-export { resolve, install, peek, entries, dirty,
-         type Resolved, type Installed, type Origin, type Sources, type Opts } from "./install"
+export { resolve, install, peek, entries, dirty, downloadBytes, resolveGithubSource, resolvePackageIndex, verifyPackageFiles, TRUST_STATES,
+         type Resolved, type Installed, type Origin, type Sources, type Opts, type TrustResult, type TrustState, type SourceKind, type GithubSource, type DownloadOptions, type CloneBackend, type CloneResult } from "./install"
 export { EikonCompatibilityError, EikonValidationError, type CompatibilityProblem, type ValidationProblem } from "./contract/errors"
 export {
   assertLaunchCompatibility,

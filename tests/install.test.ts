@@ -99,6 +99,37 @@ describe("resolve + install: local dir", () => {
     const bad = join(root, "future"); seed(bad, "future", { eikon_requires: ">=99" })
     await expect(install(bad, dest)).rejects.toThrow(/eikon_requires/)
   })
+
+  test("install name rejects path escapes", async () => {
+    const sibling = join(dest, "victim")
+    mkdirSync(sibling, { recursive: true })
+    writeFileSync(join(sibling, "sentinel.txt"), "keep")
+    for (const name of ["../victim", "/tmp/victim", "nested/name", "nested\\name", ".", "..", "-bad", ""]) {
+      await expect(install(src, dest, { name })).rejects.toThrow(/invalid eikon name/)
+      expect(readFileSync(join(sibling, "sentinel.txt"), "utf8")).toBe("keep")
+    }
+  })
+
+  test("failed replacement preserves existing install", async () => {
+    const good = join(root, "existing-good")
+    const bad = join(root, "existing-bad")
+    mkdirSync(join(bad, "streams"), { recursive: true })
+    writeFileSync(join(bad, "manifest.json"), JSON.stringify({
+      kind: "eikon.package",
+      schemaVersion: "1.0",
+      id: "liftaris/existing",
+      name: "existing",
+      compatibility: { eikon: ">=1 <2" },
+      entrypoints: { default: "streams/existing.eikon" },
+      files: [{ path: "streams/existing.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: 9, digest: "sha256:60498ebafa3f473a2a72c1242e8c3202bf50a6d81dfc721958be1550f46faf33" }],
+    }, null, 2))
+    writeFileSync(join(bad, "streams", "existing.eikon"), "not-json\n")
+    seed(good, "existing")
+    const out = await install(good, dest)
+    writeFileSync(join(out.dir, "sentinel.txt"), "keep")
+    await expect(install(bad, dest)).rejects.toThrow(/malformed JSON/)
+    expect(readFileSync(join(out.dir, "sentinel.txt"), "utf8")).toBe("keep")
+  })
 })
 
 describe("resolve + install: http base", () => {
@@ -179,6 +210,39 @@ describe("resolve + install: launch package", () => {
     const first = JSON.parse(packed.split("\n", 1)[0]!)
     expect(first.type).toBe("header")
     expect(first.eikon).toBe(1)
+  })
+
+  test("package install requires descriptors for every written file", async () => {
+    const bad = join(root, "missing-entrypoint-descriptor")
+    mkdirSync(join(bad, "streams"), { recursive: true })
+    writeFileSync(join(bad, "manifest.json"), JSON.stringify({
+      kind: "eikon.package",
+      schemaVersion: "1.0",
+      id: "liftaris/uncovered",
+      name: "uncovered",
+      compatibility: { eikon: ">=1 <2" },
+      entrypoints: { default: "streams/uncovered.eikon" },
+      files: [{ path: "streams/other.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: 5, digest: "sha256:d9298a10d1b0735837dc4bd85dac641b0f3cef27a47e5d53a54f2f3f5b2fcffa" }],
+    }, null, 2))
+    writeFileSync(join(bad, "streams", "uncovered.eikon"), launch)
+    writeFileSync(join(bad, "streams", "other.eikon"), "other")
+    await expect(install(bad, dest)).rejects.toThrow(new RegExp("missing verified descriptor.*streams/uncovered\\.eikon"))
+    expect(existsSync(join(dest, "uncovered"))).toBe(false)
+  })
+
+  test("root packed eikon cannot overwrite package entrypoint", async () => {
+    const next = join(root, "packed-overwrite")
+    mkdirSync(join(next, "streams"), { recursive: true })
+    mkdirSync(join(next, "source"), { recursive: true })
+    writeFileSync(join(next, "manifest.json"), pkg("packed"))
+    writeFileSync(join(next, "streams", "packed.eikon"), launch)
+    writeFileSync(join(next, "source", "base.png"), Buffer.from([137, 80, 78, 71]))
+    writeFileSync(join(next, "source", "idle.mp4"), Buffer.alloc(1024))
+    writeFileSync(join(next, "packed.eikon"), launch.replace("launch", "overwrite"))
+    const out = await install(next, dest)
+    const packed = readFileSync(join(out.dir, "packed.eikon"), "utf8")
+    const first = JSON.parse(packed.split("\n", 1)[0]!)
+    expect(first.title).toBe("launch")
   })
 })
 
