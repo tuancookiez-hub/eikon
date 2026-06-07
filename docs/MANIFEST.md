@@ -2,11 +2,13 @@
 
 **Kind:** `eikon.package`
 **Schema version:** `1.0`
-**Status:** Draft for launch implementation
+**Status:** Launch implementation-aligned
 
 The package manifest is the launch install/edit/source contract for an eikon. It describes how to find renderable streams, optional editable source media, poster/preview assets, compatibility, content-addressed file descriptors, and optional edit metadata. It is separate from the `.eikon` stream format and from the public catalog entry.
 
 Older source-only manifests are still accepted by migration tooling during conversion, but the launch manifest below is the shape gallery, registry, Herm marketplace, and package readers should target.
+
+Launch public shapes do not define first-class `license`, `provenance`, `review`, or `reviewer` metadata fields. Legacy readers may reject, strip, or report those fields during migration, but packages, catalog entries, platform metadata, and publish payloads should not expose them as active data.
 
 ## Minimal manifest
 
@@ -101,7 +103,7 @@ Older source-only manifests are still accepted by migration tooling during conve
 | `extensions` | no | Optional and required extension declarations. |
 | `legacy` | no | Migration notes for packages derived from pre-launch `.eikon` drafts. |
 
-All file paths are package-relative. Package readers and registry tooling must reject parent escapes, absolute paths, private/file URLs in remote contexts, symlinks/special files in archive imports, and unsafe metadata before rendering or installing.
+All file paths are package-relative. Human-authored/local manifests may use descriptive paths such as `streams/nous.eikon`; registry-normalized packages usually rewrite referenced files to content-addressed paths such as `blobs/sha256/<digest>`. Package readers and registry tooling must reject parent escapes, absolute paths, private/file URLs in remote contexts, symlinks/special files in archive imports, and unsafe metadata before rendering or installing.
 
 The package manifest does not own runtime signal-to-clip mappings. Those mappings live in the `.eikon` stream header so a standalone stream can render without a package manifest. Package tooling may validate, index, or cache derived signal information, but playback must not depend on package metadata.
 
@@ -122,7 +124,7 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
   "description": "Monochrome sidebar avatar",
   "glyph": "⬡",
   "tags": ["monochrome"],
-  "poster": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<poster-digest>",
+  "poster": "<24-line text poster>",
   "preview": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<preview-digest>",
   "runtimeUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<runtime-digest>",
   "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/1.0.0.json",
@@ -134,6 +136,8 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
 
 Catalog clients may search by `name`, `title`, `author`, and `tags`. Installed-state matching should prefer validated registry identity, version, source key, and digest. Name-only matching is a local legacy migration fallback and must not decide remote install/active state.
 
+`poster` in a catalog entry is cheap display data, normally an inline text poster for terminal-native grids and browser cards. `preview` and `runtimeUrl` are fetchable URLs; for launch catalogs they may point at the same `.eikon` stream when no separate preview asset exists.
+
 A shadcn-like registry may expose:
 
 ```text
@@ -144,11 +148,13 @@ packages/<namespace>/<name>/blobs/sha256/<digest>
 downloads/<namespace>-<name>-<version>.zip
 ```
 
+Inside a published package manifest, descriptor paths remain package-relative (`blobs/sha256/<digest>`). Catalog URLs expand those paths under the package root (`packages/<namespace>/<name>/blobs/sha256/<digest>`). A root-level `blobs/` mirror is not part of the launch registry shape unless a future registry explicitly chooses global deduplication.
+
 Herm's normal marketplace flow resolves `id`/`version` through configured trusted registries, fetches the package manifest, verifies descriptor/path/size/digest/security policy, downloads the runtime `.eikon` by default, and fetches source/edit files lazily or selectively when needed.
 
 ## Platform metadata
 
-Platform metadata is mutable service state. Examples include canonical detail URL, source URL, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback and must not be embedded as required rendering data.
+Platform metadata is mutable service state. Examples include canonical detail URL, source URL, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback, must not be embedded as required rendering data, and must not reintroduce retired public metadata fields.
 
 ## Signal mappings and triggers
 
@@ -204,7 +210,7 @@ Installers and migration tools may read that legacy shape only to preserve exist
 - `eikon_requires` becomes `compatibility.eikon`.
 - source and state media move under file descriptors and optional editability metadata.
 - draft `.eikon` data converts to a launch `.eikon` stream entrypoint.
-- author, source URL, and trust data move to display/catalog/platform fields as appropriate; unsupported license/provenance fields are dropped.
+- author, source/edit URLs, and digest/source-key data move to display/catalog/platform fields as appropriate; unsupported license/provenance fields are dropped.
 
 ## Browser-safe boundary
 

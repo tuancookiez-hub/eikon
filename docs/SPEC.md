@@ -16,6 +16,8 @@ The Eikon contract consists of four separate shapes:
 
 Local rendering must not depend on package, catalog, or platform metadata. Catalog and platform fields may help users find, trust, or install an eikon, but they do not mutate stream bytes.
 
+Retired pre-launch concepts stay out of the public launch shapes: no `.eikonl` runtime, no `.eikonpkg` package format, no runtime `source_url`, no package-owned runtime signal mappings, and no first-class `license`, `provenance`, `review`, or `reviewer` metadata fields. Those names may appear only in migration, rejection, or stripping behavior.
+
 ## Stream/document shape
 
 A launch stream is UTF-8 NDJSON. Every line is a typed record with a `type` field. The first line MUST be a `header` record. Unknown fields are ignored unless required by an unsupported required extension. A renderer MUST NOT perform network requests while parsing or rendering a `.eikon` stream.
@@ -184,7 +186,7 @@ Migration/adaptation must:
 - Detect old draft records by content/header shape, not by extension alone.
 - Convert header/state/frame records into typed `header`/`clip`/`frame` records.
 - Preserve the six canonical lifecycle signals when present and provide explicit/defaultSignal fallback behavior for missing states.
-- Move author, source URL, trust, and discovery metadata into package/catalog/platform shapes where appropriate; drop unsupported license/provenance fields instead of relocating them.
+- Move author, source/edit URLs, digest/source-key data, and discovery metadata into package/catalog/platform shapes where appropriate; drop unsupported license/provenance fields instead of relocating them.
 - Report metadata that was moved, dropped, or could not be represented.
 - Write launch `.eikon` output and keep a backup of the original draft input.
 
