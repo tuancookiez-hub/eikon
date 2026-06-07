@@ -91,6 +91,20 @@ describe("U1 source identity and trust", () => {
     expect(existsSync(join(dest, "bad"))).toBe(false)
   })
 
+  test("remote descriptor digest mismatch blocks before writing local state", async () => {
+    const remoteLaunch = launch.replace("abcd", "wxyz")
+    const packageManifest = pkg("remote-bad")
+    const fetcher = async (input: string | URL | Request) => {
+      const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
+      if (path === "/packages/liftaris/remote-bad/1.0.0.json") return Response.json(packageManifest)
+      if (path === "/packages/liftaris/remote-bad/streams/main.eikon") return new Response(remoteLaunch)
+      return new Response("404", { status: 404 })
+    }
+
+    await expect(install("https://cdn.example/packages/liftaris/remote-bad/1.0.0.json", dest, { downloader: { fetcher } })).rejects.toThrow(/mismatch.*streams\/main\.eikon/)
+    expect(existsSync(join(dest, "remote-bad"))).toBe(false)
+  })
+
   test("symlink and path escape descriptors are rejected before writes", async () => {
     const symlinked = join(root, "symlinked")
     writePackage(symlinked, "symlinked", pkg("symlinked", [{ path: "streams/main.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: Buffer.byteLength(launch), digest: digest(launch) }, { path: "linked.png", role: "source.base", mediaType: "image/png", size: 1, digest: digest("x") }]))
@@ -149,6 +163,10 @@ describe("U1 GitHub catalog resolver", () => {
 })
 
 describe("U1 production downloader boundary", () => {
+  test("blocks cleartext public HTTP downloads", async () => {
+    await expect(downloadBytes("http://example.com/pkg", { fetcher: async () => new Response("ok") })).rejects.toThrow(/https/i)
+  })
+
   test("blocks private hosts by default, supports explicit fixture allowance", async () => {
     await expect(downloadBytes("http://127.0.0.1/pkg", { fetcher: fetch })).rejects.toThrow(/private host/)
     const bytes = await downloadBytes("http://127.0.0.1/pkg", { allowPrivate: true, fetcher: async () => new Response("ok") })

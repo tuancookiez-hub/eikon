@@ -101,9 +101,10 @@ function privateHost(host: string) {
 
 function assertDownloadUrl(raw: string, opts: DownloadOptions) {
   const url = new URL(raw)
-  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(`download URL must use http(s): ${cleanUrl(raw)}`)
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(`download URL must use https: ${cleanUrl(raw)}`)
   if (url.username || url.password) throw new Error(`download URL cannot include credentials: ${cleanUrl(raw)}`)
   if (!opts.allowPrivate && privateHost(url.hostname)) throw new Error(`download URL cannot use private host: ${url.hostname}`)
+  if (url.protocol === "http:" && !privateHost(url.hostname)) throw new Error(`download URL must use https: ${cleanUrl(raw)}`)
   return url
 }
 
@@ -288,8 +289,26 @@ function trustFor(man: Manifest | EikonPackageManifest, staged: string, base?: s
   if (!files.length) return { state: "unverified", reason: "package descriptors missing" }
   const missing = files.filter(file => !file.digest || typeof file.size !== "number")
   if (missing.length) return { state: "unverified", reason: "package descriptor digest or size missing" }
-  if (base) return { state: "verified", verified: files.map(file => file.path) }
+  if (base) return { state: "unverified", reason: "remote package files not downloaded yet" }
   return verifyPackageFiles(pkg, staged)
+}
+
+async function verifyRemotePackageFiles(pkg: EikonPackageManifest, base: string, opts: DownloadOptions): Promise<{ trust: TrustResult; files?: Map<string, Uint8Array> }> {
+  const files = pkg.files ?? []
+  if (!files.length) return { trust: { state: "unverified", reason: "package descriptors missing" } }
+  const missing = files.filter(file => !file.digest || typeof file.size !== "number")
+  if (missing.length) return { trust: { state: "unverified", reason: "package descriptor digest or size missing" } }
+  const verified: string[] = []
+  const data = new Map<string, Uint8Array>()
+  for (const file of files) {
+    if (!isSafeRelativePath(file.path)) throw new Error(`mismatch: unsafe descriptor path ${file.path}`)
+    const buf = await downloadBytes(new URL(file.path, base).href, opts)
+    if (typeof file.size === "number" && buf.length !== file.size) throw new Error(`mismatch: size ${file.path}`)
+    if (file.digest && sha256(buf) !== file.digest) throw new Error(`mismatch: digest ${file.path}`)
+    data.set(file.path, buf)
+    verified.push(file.path)
+  }
+  return { trust: { state: "verified", verified }, files: data }
 }
 
 export function verifyPackageFiles(pkg: EikonPackageManifest, staged: string): TrustResult {
@@ -450,49 +469,59 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
   const dst = join(root, name)
   const srcd = join(dst, "source")
   try {
-    if (r.staged && (r.manifest as Record<string, unknown>).kind === PACKAGE_KIND) verifyPackageFiles(validatePackageManifest(r.manifest), r.staged)
+    let remote: Awaited<ReturnType<typeof verifyRemotePackageFiles>> | undefined
+    let launchText: string | undefined
+    if ((r.manifest as Record<string, unknown>).kind === PACKAGE_KIND) {
+      const man = validatePackageManifest(r.manifest)
+      const dl: DownloadOptions = opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base ?? "") ? { allowPrivate: true } : {})
+      if (r.base) remote = await verifyRemotePackageFiles(man, r.base, dl)
+      else if (r.staged) verifyPackageFiles(man, r.staged)
+      const rel = man.entrypoints.default
+      if (r.base) {
+        const entry = remote?.files?.get(rel) ?? await downloadBytes(new URL(rel, r.base).href, dl)
+        launchText = new TextDecoder().decode(entry)
+      } else {
+        launchText = readFileSync(join(r.staged, rel), "utf8")
+      }
+      parseLaunchStream(launchText)
+      if (remote) r.trust = remote.trust
+    }
+
     mkdirSync(srcd, { recursive: true })
 
-  if ((r.manifest as Record<string, unknown>).kind === PACKAGE_KIND) {
-    const man = validatePackageManifest(r.manifest)
-    const rel = man.entrypoints.default
-    const text = r.base
-    ? new TextDecoder().decode(await downloadBytes(new URL(rel, r.base).href, opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base) ? { allowPrivate: true } : undefined)))
-    : readFileSync(join(r.staged, rel), "utf8")
-    parseLaunchStream(text)
-    writeFileSync(join(dst, `${name}.eikon`), text)
-  }
+    if (launchText) writeFileSync(join(dst, `${name}.eikon`), launchText)
 
-  // The packed .eikon travels when present in the source.
-  const packed = `${r.name}.eikon`
-  if (r.staged && existsSync(join(r.staged, packed)))
-    copyFileSync(join(r.staged, packed), join(dst, `${name}.eikon`))
+    // The packed .eikon travels when present in the source.
+    const packed = `${r.name}.eikon`
+    if (r.staged && existsSync(join(r.staged, packed)))
+      copyFileSync(join(r.staged, packed), join(dst, `${name}.eikon`))
 
-  const xs = entries(r.manifest)
-  const sources: Sources = {}
-  let done = 0, bytes = 0
-  const tick = () => opts.progress?.(++done, xs.length)
+    const xs = entries(r.manifest)
+    const sources: Sources = {}
+    let done = 0, bytes = 0
+    const tick = () => opts.progress?.(++done, xs.length)
 
-  if (opts.media !== false) await Promise.all(xs.map(async ([role, rel]) => {
-    const fname = `${role}${extname(rel).toLowerCase()}`
-    const to = join(srcd, fname)
-    if (r.base) {
-      const buf = await downloadBytes(new URL(rel, r.base).href, opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base) ? { allowPrivate: true } : undefined))
-      await Bun.write(to, buf); bytes += buf.length
-    } else {
-      const from = join(r.staged, rel)
-      if (!existsSync(from)) throw new Error(`${rel}: missing in ${r.staged}`)
-      copyFileSync(from, to); bytes += statSync(to).size
-    }
-    sources[role] = fname; tick()
-  }))
+    if (opts.media !== false) await Promise.all(xs.map(async ([role, rel]) => {
+      const fname = `${role}${extname(rel).toLowerCase()}`
+      const to = join(srcd, fname)
+      if (r.base) {
+        const dl: DownloadOptions = opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base) ? { allowPrivate: true } : {})
+        const buf = remote?.files?.get(rel) ?? await downloadBytes(new URL(rel, r.base).href, dl)
+        await Bun.write(to, buf); bytes += buf.length
+      } else {
+        const from = join(r.staged, rel)
+        if (!existsSync(from)) throw new Error(`${rel}: missing in ${r.staged}`)
+        copyFileSync(from, to); bytes += statSync(to).size
+      }
+      sources[role] = fname; tick()
+    }))
 
-  const out = installManifest(r.manifest, r.origin)
-  writeFileSync(join(dst, "manifest.json"), JSON.stringify(out, null, 2) + "\n")
+    const out = installManifest(r.manifest, r.origin)
+    writeFileSync(join(dst, "manifest.json"), JSON.stringify(out, null, 2) + "\n")
 
-  if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
+    if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
 
-  return { ...r, name, dir: dst, sources, n: xs.length, bytes }
+    return { ...r, name, dir: dst, sources, n: xs.length, bytes }
   } catch (err) {
     rmSync(dst, { recursive: true, force: true })
     if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
