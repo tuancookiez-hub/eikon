@@ -65,6 +65,19 @@ function setActive(name: string | undefined) {
   writePrefs(next)
 }
 
+const NAME_RE = /^[a-z0-9][a-z0-9-]{1,63}$/
+
+function lifecycleName(name: string) {
+  if (!NAME_RE.test(name)) die(`${name || "<empty>"}: invalid eikon name`)
+  return name
+}
+
+function requiredLifecycleName(argv: string[], a: ReturnType<typeof args>, usage: string): string {
+  if (a.pos[0] !== undefined) return lifecycleName(a.pos[0])
+  if (argv[0]?.startsWith("--")) die(`${argv[0]}: invalid eikon name`)
+  return die(usage)
+}
+
 function installedDir(name: string) { return join(root(), name) }
 function manifestPath(name: string) { return join(installedDir(name), "manifest.json") }
 
@@ -217,7 +230,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async use(argv) {
     const a = args(argv)
-    const name = a.pos[0] ?? die("usage: eikon use <name> [--json]")
+    const name = requiredLifecycleName(argv, a, "usage: eikon use <name> [--json]")
     if (!existsSync(manifestPath(name))) die(`${name}: not installed in ${root()}`)
     setActive(name)
     out(a, { command: "use", name, active: name }, () => `✓ active eikon: ${name}`)
@@ -225,7 +238,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async update(argv) {
     const a = args(argv)
-    const name = a.pos[0] ?? die("usage: eikon update <name> [--force] [--active-ok] [--json]")
+    const name = requiredLifecycleName(argv, a, "usage: eikon update <name> [--force] [--active-ok] [--json]")
     const dir = installedDir(name)
     const mf = manifestPath(name)
     if (!existsSync(mf)) die(`${name}: not installed (no manifest.json)`)
@@ -241,7 +254,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async remove(argv) {
     const a = args(argv)
-    const name = a.pos[0] ?? die("usage: eikon remove <name> [--active-ok] [--json]")
+    const name = requiredLifecycleName(argv, a, "usage: eikon remove <name> [--active-ok] [--json]")
     const dir = installedDir(name)
     if (!existsSync(manifestPath(name))) die(`${name}: not installed`)
     const wasActive = active() === name
@@ -253,7 +266,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async info(argv) {
     const a = args(argv)
-    const name = a.pos[0] ?? die("usage: eikon info <name> [--json]")
+    const name = requiredLifecycleName(argv, a, "usage: eikon info <name> [--json]")
     const data = infoFor(name)
     out(a, data, () => `${data.name}  ${data.version ? `v${data.version}` : ""}  ${data.status}\n  title:  ${data.title ?? data.name}\n  author: ${data.author ?? "unknown"}\n  from:   ${data.sourceKind} ${data.sourceIdentity ?? data.source ?? "unknown"}\n  trust:  ${data.trust}\n  dir:    ${data.dir}`)
   },

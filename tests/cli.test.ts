@@ -127,6 +127,33 @@ describe("eikon CLI lifecycle", () => {
     expect(JSON.parse(readFileSync(join(profile, "tui.json"), "utf8")).eikon).toBeUndefined()
   })
 
+  test("lifecycle names reject path traversal and leave sibling directories untouched", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "eikon-cli-"))
+    const profile = join(tmp, "profile")
+    const victim = join(profile, "victim")
+    mkdirSync(join(profile, "eikons"), { recursive: true })
+    mkdirSync(victim, { recursive: true })
+    writeFileSync(join(victim, "manifest.json"), JSON.stringify({ name: "victim" }))
+
+    for (const cmd of ["use", "remove", "update", "info"]) {
+      const out = await run([cmd, "../victim", "--json"], { HERM_CONFIG_DIR: profile })
+      expect(out.code).toBe(1)
+      expect(out.stderr).toContain("invalid eikon name")
+      expect(existsSync(join(victim, "manifest.json"))).toBe(true)
+    }
+  })
+
+  test("lifecycle names reject absolute separators controls empty and option-like values", async () => {
+    const profile = join(mkdtempSync(join(tmpdir(), "eikon-cli-")), "profile")
+    const cases = ["/tmp/victim", "nested/name", "nested\\name", "bad\nname", "", "--force"]
+
+    for (const name of cases) {
+      const out = await run(["info", name, "--json"], { HERM_CONFIG_DIR: profile })
+      expect(out.code).toBe(1)
+      expect(out.stderr).toContain("invalid eikon name")
+    }
+  })
+
   test("search returns stable empty JSON results", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "eikon-cli-"))
     const srv = Bun.serve({ port: 0, fetch(req) {
