@@ -105,6 +105,39 @@ describe("U1 source identity and trust", () => {
     expect(existsSync(join(dest, "remote-bad"))).toBe(false)
   })
 
+  test("remote package install requires a verified runtime entrypoint descriptor", async () => {
+    const other = new TextEncoder().encode("other")
+    const packageManifest = pkg("remote-missing-runtime", [{ path: "streams/other.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: other.length, digest: digest(other) }])
+    const fetcher = async (input: string | URL | Request) => {
+      const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
+      if (path === "/packages/liftaris/remote-missing-runtime/1.0.0.json") return Response.json(packageManifest)
+      if (path === "/packages/liftaris/remote-missing-runtime/streams/main.eikon") return new Response(launch)
+      if (path === "/packages/liftaris/remote-missing-runtime/streams/other.eikon") return new Response(other)
+      return new Response("404", { status: 404 })
+    }
+
+    await expect(install("https://cdn.example/packages/liftaris/remote-missing-runtime/1.0.0.json", dest, { downloader: { fetcher } })).rejects.toThrow(/missing verified descriptor.*streams\/main\.eikon/)
+    expect(existsSync(join(dest, "remote-missing-runtime"))).toBe(false)
+  })
+
+  test("remote package install requires verified descriptors for source media writes", async () => {
+    const source = new TextEncoder().encode("clip")
+    const packageManifest = {
+      ...pkg("remote-missing-source"),
+      source: { states: { idle: { file: "source/idle.mp4" } } },
+    }
+    const fetcher = async (input: string | URL | Request) => {
+      const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
+      if (path === "/packages/liftaris/remote-missing-source/1.0.0.json") return Response.json(packageManifest)
+      if (path === "/packages/liftaris/remote-missing-source/streams/main.eikon") return new Response(launch)
+      if (path === "/packages/liftaris/remote-missing-source/source/idle.mp4") return new Response(source)
+      return new Response("404", { status: 404 })
+    }
+
+    await expect(install("https://cdn.example/packages/liftaris/remote-missing-source/1.0.0.json", dest, { downloader: { fetcher } })).rejects.toThrow(/missing verified descriptor.*source\/idle\.mp4/)
+    expect(existsSync(join(dest, "remote-missing-source"))).toBe(false)
+  })
+
   test("symlink and path escape descriptors are rejected before writes", async () => {
     const symlinked = join(root, "symlinked")
     writePackage(symlinked, "symlinked", pkg("symlinked", [{ path: "streams/main.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: Buffer.byteLength(launch), digest: digest(launch) }, { path: "linked.png", role: "source.base", mediaType: "image/png", size: 1, digest: digest("x") }]))

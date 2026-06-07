@@ -311,6 +311,11 @@ async function verifyRemotePackageFiles(pkg: EikonPackageManifest, base: string,
   return { trust: { state: "verified", verified }, files: data }
 }
 
+function assertRemotePackageWriteCoverage(pkg: EikonPackageManifest, files: Map<string, Uint8Array> | undefined) {
+  for (const rel of new Set([pkg.entrypoints.default, ...entries(pkg).map(([, rel]) => rel)]))
+    if (!files?.has(rel)) throw new Error(`missing verified descriptor for remote package write: ${rel}`)
+}
+
 export function verifyPackageFiles(pkg: EikonPackageManifest, staged: string): TrustResult {
   const verified: string[] = []
   for (const file of pkg.files ?? []) {
@@ -474,11 +479,14 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
     if ((r.manifest as Record<string, unknown>).kind === PACKAGE_KIND) {
       const man = validatePackageManifest(r.manifest)
       const dl: DownloadOptions = opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base ?? "") ? { allowPrivate: true } : {})
-      if (r.base) remote = await verifyRemotePackageFiles(man, r.base, dl)
-      else if (r.staged) verifyPackageFiles(man, r.staged)
+      if (r.base) {
+        remote = await verifyRemotePackageFiles(man, r.base, dl)
+        assertRemotePackageWriteCoverage(man, remote.files)
+      } else if (r.staged) verifyPackageFiles(man, r.staged)
       const rel = man.entrypoints.default
       if (r.base) {
-        const entry = remote?.files?.get(rel) ?? await downloadBytes(new URL(rel, r.base).href, dl)
+        const verified = remote!.files!
+        const entry = verified.get(rel)!
         launchText = new TextDecoder().decode(entry)
       } else {
         launchText = readFileSync(join(r.staged, rel), "utf8")
@@ -506,7 +514,7 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
       const to = join(srcd, fname)
       if (r.base) {
         const dl: DownloadOptions = opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base) ? { allowPrivate: true } : {})
-        const buf = remote?.files?.get(rel) ?? await downloadBytes(new URL(rel, r.base).href, dl)
+        const buf = remote ? remote.files!.get(rel)! : await downloadBytes(new URL(rel, r.base).href, dl)
         await Bun.write(to, buf); bytes += buf.length
       } else {
         const from = join(r.staged, rel)
