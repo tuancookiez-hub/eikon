@@ -217,7 +217,8 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     const a = args(argv)
     const query = a.pos.join(" ")
     const catalog = a.str("catalog")
-    const entries = await loadCatalogEntries(catalog ?? "https://eikon.liftaris.dev/eikons")
+    const source = catalog ?? "https://eikon.liftaris.dev/eikons"
+    const entries = await loadCatalogEntries(source, fetch, { allowPrivate: /^http:\/\/localhost[:/]/.test(source) })
     const rows = searchCatalogEntries(entries, query).map(e => ({ name: e.name, title: e.title ?? e.name, author: e.author, version: e.version, sourceIdentity: e.sourceKey || e.id, trust: e.trust?.manifestDigest || e.trust?.runtimeDigest ? "verified" : "unverified", installed: existsSync(manifestPath(e.name)), active: active() === e.name }))
     out(a, rows, () => rows.map(e => `${e.name}\t${e.title}\t${e.trust}`).join("\n"))
   },

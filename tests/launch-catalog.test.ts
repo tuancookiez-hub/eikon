@@ -96,7 +96,7 @@ test("catalog client loads and normalizes remote index entries", async () => {
     },
   })
   try {
-    const entries = await loadCatalogEntries(`http://localhost:${srv.port}`)
+    const entries = await loadCatalogEntries(`http://localhost:${srv.port}`, fetch, { allowPrivate: true })
     expect(entries).toHaveLength(1)
     expect(entries[0]?.runtimeUrl).toBe(`http://localhost:${srv.port}/packages/liftaris/nous/streams/nous.eikon`)
   } finally {

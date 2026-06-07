@@ -5,6 +5,7 @@ import { lint, lintRegistry } from "../src/ui/lint"
 import {
   catalogEntry,
   loadCatalog,
+  loadCatalogEntries,
   publicCatalogUrl,
   searchCatalog,
   type CatalogIndexEntry,
@@ -159,6 +160,7 @@ describe("shared catalog contract", () => {
     await expect(loadCatalog("file:///tmp/eikons", fetcher)).rejects.toThrow(/public catalog URL/)
     await expect(loadCatalog("http://localhost:1234/eikons", fetcher)).rejects.toThrow(/private host/)
     await expect(loadCatalog("https://eikon.liftaris.dev/eikons/../private", fetcher)).rejects.toThrow(/path escape/)
+    await expect(loadCatalogEntries("http://169.254.169.254/eikons", fetcher)).rejects.toThrow(/private host/)
   })
 
   test("defaults legacy trust to an empty object for compatibility", () => {

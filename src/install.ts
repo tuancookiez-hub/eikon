@@ -6,7 +6,7 @@
 // Writes `manifest.json` at the destination with an `origin` block so
 // `update` and profile-distribution can detect local edits.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, statSync, readdirSync, lstatSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, renameSync, rmSync, statSync, readdirSync, lstatSync } from "node:fs"
 import { join, extname, basename, dirname } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -74,6 +74,7 @@ export type Opts = {
 export type GithubSource = { owner: string; repo: string; selector?: string; cloneUrl: string; display: string }
 
 const sha256 = (data: string | Uint8Array) => `sha256:${createHash("sha256").update(data).digest("hex")}`
+const NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 const cleanUrl = (raw: string) => {
   try {
     const u = new URL(raw)
@@ -316,6 +317,18 @@ function assertRemotePackageWriteCoverage(pkg: EikonPackageManifest, files: Map<
     if (!files?.has(rel)) throw new Error(`missing verified descriptor for remote package write: ${rel}`)
 }
 
+function assertVerifiedPackageWriteCoverage(pkg: EikonPackageManifest, trust: TrustResult) {
+  if (trust.state !== "verified") return
+  const verified = new Set(trust.verified ?? [])
+  for (const rel of new Set([pkg.entrypoints.default, ...entries(pkg).map(([, rel]) => rel)]))
+    if (!verified.has(rel)) throw new Error(`missing verified descriptor for package write: ${rel}`)
+}
+
+function installName(name: string) {
+  if (!NAME_RE.test(name)) throw new Error(`${name || "<empty>"}: invalid eikon name`)
+  return name
+}
+
 export function verifyPackageFiles(pkg: EikonPackageManifest, staged: string): TrustResult {
   const verified: string[] = []
   for (const file of pkg.files ?? []) {
@@ -353,7 +366,13 @@ function checkRequires(spec: string | undefined): void {
 
 async function catalog(name: string, url: string, opts: Pick<Opts, "downloader"> = {}): Promise<CatalogEntry> {
   const base = url.replace(/\/?$/, "/")
-  const entries = await loadCatalogEntries(base)
+  const allow = opts.downloader?.allowPrivate || /^http:\/\/localhost[:/]/.test(base)
+  const dl: DownloadOptions = opts.downloader ?? (allow ? { allowPrivate: true } : {})
+  const net = async (input: string | URL | Request) => {
+    const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+    return new Response(new TextDecoder().decode(await downloadBytes(raw, dl)))
+  }
+  const entries = await loadCatalogEntries(base, net, { allowPrivate: allow })
   const entry = entries.find(e => e.name === name || e.id === name || e.sourceKey === name)
   if (!entry) throw new Error(`catalog: no eikon named "${name}"`)
   return entry
@@ -470,19 +489,28 @@ export function peek(src: string, opts?: Pick<Opts, "catalog" | "downloader">): 
 export async function install(src: string, root: string, opts: Opts = {}): Promise<Installed> {
   const r = await resolve(src, opts)
   checkRequires((r.manifest as Manifest & { eikon_requires?: string }).eikon_requires)
-  const name = opts.name ?? r.name
+  const name = installName(opts.name ?? r.name)
+  mkdirSync(root, { recursive: true })
   const dst = join(root, name)
-  const srcd = join(dst, "source")
+  const tmp = mkdtempSync(join(root, `.${name}-`))
+  const srcd = join(tmp, "source")
+  const old = join(root, `.${name}.old-${process.pid}-${Date.now()}`)
   try {
     let remote: Awaited<ReturnType<typeof verifyRemotePackageFiles>> | undefined
     let launchText: string | undefined
-    if ((r.manifest as Record<string, unknown>).kind === PACKAGE_KIND) {
+    const pkg = (r.manifest as Record<string, unknown>).kind === PACKAGE_KIND
+    if (pkg) {
       const man = validatePackageManifest(r.manifest)
       const dl: DownloadOptions = opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base ?? "") ? { allowPrivate: true } : {})
       if (r.base) {
         remote = await verifyRemotePackageFiles(man, r.base, dl)
         assertRemotePackageWriteCoverage(man, remote.files)
-      } else if (r.staged) verifyPackageFiles(man, r.staged)
+        r.trust = remote.trust
+      }
+      if (!r.base && r.staged) {
+        r.trust = verifyPackageFiles(man, r.staged)
+        assertVerifiedPackageWriteCoverage(man, r.trust)
+      }
       const rel = man.entrypoints.default
       if (r.base) {
         const verified = remote!.files!
@@ -492,17 +520,15 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
         launchText = readFileSync(join(r.staged, rel), "utf8")
       }
       parseLaunchStream(launchText)
-      if (remote) r.trust = remote.trust
     }
 
     mkdirSync(srcd, { recursive: true })
 
-    if (launchText) writeFileSync(join(dst, `${name}.eikon`), launchText)
+    if (launchText) writeFileSync(join(tmp, `${name}.eikon`), launchText)
 
-    // The packed .eikon travels when present in the source.
     const packed = `${r.name}.eikon`
-    if (r.staged && existsSync(join(r.staged, packed)))
-      copyFileSync(join(r.staged, packed), join(dst, `${name}.eikon`))
+    if (!pkg && r.staged && existsSync(join(r.staged, packed)))
+      copyFileSync(join(r.staged, packed), join(tmp, `${name}.eikon`))
 
     const xs = entries(r.manifest)
     const sources: Sources = {}
@@ -525,13 +551,20 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
     }))
 
     const out = installManifest(r.manifest, { ...r.origin, trust: r.trust.state } as Origin & { trust: TrustState })
-    writeFileSync(join(dst, "manifest.json"), JSON.stringify(out, null, 2) + "\n")
+    writeFileSync(join(tmp, "manifest.json"), JSON.stringify(out, null, 2) + "\n")
 
+    if (existsSync(dst)) renameSync(dst, old)
+    try { renameSync(tmp, dst) }
+    catch (err) {
+      if (existsSync(old)) renameSync(old, dst)
+      throw err
+    }
+    if (existsSync(old)) rmSync(old, { recursive: true, force: true })
     if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
 
     return { ...r, name, dir: dst, sources, n: xs.length, bytes }
   } catch (err) {
-    rmSync(dst, { recursive: true, force: true })
+    rmSync(tmp, { recursive: true, force: true })
     if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
     throw err
   }

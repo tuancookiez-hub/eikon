@@ -115,6 +115,7 @@ export function publicCatalogUrl(raw = DEFAULT_PUBLIC_CATALOG, base?: string, op
   if (opts.allowPrivate && out.protocol === "file:") return out.href
   if (out.protocol !== "https:" && out.protocol !== "http:") throw new Error(`public catalog URL must use http(s): ${out.href}`)
   if (!opts.allowPrivate && privateHost(out.hostname)) throw new Error(`public catalog URL cannot use private host: ${out.hostname}`)
+  if (out.protocol === "http:" && !privateHost(out.hostname)) throw new Error(`public catalog URL must use https: ${out.href}`)
   if (out.pathname.split("/").some(p => p === "..")) throw new Error(`public catalog URL path escape: ${out.href}`)
   return out.href
 }
@@ -273,8 +274,8 @@ export function searchCatalogEntries(entries: readonly CatalogEntry[], query: st
   return entries.filter(entry => [entry.name, entry.title, entry.author, entry.description, ...(entry.tags ?? [])].some(value => value?.toLowerCase().includes(q)))
 }
 
-export async function loadCatalogEntries(base: string, fetcher: typeof fetch = fetch): Promise<CatalogEntry[]> {
-  const root = base.replace(/\/$/, "")
+export async function loadCatalogEntries(base: string, fetcher: Fetcher = fetch, opts: CatalogOptions = {}): Promise<CatalogEntry[]> {
+  const root = trimSlash(publicCatalogUrl(base, undefined, opts))
   const res = await fetcher(`${root}/index.json`)
   if (!res.ok) throw new Error(`catalog: ${res.status} loading ${root}/index.json`)
   const items = await res.json() as unknown
