@@ -19,19 +19,35 @@ src/              library (parse/serialize/lint/install) + CLI + browser
 docs/             SPEC.md, MANIFEST.md
 ```
 
-## Install one
+## Install and use
 
 ```sh
-bunx eikon install ares              # from the default registry
-bunx eikon install github.com/you/x  # from any git repo with a manifest.json
-bunx eikon install ./my-eikon/       # from a local dir
-bunx eikon info ares                 # what's installed, where it came from
+bunx eikon search ares --json                    # discover catalog entries
+bunx eikon inspect ares                           # read metadata/trust before install
+bunx eikon install ares                           # install only; does not activate
+bunx eikon use ares                               # activate explicitly
+bunx eikon list                                   # installed/active state
+bunx eikon info ares                              # source, compatibility, trust, status
+bunx eikon update ares                            # reinstall from recorded origin
+bunx eikon remove ares                            # remove from local library
+bunx eikon install github.com/you/catalog/mono    # multi-eikon GitHub catalog repo
+bunx eikon install github.com/you/single          # single-package GitHub repo
+bunx eikon install ./my-eikon/                    # local package dir
 ```
 
-Lands in `$HERMES_HOME/eikons/<name>/`. Herm's Marketplace tab does the same
-in-process without activating the eikon; its Studio tab can fetch package
-source from package/catalog metadata. Runtime `.eikon` streams stay standalone
-and do not carry source URLs.
+`install` writes into the Herm-compatible profile eikon library but never changes
+the active avatar. `use` is the only activation command. `HERM_CONFIG_DIR` selects
+the profile root; otherwise the CLI uses `$HERMES_HOME/herm` and stores eikons in
+that profile's `eikons/` directory. Removing or updating the active eikon requires
+`--active-ok` because it mutates the avatar the host is currently showing.
+
+Default catalog installs fetch built package artifacts and verify package file
+size/digest descriptors when present. Direct GitHub paths use normal git
+authentication; `github.com/owner/repo/name` selects an eikon from a catalog repo,
+while `github.com/owner/repo` keeps the single-package fallback. Trust is reported
+as `verified`, `unverified`, or `mismatch` in inspect/info/list output. Herm's
+Marketplace tab uses the same package/catalog metadata in-process, and runtime
+`.eikon` streams stay standalone without source URLs.
 
 ## Make one
 
@@ -70,11 +86,18 @@ Studio tab.
 eikon publish mine.eikon
 ```
 
-This submits a bundle to `eikons/<name>/`: the packed `.eikon`,
+This creates a normal GitHub PR contribution against `EIKON_REPO` or the default
+`liftaris/eikon` catalog. The helper uses `gh` authentication and repository
+mechanics; creators can also prepare and share single-package or multi-eikon GitHub
+repos directly with `pack`, `manifest`, and `index`. There is no hosted
+marketplace account, upload API, dashboard, or moderation workflow in this v1
+path.
+
+The contribution bundle targets `eikons/<name>/`: the packed `.eikon`,
 `manifest.json` when present, referenced source files, and catalog metadata. The
 CLI previews and allowlists bundle paths, skips hidden or secret-like extras by
 default, rejects path/symlink escapes, and reports setup or validation errors
-before creating the submission request.
+before creating the PR request.
 
 ## States
 

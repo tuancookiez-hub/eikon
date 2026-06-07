@@ -3,10 +3,10 @@
 
 import { resolve, basename, join } from "node:path"
 import { homedir } from "node:os"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs"
 import { parse, poster } from "./ui/eikon"
 import { lint, lintManifest, type Manifest } from "./ui/lint"
-import { install, dirty, type Origin } from "./install"
+import { resolve as resolveInstall, install, dirty, verifyPackageFiles, TRUST_STATES, type Origin, type TrustState } from "./install"
 import { pack } from "./pack"
 import * as reg from "./registry"
 import { Browser } from "./browse/Browser"
@@ -15,12 +15,16 @@ import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
 import { PACKAGE_KIND } from "./contract/shape"
 import { validatePackageManifest } from "./package/manifest"
+import { loadCatalogEntries, searchCatalogEntries } from "./catalog"
 
 const REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
-const root = () => join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "eikons")
+const profileRoot = () => process.env.HERM_CONFIG_DIR ?? join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "herm")
+const root = () => join(profileRoot(), "eikons")
+const prefsFile = () => process.env.HERM_CONFIG_DIR ? join(process.env.HERM_CONFIG_DIR, "tui.json") : join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "herm", "tui.json")
 const mb = (n: number) => n < 1 << 20 ? `${(n / 1024).toFixed(0)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`
 
 const die = (msg: string): never => { console.error(`eikon: ${msg}`); process.exit(1) }
+const out = (a: ReturnType<typeof args>, data: unknown, human: () => string) => console.log(a.kv.json ? JSON.stringify(data, null, 2) : human())
 
 function args(argv: string[]) {
   const pos: string[] = [], kv: Record<string, string | true> = {}
@@ -31,6 +35,93 @@ function args(argv: string[]) {
     kv[a.slice(2)] = next && !next.startsWith("--") ? (i++, next) : true
   }
   return { pos, kv, str: (k: string) => typeof kv[k] === "string" ? kv[k] as string : undefined }
+}
+
+function prefs(): Record<string, unknown> {
+  const path = prefsFile()
+  if (!existsSync(path)) return {}
+  const raw = readFileSync(path, "utf8").trim()
+  if (!raw) return {}
+  const value = JSON.parse(raw) as Record<string, unknown>
+  if (!value.eikon && typeof value.eikonPath === "string") value.eikon = basename(value.eikonPath, ".eikon")
+  return value
+}
+
+function active() {
+  const value = prefs().eikon
+  return typeof value === "string" ? value : undefined
+}
+
+function writePrefs(next: Record<string, unknown>) {
+  mkdirSync(profileRoot(), { recursive: true })
+  writeFileSync(prefsFile(), JSON.stringify(next, null, 2) + "\n")
+}
+
+function setActive(name: string | undefined) {
+  const next = prefs()
+  if (name) next.eikon = name
+  else delete next.eikon
+  delete next.eikonPath
+  writePrefs(next)
+}
+
+function installedDir(name: string) { return join(root(), name) }
+function manifestPath(name: string) { return join(installedDir(name), "manifest.json") }
+
+function installedNames() {
+  if (!existsSync(root())) return []
+  return readdirSync(root(), { withFileTypes: true }).filter(e => e.isDirectory() && existsSync(join(root(), e.name, "manifest.json"))).map(e => e.name).sort()
+}
+
+function trustOf(man: Manifest & { files?: unknown[] }, dir: string): TrustState {
+  const originTrust = (man as { origin?: { trust?: TrustState } }).origin?.trust
+  if (originTrust && TRUST_STATES.includes(originTrust)) return originTrust
+  if ((man as Record<string, unknown>).kind === PACKAGE_KIND) return verifyPackageFiles(validatePackageManifest(man), dir).state
+  return "unverified"
+}
+
+function infoFor(name: string) {
+  const path = manifestPath(name)
+  if (!existsSync(path)) die(`${name}: not installed`)
+  const man = JSON.parse(readFileSync(path, "utf8")) as Manifest & { origin?: Origin; display?: { title?: string; author?: string }; files?: unknown[]; compatibility?: { eikon?: string } }
+  const isActive = active() === name
+  const trust = trustOf(man, installedDir(name))
+  return {
+    name,
+    title: man.display?.title ?? man.name,
+    author: man.display?.author,
+    version: man.version,
+    status: isActive ? "active" : "installed",
+    active: isActive,
+    sourceKind: man.origin?.kind ?? "legacy",
+    sourceIdentity: man.origin?.identityKey ?? man.origin?.sourceKey ?? man.origin?.repo ?? man.origin?.source,
+    source: man.origin?.source,
+    compatibility: man.compatibility?.eikon ?? man.eikon_requires,
+    trust,
+    removable: true,
+    updateable: !!man.origin?.source,
+    dir: installedDir(name),
+  }
+}
+
+function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>>, installed: boolean) {
+  const man = r.manifest as Manifest & { display?: { title?: string; author?: string }; compatibility?: { eikon?: string }; preview?: string; poster?: string }
+  return {
+    command: "inspect",
+    name: r.name,
+    title: man.display?.title ?? man.name,
+    author: man.display?.author,
+    version: man.version,
+    source: src,
+    sourceKind: r.origin.kind,
+    sourceIdentity: r.origin.identityKey ?? r.origin.sourceKey ?? r.origin.repo ?? r.origin.source,
+    compatibility: man.compatibility?.eikon ?? man.eikon_requires,
+    preview: !!man.preview,
+    poster: !!man.poster,
+    installed,
+    trust: r.trust.state,
+    trustReason: r.trust.reason,
+  }
 }
 
 async function gh(args: string[], input?: string) {
@@ -60,6 +151,10 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   },
 
   async publish(argv) {
+    if (argv.includes("--help")) {
+      console.log(`eikon publish <file.eikon>\n\nGitHub PR contribution helper for ${REPO}. Set EIKON_REPO=owner/repo to target a different catalog. This prepares a normal GitHub contribution with gh; no hosted upload/auth service, dashboard, or moderation product is involved.`)
+      return
+    }
     const path = argv[0] ?? die("usage: eikon publish <file>")
     const raw = await Bun.file(resolve(path)).text()
     const e = lint(raw)
@@ -86,39 +181,81 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async install(argv) {
     const a = args(argv)
-    const src = a.pos[0] ?? die("usage: eikon install <name|url|dir> [--name N] [--no-source] [--catalog URL]")
-    const out = await install(src, root(), {
+    const src = a.pos[0] ?? die("usage: eikon install <name|url|dir> [--name N] [--no-source] [--catalog URL] [--json]")
+    const before = active()
+    const installed = await install(src, root(), {
       name: a.str("name"), media: !a.kv["no-source"], catalog: a.str("catalog"),
-      progress: (d, t) => process.stderr.write(`\r  ${d}/${t}`),
+      progress: a.kv.json ? undefined : (d, t) => process.stderr.write(`\r  ${d}/${t}`),
     })
-    process.stderr.write("\r")
-    console.log(`✓ ${out.name}  ${out.n} files  ${mb(out.bytes)}  → ${out.dir}`)
+    if (!a.kv.json) process.stderr.write("\r")
+    const data = { command: "install", name: installed.name, files: installed.n, bytes: installed.bytes, dir: installed.dir, active: before, trust: installed.trust.state, sourceKind: installed.origin.kind }
+    out(a, data, () => `✓ ${installed.name}  ${installed.n} files  ${mb(installed.bytes)}  → ${installed.dir}\n  installed only; run eikon use ${installed.name} to activate`)
+  },
+
+  async inspect(argv) {
+    const a = args(argv)
+    const src = a.pos[0] ?? die("usage: eikon inspect <name|url|dir> [--catalog URL] [--json]")
+    const r = await resolveInstall(src, { catalog: a.str("catalog") })
+    const data = inspectResult(src, r, existsSync(manifestPath(r.name)))
+    out(a, data, () => `${data.name}  ${data.title ?? ""}\n  author: ${data.author ?? "unknown"}\n  source: ${data.sourceKind} ${data.sourceIdentity ?? data.source}\n  trust:  ${data.trust}${data.trustReason ? ` (${data.trustReason})` : ""}\n  installed: ${data.installed}`)
+  },
+
+  async search(argv) {
+    const a = args(argv)
+    const query = a.pos.join(" ")
+    const catalog = a.str("catalog")
+    const entries = await loadCatalogEntries(catalog ?? "https://eikon.liftaris.dev/eikons")
+    const rows = searchCatalogEntries(entries, query).map(e => ({ name: e.name, title: e.title ?? e.name, author: e.author, version: e.version, sourceIdentity: e.sourceKey || e.id, trust: e.trust?.manifestDigest || e.trust?.runtimeDigest ? "verified" : "unverified", installed: existsSync(manifestPath(e.name)), active: active() === e.name }))
+    out(a, rows, () => rows.map(e => `${e.name}\t${e.title}\t${e.trust}`).join("\n"))
+  },
+
+  async list(argv) {
+    const a = args(argv)
+    const rows = installedNames().map(infoFor)
+    out(a, rows, () => rows.map(e => `${e.status === "active" ? "*" : " "} ${e.name}\t${e.sourceKind}\t${e.trust}`).join("\n"))
+  },
+
+  async use(argv) {
+    const a = args(argv)
+    const name = a.pos[0] ?? die("usage: eikon use <name> [--json]")
+    if (!existsSync(manifestPath(name))) die(`${name}: not installed in ${root()}`)
+    setActive(name)
+    out(a, { command: "use", name, active: name }, () => `✓ active eikon: ${name}`)
   },
 
   async update(argv) {
-    const name = argv[0] ?? die("usage: eikon update <name> [--force]")
-    const dir = join(root(), name)
-    const mf = join(dir, "manifest.json")
+    const a = args(argv)
+    const name = a.pos[0] ?? die("usage: eikon update <name> [--force] [--active-ok] [--json]")
+    const dir = installedDir(name)
+    const mf = manifestPath(name)
     if (!existsSync(mf)) die(`${name}: not installed (no manifest.json)`)
     const man = JSON.parse(readFileSync(mf, "utf8")) as Manifest & { origin?: Origin }
     const origin = man.origin
     if (!origin?.source) die(`${name}: no origin recorded; reinstall with a source`)
-    if (dirty(dir) && !argv.includes("--force"))
-      die(`${name}: locally modified since install; pass --force to overwrite`)
-    const out = await install(origin!.source, root(), { name })
-    console.log(`✓ ${out.name}  ${out.n} files  ${mb(out.bytes)}  (${origin!.source})`)
+    if (active() === name && !a.kv["active-ok"]) die(`${name}: update would change the active avatar backing package; pass --active-ok to acknowledge`)
+    if (dirty(dir) && !a.kv.force) die(`${name}: locally modified since install; pass --force to overwrite`)
+    const src = man.origin?.source ?? die(`${name}: no origin recorded; reinstall with a source`)
+    const installed = await install(src, root(), { name })
+    out(a, { command: "update", name: installed.name, source: src, active: active() === name, trust: installed.trust.state }, () => `✓ ${installed.name}  ${installed.n} files  ${mb(installed.bytes)}  (${src})`)
+  },
+
+  async remove(argv) {
+    const a = args(argv)
+    const name = a.pos[0] ?? die("usage: eikon remove <name> [--active-ok] [--json]")
+    const dir = installedDir(name)
+    if (!existsSync(manifestPath(name))) die(`${name}: not installed`)
+    const wasActive = active() === name
+    if (wasActive && !a.kv["active-ok"]) die(`${name}: remove would clear the active avatar; pass --active-ok to acknowledge`)
+    rmSync(dir, { recursive: true, force: true })
+    if (wasActive) setActive(undefined)
+    out(a, { command: "remove", name, removed: true, activeCleared: wasActive }, () => `✓ removed ${name}${wasActive ? " and cleared active eikon" : ""}`)
   },
 
   async info(argv) {
-    const name = argv[0] ?? die("usage: eikon info <name>")
-    const mf = join(root(), name, "manifest.json")
-    if (!existsSync(mf)) die(`${name}: not installed`)
-    const m = JSON.parse(readFileSync(mf, "utf8")) as Manifest & { origin?: Origin }
-    console.log(`${m.name}  v${m.version ?? 1}${m.eikon_requires ? `  (requires ${m.eikon_requires})` : ""}`)
-    console.log(`  states: ${Object.keys(m.states ?? {}).join(" ")}`)
-    if (m.source) console.log(`  base:   ${m.source}`)
-    if (m.origin) console.log(`  from:   ${m.origin.source}\n  at:     ${m.origin.at}${m.origin.sha ? `  (${m.origin.sha.slice(0, 7)})` : ""}`)
-    console.log(`  dir:    ${join(root(), name)}`)
+    const a = args(argv)
+    const name = a.pos[0] ?? die("usage: eikon info <name> [--json]")
+    const data = infoFor(name)
+    out(a, data, () => `${data.name}  ${data.version ? `v${data.version}` : ""}  ${data.status}\n  title:  ${data.title ?? data.name}\n  author: ${data.author ?? "unknown"}\n  from:   ${data.sourceKind} ${data.sourceIdentity ?? data.source ?? "unknown"}\n  trust:  ${data.trust}\n  dir:    ${data.dir}`)
   },
 
   add: (argv) => cmds.install!(argv),

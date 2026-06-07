@@ -524,7 +524,7 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
       sources[role] = fname; tick()
     }))
 
-    const out = installManifest(r.manifest, r.origin)
+    const out = installManifest(r.manifest, { ...r.origin, trust: r.trust.state } as Origin & { trust: TrustState })
     writeFileSync(join(dst, "manifest.json"), JSON.stringify(out, null, 2) + "\n")
 
     if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
