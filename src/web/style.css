@@ -6,6 +6,7 @@
   --bg: #050505;
   --panel: #090909;
   --panel-2: #0d0d0d;
+  --preview-surface: #020202;
   --line: #2a2a2a;
   --line-strong: #6f6f6f;
   --text: #e7e7e7;
@@ -106,7 +107,7 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  background: #020202;
+  background: var(--preview-surface);
   border: 1px solid var(--line);
   container-type: inline-size;
 }
@@ -171,7 +172,7 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   justify-self: stretch;
   overflow: visible;
   padding: 0;
-  background: transparent;
+  background: var(--preview-surface);
   border: 0;
   color: var(--text);
   font-size: var(--selected-preview-font-size, clamp(5.5px, .52vw, 8px));

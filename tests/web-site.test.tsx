@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test"
 import { join, resolve } from "node:path"
 import { renderToStaticMarkup } from "react-dom/server"
-import { App, WEB_PREVIEW_FPS, WEB_PREVIEW_FRAME_MS } from "../src/web/App"
+import { App, WEB_PREVIEW_FPS, WEB_PREVIEW_FRAME_MS, WEB_SELECTED_PREVIEW_SCALE } from "../src/web/App"
 import { browserInstructions, EntryCard } from "../src/web/player"
 import type { CatalogEntry } from "../src/browser"
 
@@ -106,7 +106,9 @@ test("web preview uses terminal-like cells, square cards, mobile drawer, and smo
 
   expect(WEB_PREVIEW_FPS).toBeGreaterThanOrEqual(16)
   expect(WEB_PREVIEW_FRAME_MS).toBeLessThanOrEqual(1000 / 16)
+  expect(WEB_SELECTED_PREVIEW_SCALE).toBe(1.5)
   expect(css).toContain("--terminal-line-height: 2.44ch")
+  expect(css).toContain("--preview-surface: #020202")
   expect(css).toContain("line-height: var(--terminal-line-height)")
   expect(css).toContain("overflow-x: clip")
   expect(css).toContain("aspect-ratio: 1 / 1")
@@ -117,7 +119,8 @@ test("web preview uses terminal-like cells, square cards, mobile drawer, and smo
   expect(css).toMatch(/\.ascii\s*\{[^}]*display:\s*grid/)
   expect(css).toMatch(/\.ascii\s*\{[^}]*justify-items:\s*center/)
   expect(css).toMatch(/\.ascii\s*\{[^}]*align-items:\s*start/)
-  expect(css).toMatch(/\.ascii\s*\{[^}]*background:\s*transparent/)
+  expect(css).toMatch(/\.cardPreview\s*\{[^}]*background:\s*var\(--preview-surface\)/)
+  expect(css).toMatch(/\.ascii\s*\{[^}]*background:\s*var\(--preview-surface\)/)
   expect(css).toMatch(/\.ascii\s*\{[^}]*border:\s*0/)
   expect(css).toMatch(/\.ascii\s*\{[^}]*font-size:\s*var\(--selected-preview-font-size,\s*clamp\(5\.5px,\s*\.52vw,\s*8px\)\)/)
   expect(css).not.toMatch(/@media[^}]*\.ascii\s*\{[^}]*font-size/s)

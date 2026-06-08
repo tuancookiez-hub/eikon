@@ -8,6 +8,7 @@ const loc = typeof location === "undefined" ? undefined : location
 const catalogBase = new URLSearchParams(loc?.search ?? "").get("catalog") ?? "/eikons"
 export const WEB_PREVIEW_FPS = 16
 export const WEB_PREVIEW_FRAME_MS = 1000 / WEB_PREVIEW_FPS
+export const WEB_SELECTED_PREVIEW_SCALE = 1.5
 type DrawerMode = "collapsed" | "peek" | "expanded"
 
 export function App() {
@@ -29,11 +30,19 @@ export function App() {
     if (!node) return
     const selectedPoster = document.querySelector<HTMLElement>(".card.selected .cardPoster")
     const posterFont = selectedPoster ? window.getComputedStyle(selectedPoster).fontSize : ""
+    const posterFontPx = Number.parseFloat(posterFont)
     const posterWidth = selectedPoster?.getBoundingClientRect().width ?? 0
-    if (posterFont) node.style.setProperty("--selected-preview-font-size", posterFont)
-    else node.style.removeProperty("--selected-preview-font-size")
-    if (posterWidth > 0) node.style.setProperty("--selected-preview-width", `${posterWidth}px`)
-    else node.style.removeProperty("--selected-preview-width")
+    if (Number.isFinite(posterFontPx) && posterFontPx > 0) {
+      node.style.setProperty("--selected-preview-font-size", `${posterFontPx * WEB_SELECTED_PREVIEW_SCALE}px`)
+    } else {
+      node.style.removeProperty("--selected-preview-font-size")
+    }
+    if (posterWidth > 0) {
+      const scaledWidth = posterWidth * WEB_SELECTED_PREVIEW_SCALE
+      node.style.setProperty("--selected-preview-width", `${scaledWidth}px`)
+    } else {
+      node.style.removeProperty("--selected-preview-width")
+    }
     if (window.matchMedia("(max-width: 980px)").matches) {
       node.style.removeProperty("--detail-height")
       return
