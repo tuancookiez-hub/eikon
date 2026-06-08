@@ -4,7 +4,7 @@ import { createHash } from "node:crypto"
 import { DEFAULT_CATALOG } from "./ui/spec"
 import { poster } from "./ui/eikon"
 import { migrateLegacyEikon } from "./stream/legacy"
-import { parseLaunchStream } from "./stream/parse"
+import { parseRuntimeFile, decodeRuntimeFile, runtimeDescriptor as runtimeBlob, type ParsedLaunchStream } from "./stream"
 import { normalizeCatalogEntry, validateCatalogEntry } from "./catalog"
 import {
   LAUNCH_MEDIA_TYPE,
@@ -13,21 +13,33 @@ import {
   type PackageFileDescriptor,
   type PackageSourceMedia,
   type SignalName,
+  type RuntimeEncoding,
 } from "./contract/shape"
 import { validatePackageManifest } from "./package/manifest"
 
-const root = () => {
+export type RegistryOptions = {
+  root?: string
+  base?: string
+  encoding?: RuntimeEncoding
+}
+
+const root = (opts: RegistryOptions = {}) => {
+  if (opts.root) return opts.root
   let d = import.meta.dir
   while (!existsSync(join(d, "eikons", "index.json")) && dirname(d) !== d) d = dirname(d)
   return join(d, "eikons")
 }
-const siteRoot = () => dirname(root())
+const siteRoot = (opts: RegistryOptions = {}) => dirname(root(opts))
 const slash = (s: string) => s.replace(/\/?$/, "/")
 const digestHex = (digest: string) => digest.replace(/^sha256:/, "")
 const blobRel = (digest: string) => `blobs/sha256/${digestHex(digest)}`
 
 function sha256(path: string): string {
   return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`
+}
+
+function sha256Bytes(bytes: string | Uint8Array): string {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`
 }
 
 function mediaType(path: string): string {
@@ -51,6 +63,19 @@ function fileInfo(dir: string, path: string, role: PackageFileDescriptor["role"]
     size: statSync(full).size,
     digest: sha256(full),
     ...(signal ? { signal } : {}),
+  }
+}
+
+function localRuntimeInfo(dir: string, path: string, text: string): PackageFileDescriptor {
+  const info = fileInfo(dir, path, "runtime")
+  const bytes = readFileSync(join(dir, path))
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return info
+  const decoded = new TextEncoder().encode(text)
+  return {
+    ...info,
+    encoding: "gzip",
+    decodedSize: decoded.length,
+    decodedDigest: sha256Bytes(decoded),
   }
 }
 
@@ -110,6 +135,39 @@ function stageBlob(pkgDir: string, src: string, digest: string): void {
   copyFileSync(src, local)
 }
 
+function stageBytes(pkgDir: string, bytes: Uint8Array, digest: string): void {
+  const rel = blobRel(digest)
+  const local = join(pkgDir, rel)
+  mkdirSync(dirname(local), { recursive: true })
+  writeFileSync(local, bytes)
+}
+
+function runtimeInfo(path: string, text: string, encoding: RuntimeEncoding): PackageFileDescriptor & { bytes: Uint8Array } {
+  const info = runtimeBlob(text, { encoding })
+  return {
+    path,
+    role: "runtime",
+    mediaType: LAUNCH_MEDIA_TYPE,
+    size: info.size,
+    digest: info.digest,
+    ...(encoding === "gzip" ? { encoding: info.encoding, decodedSize: info.decodedSize, decodedDigest: info.decodedDigest } : {}),
+    bytes: info.bytes,
+  }
+}
+
+function registryRuntime(file: PackageFileDescriptor & { bytes: Uint8Array }): PackageFileDescriptor {
+  return {
+    path: blobRel(file.digest!),
+    role: file.role,
+    mediaType: file.mediaType,
+    size: file.size,
+    digest: file.digest,
+    ...(file.encoding ? { encoding: file.encoding } : {}),
+    ...(file.decodedSize != null ? { decodedSize: file.decodedSize } : {}),
+    ...(file.decodedDigest ? { decodedDigest: file.decodedDigest } : {}),
+  }
+}
+
 function registrySource(source: PackageSourceMedia | undefined, localFiles: PackageFileDescriptor[]): PackageSourceMedia | undefined {
   if (!source) return undefined
   const byPath = new Map(localFiles.map(file => [file.path, blobRel(file.digest!)]))
@@ -123,7 +181,7 @@ function registrySource(source: PackageSourceMedia | undefined, localFiles: Pack
   return out.base || out.states ? out : undefined
 }
 
-function displayFrom(prior: Record<string, unknown>, launch: ReturnType<typeof parseLaunchStream>, name: string): EikonPackageManifest["display"] {
+function displayFrom(prior: Record<string, unknown>, launch: ParsedLaunchStream, name: string): EikonPackageManifest["display"] {
   const displayPrior = prior.display && typeof prior.display === "object" && !Array.isArray(prior.display) ? prior.display as Record<string, unknown> : {}
   return {
     title: typeof displayPrior.title === "string" ? displayPrior.title : launch.header.title ?? name,
@@ -133,9 +191,11 @@ function displayFrom(prior: Record<string, unknown>, launch: ReturnType<typeof p
   }
 }
 
-export async function index(base = DEFAULT_CATALOG) {
-  const dir = root()
-  const site = siteRoot()
+export async function index(input: string | RegistryOptions = DEFAULT_CATALOG) {
+  const opts = typeof input === "string" ? { base: input } : input
+  const base = opts.base ?? DEFAULT_CATALOG
+  const dir = root(opts)
+  const site = siteRoot(opts)
   const out = []
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (!e.isDirectory()) continue
@@ -143,12 +203,15 @@ export async function index(base = DEFAULT_CATALOG) {
     const manifestPath = join(d, "manifest.json")
     const streamPath = join(d, `${e.name}.eikon`)
     if (!existsSync(manifestPath) || !existsSync(streamPath)) continue
-    const man = validatePackageManifest(JSON.parse(readFileSync(manifestPath, "utf8")), { registry: true })
-    const stream = parseLaunchStream(readFileSync(streamPath, "utf8"))
+    const local = validatePackageManifest(JSON.parse(readFileSync(manifestPath, "utf8")), { registry: true })
+    const versionManifest = join(site, "packages", ...local.id.split("/"), `${local.version ?? "1.0.0"}.json`)
+    const man = existsSync(versionManifest)
+      ? validatePackageManifest(JSON.parse(readFileSync(versionManifest, "utf8")), { registry: true })
+      : local
+    const stream = parseRuntimeFile(streamPath)
     const runtime = man.files?.find(file => file.role === "runtime" && file.path === man.entrypoints.default)
     if (!runtime?.digest) throw new Error(`${e.name}: runtime descriptor missing digest`)
     const pkg = packageUrl(base, man.id, man.version ?? "1.0.0")
-    const versionManifest = join(site, "packages", ...man.id.split("/"), `${man.version ?? "1.0.0"}.json`)
     const manifestDigest = existsSync(versionManifest) ? sha256(versionManifest) : undefined
     const normalized = normalizeCatalogEntry({ manifest: man, packageUrl: pkg, sourceKey: `registry:${new URL(base).host}:${man.id}@${man.version ?? "1.0.0"}`, detailUrl: detailUrl(base, e.name) }, base)
     const entry = validateCatalogEntry({
@@ -170,9 +233,10 @@ export async function index(base = DEFAULT_CATALOG) {
   return out.length
 }
 
-export function manifest() {
-  const dir = root()
-  const site = siteRoot()
+export function manifest(opts: RegistryOptions = {}) {
+  const dir = root(opts)
+  const site = siteRoot(opts)
+  const encoding = opts.encoding ?? "identity"
   rmSync(join(site, "packages"), { recursive: true, force: true })
   rmSync(join(site, "blobs"), { recursive: true, force: true })
   let n = 0
@@ -183,21 +247,24 @@ export function manifest() {
     if (!existsSync(packed)) continue
     const oldManifest = join(d, "manifest.json")
     const prior = existsSync(oldManifest) ? JSON.parse(readFileSync(oldManifest, "utf8")) as Record<string, unknown> : {}
-    const text = readFileSync(packed, "utf8")
+    const text = decodeRuntimeFile(packed)
     const migrated = text.trimStart().startsWith('{"type":"header"') || text.trimStart().startsWith('{"type":"header",')
       ? undefined
       : migrateLegacyEikon(text, { id: `liftaris/${e.name}`, entrypoint: `${e.name}.eikon`, version: "1.0.0" })
     if (migrated) writeFileSync(packed, migrated.stream)
-    const launch = parseLaunchStream(readFileSync(packed, "utf8"))
+    const runtimeText = migrated?.stream ?? text
+    const launch = parseRuntimeFile(packed)
     const source = sourceMedia(prior)
-    const localFiles = [fileInfo(d, `${e.name}.eikon`, "runtime"), ...sourceDescriptors(d, source)]
-    const registryFiles = localFiles.map(registryInfo)
+    const localRuntime = localRuntimeInfo(d, `${e.name}.eikon`, runtimeText)
+    const runtime = runtimeInfo(`${e.name}.eikon`, runtimeText, encoding)
+    const localFiles = [localRuntime, ...sourceDescriptors(d, source)]
+    const registryFiles = [registryRuntime(runtime), ...localFiles.slice(1).map(registryInfo)]
     const registrySourceMedia = registrySource(source, localFiles)
-    const runtime = localFiles[0]!
     const [namespace = "local", packageName = e.name] = `liftaris/${e.name}`.split("/")
     const pkgDir = join(site, "packages", namespace, packageName)
     mkdirSync(pkgDir, { recursive: true })
-    for (const file of localFiles) stageBlob(pkgDir, join(d, file.path), file.digest!)
+    stageBytes(pkgDir, runtime.bytes, runtime.digest!)
+    for (const file of localFiles.slice(1)) stageBlob(pkgDir, join(d, file.path), file.digest!)
 
     const shared = {
       kind: PACKAGE_KIND,

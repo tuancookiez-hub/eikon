@@ -46,7 +46,7 @@ test("ipc: emit → picks round-trip with interleaved noise", async () => {
 
   async function* src() { for (const c of chunks) yield c }
   const got: { name: string; raw: string }[] = []
-  for await (const p of picks(src())) got.push(p)
+  for await (const p of picks(src())) got.push({ name: p.name, raw: p.raw })
 
   expect(got).toEqual([
     { name: "ares", raw: "RAW-ARES-BODY" },
@@ -63,4 +63,14 @@ test("ipc: header split across chunk boundary", async () => {
   const got: string[] = []
   for await (const p of picks(src())) got.push(p.raw)
   expect(got).toEqual(["ABC"])
+})
+
+test("ipc: binary picks preserve stored bytes", async () => {
+  const chunks: Buffer[] = []
+  const sink = { write: (s: string | Uint8Array) => (chunks.push(Buffer.from(s)), true) } as NodeJS.WritableStream
+  emit(sink)("gzip", new Uint8Array([0x1f, 0x8b, 0x08, 0xff]))
+  async function* src() { for (const c of chunks) yield c }
+  const got: number[][] = []
+  for await (const p of picks(src())) got.push([...p.bytes])
+  expect(got).toEqual([[0x1f, 0x8b, 0x08, 0xff]])
 })

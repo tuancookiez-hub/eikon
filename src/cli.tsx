@@ -16,6 +16,7 @@ import { createRoot } from "@opentui/react"
 import { PACKAGE_KIND } from "./contract/shape"
 import { validatePackageManifest } from "./package/manifest"
 import { loadCatalogEntries, searchCatalogEntries } from "./catalog"
+import { decodeRuntimeFile, writeRuntimeFile } from "./stream"
 
 const REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 const profileRoot = () => process.env.HERM_CONFIG_DIR ?? join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "herm")
@@ -147,7 +148,7 @@ async function gh(args: string[], input?: string) {
 const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async lint(argv) {
     const path = argv[0] ?? die("usage: eikon lint <file.eikon|manifest.json>")
-    const raw = await Bun.file(resolve(path)).text()
+    const raw = basename(path) === "manifest.json" ? await Bun.file(resolve(path)).text() : decodeRuntimeFile(resolve(path))
     if (basename(path) === "manifest.json") {
       const parsed = JSON.parse(raw) as Record<string, unknown>
       if (parsed.kind === PACKAGE_KIND) {
@@ -169,7 +170,8 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
       return
     }
     const path = argv[0] ?? die("usage: eikon publish <file>")
-    const raw = await Bun.file(resolve(path)).text()
+    const abs = resolve(path)
+    const raw = decodeRuntimeFile(abs)
     const e = lint(raw)
     const name = e.meta.name
     const branch = `add/${name}`
@@ -184,7 +186,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     await gh(["api", "-X", "PUT", `repos/${fork}/contents/eikons/${name}/${name}.eikon`,
       "-f", `message=eikons: add ${name}`,
       "-f", `branch=${branch}`,
-      "-f", `content=${Buffer.from(raw).toString("base64")}`])
+      "-f", `content=${Buffer.from(await Bun.file(abs).arrayBuffer()).toString("base64")}`])
 
     const url = await gh(["pr", "create", "-R", REPO, "-H", `${user}:${branch}`, "-B", "main",
       "-t", `eikons: add ${name}`,
@@ -279,7 +281,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     const catalog = src.endsWith(".eikon")
       ? local(resolve(src, ".."))
       : cat(resolve(import.meta.dir, "../eikons"))
-    const raw = src.endsWith(".eikon") ? await Bun.file(resolve(src)).text() : await catalog.load(src)
+    const raw = src.endsWith(".eikon") ? decodeRuntimeFile(resolve(src)) : await catalog.load(src)
     const e = parse(raw)
     // Cheap inline preview: render poster, list states.
     console.log(poster(e))
@@ -288,7 +290,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async pack(argv) {
     const a = args(argv)
-    const src = a.pos[0] ?? die("usage: eikon pack <image|video|dir> [out.eikon] [--name N] [--glyph G] [--author A] [--width 48] [--height 24] [--fps 16] [--symbols block|braille|ascii] [--colors none|256|full] [--no-invert]")
+    const src = a.pos[0] ?? die("usage: eikon pack <image|video|dir> [out.eikon] [--gzip] [--name N] [--glyph G] [--author A] [--width 48] [--height 24] [--fps 16] [--symbols block|braille|ascii] [--colors none|256|full] [--no-invert]")
     const { doc, text } = pack(resolve(src), {
       name: a.str("name"), author: a.str("author"), glyph: a.str("glyph"),
       width: a.str("width") ? +a.str("width")! : undefined,
@@ -299,9 +301,10 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     })
     lint(text)
     const out = resolve(a.pos[1] ?? `${doc.header.name}.eikon`)
-    await Bun.write(out, text)
+    writeRuntimeFile(out, text, { encoding: a.kv.gzip ? "gzip" : "identity" })
+    const bytes = await Bun.file(out).arrayBuffer()
     const total = doc.states.reduce((n, s) => n + s.frame_count, 0)
-    console.log(`✓ ${out}  (${doc.header.width}×${doc.header.height}, ${total} frames, ${(text.length / 1024).toFixed(1)} KB)`)
+    console.log(`✓ ${out}  (${doc.header.width}×${doc.header.height}, ${total} frames, ${(bytes.byteLength / 1024).toFixed(1)} KB${a.kv.gzip ? ", gzip" : ""})`)
     console.log(`  eikon show ${out}`)
   },
 
@@ -311,12 +314,14 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   },
 
   async index(argv) {
-    const n = await reg.index(argv[0])
+    const a = args(argv)
+    const n = await reg.index({ base: a.pos[0], encoding: a.kv.gzip ? "gzip" : "identity" })
     console.log(`wrote ${n} entries → eikons/index.json`)
   },
 
-  async manifest() {
-    console.log(`wrote ${reg.manifest()} manifests`)
+  async manifest(argv) {
+    const a = args(argv)
+    console.log(`wrote ${reg.manifest({ encoding: a.kv.gzip ? "gzip" : "identity" })} manifests`)
   },
 }
 

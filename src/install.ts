@@ -15,7 +15,7 @@ import { STATES, FORMAT_VERSION, DEFAULT_CATALOG, type State } from "./ui/spec"
 import { loadCatalogEntries, normalizeCatalogEntry } from "./catalog"
 import { PACKAGE_KIND, type CatalogEntry, type EikonPackageManifest } from "./contract/shape"
 import { validatePackageManifest, isSafeRelativePath } from "./package/manifest"
-import { parseLaunchStream } from "./stream"
+import { parseRuntimeBytes } from "./stream"
 import type { Manifest } from "./ui/lint"
 
 export type Role = State | "base"
@@ -58,6 +58,7 @@ export type DownloadOptions = {
   allowPrivate?: boolean
   maxBytes?: number
   maxRedirects?: number
+  rejectContentEncoding?: boolean
   fetcher?: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 }
 
@@ -121,6 +122,8 @@ export async function downloadBytes(raw: string, opts: DownloadOptions = {}): Pr
       continue
     }
     if (!res.ok) throw new Error(`download failed ${res.status}: ${cleanUrl(url.href)}`)
+    const enc = res.headers.get("content-encoding")
+    if (opts.rejectContentEncoding && enc && enc.toLowerCase() !== "identity") throw new Error(`download content-encoding not allowed for artifact bytes: ${enc}`)
     const len = Number(res.headers.get("content-length") ?? 0)
     if (len > maxBytes) throw new Error(`download byte limit exceeded: ${cleanUrl(url.href)}`)
     const buf = new Uint8Array(await res.arrayBuffer())
@@ -303,7 +306,7 @@ async function verifyRemotePackageFiles(pkg: EikonPackageManifest, base: string,
   const data = new Map<string, Uint8Array>()
   for (const file of files) {
     if (!isSafeRelativePath(file.path)) throw new Error(`mismatch: unsafe descriptor path ${file.path}`)
-    const buf = await downloadBytes(new URL(file.path, base).href, opts)
+    const buf = await downloadBytes(new URL(file.path, base).href, { ...opts, rejectContentEncoding: file.role === "runtime" && !!file.digest })
     if (typeof file.size === "number" && buf.length !== file.size) throw new Error(`mismatch: size ${file.path}`)
     if (file.digest && sha256(buf) !== file.digest) throw new Error(`mismatch: digest ${file.path}`)
     data.set(file.path, buf)
@@ -497,7 +500,7 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
   const old = join(root, `.${name}.old-${process.pid}-${Date.now()}`)
   try {
     let remote: Awaited<ReturnType<typeof verifyRemotePackageFiles>> | undefined
-    let launchText: string | undefined
+    let launchBytes: Uint8Array | undefined
     const pkg = (r.manifest as Record<string, unknown>).kind === PACKAGE_KIND
     if (pkg) {
       const man = validatePackageManifest(r.manifest)
@@ -505,6 +508,7 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
       if (r.base) {
         remote = await verifyRemotePackageFiles(man, r.base, dl)
         assertRemotePackageWriteCoverage(man, remote.files)
+        validatePackageManifest(man, { registry: true })
         r.trust = remote.trust
       }
       if (!r.base && r.staged) {
@@ -512,19 +516,15 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
         assertVerifiedPackageWriteCoverage(man, r.trust)
       }
       const rel = man.entrypoints.default
-      if (r.base) {
-        const verified = remote!.files!
-        const entry = verified.get(rel)!
-        launchText = new TextDecoder().decode(entry)
-      } else {
-        launchText = readFileSync(join(r.staged, rel), "utf8")
-      }
-      parseLaunchStream(launchText)
+      const desc = man.files?.find(file => file.role === "runtime" && file.path === rel)
+      if (r.base) launchBytes = remote!.files!.get(rel)!
+      else launchBytes = readFileSync(join(r.staged, rel))
+      parseRuntimeBytes(launchBytes, { descriptor: desc })
     }
 
     mkdirSync(srcd, { recursive: true })
 
-    if (launchText) writeFileSync(join(tmp, `${name}.eikon`), launchText)
+    if (launchBytes) writeFileSync(join(tmp, `${name}.eikon`), launchBytes)
 
     const packed = `${r.name}.eikon`
     if (!pkg && r.staged && existsSync(join(r.staged, packed)))

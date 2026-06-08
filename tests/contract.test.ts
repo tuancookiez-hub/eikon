@@ -7,6 +7,9 @@ import {
   LAUNCH_FORMAT_VERSION,
   LAUNCH_MAJOR_VERSION,
   LAUNCH_STREAM_EXTENSION,
+  decodeRuntimeBytes,
+  parseRuntimeBytes,
+  serializeRuntimeBytes,
   parseLaunchStream,
   resolveSignal,
   serializeLaunchStream,
@@ -74,6 +77,33 @@ test("typed launch streams parse, resolve signals, and serialize round-trip", ()
   expect(resolveSignal(parsed, "approval.waiting").clip).toBe("thinking")
   expect(resolveSignal(parsed, "approval.unknown").clip).toBe("idle")
   expect(serializeLaunchStream(parsed.records)).toBe(text)
+})
+
+test("runtime byte boundary preserves plain launch parsing", () => {
+  const text = serializeLaunchStream(stream)
+  const bytes = new TextEncoder().encode(text)
+  const parsed = parseRuntimeBytes(bytes)
+  expect(parsed.meta).toEqual(parseLaunchStream(text).meta)
+  expect(parsed.records).toEqual(parseLaunchStream(text).records)
+})
+
+test("runtime byte boundary decodes gzip and enforces descriptor encoding", () => {
+  const gzip = serializeRuntimeBytes(stream, { encoding: "gzip" })
+  expect(gzip[0]).toBe(0x1f)
+  expect(gzip[1]).toBe(0x8b)
+  expect(parseRuntimeBytes(gzip).meta.name).toBe("Unit")
+  expect(parseRuntimeBytes(gzip, { descriptor: { encoding: "gzip" } }).clips.get("idle")?.frames[0]).toEqual(rows)
+  expect(() => parseRuntimeBytes(gzip, { descriptor: { encoding: "identity" } })).toThrow(/descriptor says identity/)
+  expect(() => parseRuntimeBytes(new TextEncoder().encode(serializeLaunchStream(stream)), { descriptor: { encoding: "gzip" } })).toThrow(/descriptor says gzip/)
+})
+
+test("runtime byte boundary rejects invalid encodings gzip failures utf8 and decoded caps", () => {
+  const text = serializeLaunchStream(stream)
+  const gzip = serializeRuntimeBytes(stream, { encoding: "gzip" })
+  expect(() => decodeRuntimeBytes(new Uint8Array([0xff]))).toThrow(/UTF-8/)
+  expect(() => parseRuntimeBytes(new Uint8Array([0x1f, 0x8b, 0x08, 0x00]))).toThrow(/gzip/)
+  expect(() => parseRuntimeBytes(new TextEncoder().encode(text), { descriptor: { encoding: "br" } })).toThrow(/unsupported runtime encoding/)
+  expect(() => parseRuntimeBytes(gzip, { maxDecodedBytes: 8 })).toThrow(/decoded byte limit|larger than/)
 })
 
 test("canonical signals remain the six baseline lifecycle inputs", () => {

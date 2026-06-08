@@ -10,14 +10,14 @@ const trunc = (s: string, n: number) => s.length <= n ? s : s.slice(0, n - 1) + 
 
 export function Browser(props: {
   catalog: Catalog
-  onPick?: (name: string, raw: string) => void
+  onPick?: (name: string, raw: string, bytes?: Uint8Array) => void
 }) {
   const renderer = useRenderer()
   const [entries, setEntries] = useState<Entry[]>([])
   const [cursor, setCursor] = useState(0)
   const [auto, setAuto] = useState(true)
   const [si, setSi] = useState(0)
-  const [loaded, setLoaded] = useState<{ raw: string; doc: Eikon } | null>(null)
+  const [loaded, setLoaded] = useState<{ raw: string; bytes?: Uint8Array; doc: Eikon } | null>(null)
   const [flash, setFlash] = useState("")
 
   useEffect(() => { props.catalog.list().then(setEntries) }, [props.catalog])
@@ -29,7 +29,12 @@ export function Browser(props: {
     if (!cur) return
     setLoaded(null); setSi(0); setAuto(true)
     let dead = false
-    props.catalog.load(cur.name).then(raw => { if (!dead) setLoaded({ raw, doc: parse(raw) }) })
+    const pick = props.catalog.loadArtifact
+      ? props.catalog.loadArtifact(cur.name)
+      : props.catalog.load(cur.name).then(async raw => ({ raw, bytes: props.catalog.loadBytes ? await props.catalog.loadBytes(cur.name) : undefined }))
+    pick.then(out => {
+      if (!dead) setLoaded({ raw: out.raw, bytes: out.bytes, doc: parse(out.raw) })
+    })
     return () => { dead = true }
   }, [cur, props.catalog])
 
@@ -49,7 +54,7 @@ export function Browser(props: {
     if (k.name === "space") return setAuto(a => !a)
     if (k.name === "return" && cur && loaded) {
       if (!props.onPick) return setFlash(`curl $EIKON_URL/${cur.name}.eikon -o ~/.hermes/eikons/${cur.name}.eikon`)
-      props.onPick(cur.name, loaded.raw)
+      props.onPick(cur.name, loaded.raw, loaded.bytes)
       setFlash(`✓ ${cur.name}`)
     }
   })

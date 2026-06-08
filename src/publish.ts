@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readFileSync } from "node:fs"
 import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { lint, lintManifest, type Manifest } from "./ui/lint"
 import { poster } from "./ui/eikon"
+import { decodeRuntimeFile } from "./stream"
 import { catalogEntry, type PublicCatalogEntry } from "./catalog"
 
 export const DEFAULT_SUBMIT_REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
@@ -91,7 +92,7 @@ export async function previewSubmitBundle(opts: BundleOpts): Promise<SubmitBundl
   const packed = resolve(opts.path)
   const root = dirname(packed)
   let eikon
-  try { eikon = lint(await Bun.file(packed).text()) }
+  try { eikon = lint(decodeRuntimeFile(packed)) }
   catch (err) { throw new Error(`invalid eikon: ${err instanceof Error ? err.message : String(err)}`) }
   const mf = join(root, "manifest.json")
   const manifest = existsSync(mf) ? lintManifest(mf, readFileSync(mf, "utf8")) : undefined

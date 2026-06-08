@@ -7,6 +7,7 @@ export {
   LAUNCH_MAJOR_VERSION,
   LAUNCH_MEDIA_TYPE,
   LAUNCH_STREAM_EXTENSION,
+  RUNTIME_ENCODINGS,
   PACKAGE_KIND,
   PACKAGE_SCHEMA_VERSION,
   assertLaunchCompatibility,
@@ -26,6 +27,7 @@ export {
   type LaunchStreamRecord,
   type PackageFileDescriptor,
   type PlatformMetadata,
+  type RuntimeEncoding,
   type SignalMapping,
   type SignalName,
 } from "./contract/shape"
@@ -35,6 +37,7 @@ export { validatePackageManifest, isSafeRelativePath } from "./package/manifest"
 export {
   loadCatalog,
   loadCatalogEntries,
+  loadRuntimeArtifact,
   normalizeCatalogEntry,
   publicCatalogUrl,
   searchCatalog,
@@ -55,6 +58,8 @@ export {
   type ParsedLaunchStream,
   type ResolvedSignal,
 } from "./stream/parse"
+export { decodeRuntimeBytes, parseRuntimeBytes, sha256Bytes } from "./stream/runtime-browser"
+export { DEFAULT_RUNTIME_MAX_BYTES, DEFAULT_RUNTIME_MAX_DECODED_BYTES, isGzipBytes, runtimeEncoding, type RuntimeDescriptor, type RuntimeOptions } from "./stream/runtime"
 
 export type BrowserClip = import("./stream/parse").ParsedClip
 export type BrowserEikon = Pick<import("./stream/parse").ParsedLaunchStream, "meta" | "clips">

@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import type { CatalogEntry } from "../src/browser"
 import { browserInstructions, createWebCatalog, parsePreview, webPlaybackFrame } from "../src/web/player"
+import { runtimeDescriptor } from "../src"
+
+function body(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
 
 const launch = [
   JSON.stringify({
@@ -26,7 +31,8 @@ const launch = [
   JSON.stringify({ type: "frame", clip: "error", index: 1, rows: ["Y"] }),
 ].join("\n") + "\n"
 
-const runtimeDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+const plain = runtimeDescriptor(launch)
+const runtimeDigest = plain.digest.replace("sha256:", "")
 const runtimePath = `/packages/liftaris/cycle/blobs/sha256/${runtimeDigest}`
 
 const entry: CatalogEntry = {
@@ -74,6 +80,39 @@ describe("web gallery model", () => {
     if (loaded.status !== "ready") throw new Error("preview not ready")
     expect(seen[0]).toBe(entry.runtimeUrl)
     expect(webPlaybackFrame(loaded.eikon, "idle", 1000, 0)).toEqual(["C"])
+  })
+
+  test("loads gzip runtime preview bytes and rejects content-encoded artifact responses", async () => {
+    const info = runtimeDescriptor(launch, { encoding: "gzip" })
+    const zip = {
+      ...entry,
+      trust: {
+        runtimeDigest: info.digest,
+        runtimeSize: info.size,
+        runtimeEncoding: "gzip" as const,
+        runtimeDecodedSize: info.decodedSize,
+        runtimeDecodedDigest: info.decodedDigest,
+      },
+    }
+    const catalog = createWebCatalog({
+      fetch: (async () => new Response(body(info.bytes))) as unknown as typeof fetch,
+      loadCatalog: async () => [zip],
+    })
+    await catalog.refresh()
+    const loaded = await catalog.preview(zip.sourceKey)
+    expect(loaded.status).toBe("ready")
+    if (loaded.status !== "ready") throw new Error("preview not ready")
+    expect(webPlaybackFrame(loaded.eikon, "idle", 1000, 0)).toEqual(["C"])
+
+    const bad = createWebCatalog({
+      fetch: (async () => new Response(body(info.bytes), { headers: { "content-encoding": "gzip" } })) as unknown as typeof fetch,
+      loadCatalog: async () => [zip],
+    })
+    await bad.refresh()
+    const failed = await bad.preview(zip.sourceKey)
+    expect(failed.status).toBe("error")
+    if (failed.status !== "error") throw new Error("preview unexpectedly loaded")
+    expect(failed.error).toMatch(/Content-Encoding/)
   })
 
   test("loads final checked-in index shape through runtimeUrl", async () => {

@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { githubSubmitBackend, previewSubmitBundle, submission, submit, type SubmitBackend } from "../src/publish"
+import { runtimeDescriptor } from "../src"
 
 const frame = "........\n........\n........\n........"
 const packed = (extra: Record<string, unknown> = {}) => [
@@ -81,6 +82,17 @@ describe("previewSubmitBundle", () => {
     const bundle = await previewSubmitBundle({ path: fx.file })
 
     expect(bundle.files.map(f => f.path)).toEqual(["demo.eikon"])
+  })
+
+  test("accepts gzip stored runtime submissions without recompressing inputs", async () => {
+    const fx = seed()
+    const bytes = runtimeDescriptor(packed(), { encoding: "gzip" }).bytes
+    writeFileSync(fx.file, bytes)
+
+    const bundle = await previewSubmitBundle({ path: fx.file })
+
+    expect(bundle.meta.name).toBe("demo")
+    expect(bundle.files).toMatchObject([{ path: "demo.eikon", bytes: bytes.length }])
   })
 
   test("blocks missing source files only when referenced by manifest", async () => {
