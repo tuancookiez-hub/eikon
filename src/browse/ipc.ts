@@ -9,10 +9,13 @@
 
 export const MARK = "\x1e"
 
-export type Pick = { name: string; raw: string }
+export type Pick = { name: string; raw: string; bytes: Uint8Array }
 
-export const emit = (out: NodeJS.WritableStream) => (name: string, raw: string) =>
-  out.write(MARK + JSON.stringify({ pick: name, size: Buffer.byteLength(raw) }) + "\n" + raw)
+export const emit = (out: NodeJS.WritableStream) => (name: string, raw: string | Uint8Array) => {
+  const bytes = typeof raw === "string" ? Buffer.from(raw) : Buffer.from(raw)
+  out.write(MARK + JSON.stringify({ pick: name, size: bytes.length }) + "\n")
+  out.write(bytes)
+}
 
 /** Consume RS-framed pick messages from a stream. Non-RS data is discarded. */
 export async function* picks(stream: AsyncIterable<Uint8Array>): AsyncGenerator<Pick> {
@@ -24,7 +27,8 @@ export async function* picks(stream: AsyncIterable<Uint8Array>): AsyncGenerator<
     for (;;) {
       if (want) {
         if (buf.length < want.size) break
-        yield { name: want.name, raw: buf.subarray(0, want.size).toString("utf8") }
+        const bytes = buf.subarray(0, want.size)
+        yield { name: want.name, raw: bytes.toString("utf8"), bytes: new Uint8Array(bytes) }
         buf = buf.subarray(want.size)
         want = null
         continue

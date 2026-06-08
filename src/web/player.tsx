@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 import {
   loadCatalogEntries,
+  loadRuntimeArtifact,
   parseLaunchStream,
   type BrowserClip,
   type BrowserEikon,
@@ -39,6 +40,14 @@ export type WebCatalogOptions = Partial<WebPolicy> & {
 const defaults: WebPolicy = { maxBytes: 5_000_000, timeoutMs: 8_000, concurrency: 3, cacheEntries: 24 }
 const keyFor = (entry: CatalogEntry) => entry.sourceKey || entry.id || entry.name
 const previewFor = (entry: CatalogEntry) => entry.runtimeUrl
+const cacheFor = (entry: CatalogEntry) => [
+  keyFor(entry),
+  previewFor(entry),
+  entry.trust?.runtimeDigest ?? "",
+  entry.trust?.runtimeSize ?? "",
+  entry.trust?.runtimeEncoding ?? "identity",
+  entry.trust?.runtimeDecodedDigest ?? "",
+].join("|")
 const shellSafe = /^[A-Za-z0-9_/@%+=:,.-]+$/
 
 function shellArg(value: string): string {
@@ -132,20 +141,26 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
     while (cache.size > policy.cacheEntries) cache.delete(cache.keys().next().value!)
   }
 
-  const fetchText = async (raw: string, signal?: AbortSignal) => {
+  const fetchText = async (raw: string, signal?: AbortSignal, entry?: CatalogEntry) => {
     const url = safePublicUrl(raw)
-    const hit = cache.get(url)
+    const key = entry ? cacheFor({ ...entry, runtimeUrl: url }) : url
+    const hit = cache.get(key)
     if (hit !== undefined) return hit
     return limit.run(async () => {
       const ctrl = new AbortController()
       const timer = globalThis.setTimeout(() => ctrl.abort(new Error("preview fetch timed out")), policy.timeoutMs)
       signal?.addEventListener("abort", () => ctrl.abort(new Error("preview fetch cancelled")), { once: true })
       try {
-        const res = await fetcher(url, { signal: ctrl.signal })
-        if (!res.ok) throw new Error(`web catalog: HTTP ${res.status}`)
-        const text = await res.text()
-        if (new TextEncoder().encode(text).byteLength > policy.maxBytes) throw new Error("web catalog: size limit exceeded")
-        put(url, text)
+        const text = entry
+          ? (await loadRuntimeArtifact({ ...entry, runtimeUrl: url }, fetcher, { maxBytes: policy.maxBytes, signal: ctrl.signal })).text
+          : await (async () => {
+              const res = await fetcher(url, { signal: ctrl.signal })
+              if (!res.ok) throw new Error(`web catalog: HTTP ${res.status}`)
+              const bytes = new Uint8Array(await res.arrayBuffer())
+              if (bytes.length > policy.maxBytes) throw new Error("web catalog: size limit exceeded")
+              return new TextDecoder().decode(bytes)
+            })()
+        put(key, text)
         return text
       } finally {
         globalThis.clearTimeout(timer)
@@ -158,27 +173,28 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
   const loadPreview = async (key: string, signal?: AbortSignal): Promise<PreviewState> => {
     const entry = entryFor(key)
     if (!entry) return { status: "error", error: "unknown entry" }
-    const ready = state.previews[key]
+    const id = cacheFor(entry)
+    const ready = state.previews[id]
     if (ready?.status === "ready") return ready
-    const active = inflight.get(key)
+    const active = inflight.get(id)
     if (active) return active
-    state.previews[key] = { status: "loading", entry }
+    state.previews[id] = { status: "loading", entry }
     const work = (async () => {
       try {
-        const raw = await fetchText(previewFor(entry), signal)
+        const raw = await fetchText(previewFor(entry), signal, entry)
         const eikon = parsePreview(raw)
         const loaded: PreviewState = { status: "ready", entry, raw, eikon }
-        state.previews[key] = loaded
+        state.previews[id] = loaded
         return loaded
       } catch (err) {
         const failed: PreviewState = { status: "error", entry, error: err instanceof Error ? err.message : String(err) }
-        state.previews[key] = failed
+        state.previews[id] = failed
         return failed
       } finally {
-        inflight.delete(key)
+        inflight.delete(id)
       }
     })()
-    inflight.set(key, work)
+    inflight.set(id, work)
     return work
   }
 
@@ -192,6 +208,8 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
       try {
         const base = opts.base ?? "/eikons"
         state.entries = loader ? await loader(base, fetcher) : await loadCatalogEntries(base, fetcher)
+        state.previews = {}
+        inflight.clear()
         state.status = "ready"
       } catch (err) {
         state.status = "error"
@@ -218,7 +236,8 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
       const entry = entryFor(key)
       if (!entry) return { status: "error", error: "unknown entry" }
       state.selectedKey = key
-      state.preview = state.previews[key]?.status === "ready" ? state.previews[key]! : { status: "loading", entry }
+      const id = cacheFor(entry)
+      state.preview = state.previews[id]?.status === "ready" ? state.previews[id]! : { status: "loading", entry }
       if (state.preview.status === "ready") return state.preview
       const loaded = await loadPreview(key, signal)
       if (state.selectedKey === key) state.preview = loaded

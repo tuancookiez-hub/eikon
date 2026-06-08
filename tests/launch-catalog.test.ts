@@ -48,6 +48,27 @@ test("strict registry validation requires descriptor size and digest", () => {
   expect(() => validatePackageManifest(loose, { registry: true })).toThrow(/files.0.*size.*digest/)
 })
 
+test("gzip runtime descriptors require stored and decoded identity metadata", () => {
+  const gzip = {
+    ...manifest,
+    files: [{
+      path: "blobs/sha256/abcdef0123456789abcdef0123456789",
+      role: "runtime",
+      mediaType: LAUNCH_MEDIA_TYPE,
+      encoding: "gzip",
+      size: 12,
+      digest: "sha256:stored",
+      decodedSize: 34,
+      decodedDigest: "sha256:decoded",
+    }],
+    entrypoints: { default: "blobs/sha256/abcdef0123456789abcdef0123456789" },
+  } satisfies EikonPackageManifest
+  expect(validatePackageManifest(gzip, { registry: true }).files?.[0]?.encoding).toBe("gzip")
+  expect(() => validatePackageManifest({ ...gzip, files: [{ ...gzip.files![0]!, decodedDigest: undefined }] }, { registry: true })).toThrow(/decodedDigest.*gzip registry runtime/)
+  expect(() => validatePackageManifest({ ...gzip, files: [{ ...gzip.files![0]!, encoding: "br" }] } as unknown, { registry: true })).toThrow(/encoding/)
+  expect(() => validatePackageManifest({ ...gzip, files: [{ path: "poster.txt", role: "poster", mediaType: "text/plain", encoding: "gzip" }] } as unknown)).toThrow(/runtime encoding metadata/)
+})
+
 test("enriched package registry entries normalize to final catalog entries", () => {
   const entry = normalizeCatalogEntry({ manifest, packageUrl: "https://example.test/packages/liftaris/nous/1.0.0.json", sourceKey: "registry:example.test:liftaris/nous@1.0.0" })
   expect(entry.id).toBe("liftaris/nous")
@@ -60,6 +81,24 @@ test("enriched package registry entries normalize to final catalog entries", () 
   expect(entry.runtimeUrl).toBe("https://example.test/packages/liftaris/nous/streams/nous.eikon")
   expect(entry.packageUrl).toBe("https://example.test/packages/liftaris/nous/1.0.0.json")
   expect(entry.compatibility.available).toBe(true)
+  const gzip = normalizeCatalogEntry({
+    manifest: {
+      ...manifest,
+      files: [{
+        path: "blobs/sha256/abcdef0123456789abcdef0123456789",
+        role: "runtime",
+        mediaType: LAUNCH_MEDIA_TYPE,
+        encoding: "gzip",
+        size: 12,
+        digest: "sha256:stored",
+        decodedSize: 34,
+        decodedDigest: "sha256:decoded",
+      }],
+      entrypoints: { default: "blobs/sha256/abcdef0123456789abcdef0123456789" },
+    },
+    packageUrl: "https://example.test/packages/liftaris/nous/1.0.0.json",
+  })
+  expect(gzip.trust).toMatchObject({ runtimeDigest: "sha256:stored", runtimeSize: 12, runtimeEncoding: "gzip", runtimeDecodedSize: 34, runtimeDecodedDigest: "sha256:decoded" })
 })
 
 test("simple legacy catalog entries remain readable as migration/discovery input", () => {

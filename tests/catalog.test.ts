@@ -10,9 +10,14 @@ import {
   searchCatalog,
   type CatalogIndexEntry,
 } from "../src/catalog"
+import { runtimeDescriptor } from "../src"
 
 const dir = resolve(import.meta.dir, "../eikons")
 let srv: ReturnType<typeof Bun.serve>
+
+function body(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
 
 beforeAll(() => {
   srv = Bun.serve({
@@ -89,6 +94,56 @@ describe("shared catalog contract", () => {
       expect(raw).toContain('"name":"ares"')
       expect(loaded).toBe(true)
     }
+  })
+
+  test("actual fetch preserves raw gzip bytes only when Content-Encoding is omitted", async () => {
+    const info = runtimeDescriptor(raw("wire"), { encoding: "gzip" })
+    const srv = Bun.serve({ port: 0, fetch(req) {
+      const encoded = new URL(req.url).pathname.includes("encoded")
+      return new Response(body(info.bytes), { headers: encoded ? { "content-encoding": "gzip" } : undefined })
+    }})
+    try {
+      const plain = new Uint8Array(await (await fetch(`http://localhost:${srv.port}/plain`)).arrayBuffer())
+      const encoded = new Uint8Array(await (await fetch(`http://localhost:${srv.port}/encoded`)).arrayBuffer())
+      expect(plain[0]).toBe(0x1f)
+      expect(plain[1]).toBe(0x8b)
+      expect(encoded[0]).not.toBe(0x1f)
+      expect(encoded.length).toBe(info.decodedSize)
+    } finally {
+      srv.stop()
+    }
+  })
+
+  test("loads gzip runtime bytes and rejects transparent content encoding", async () => {
+    const info = runtimeDescriptor(raw("zip"), { encoding: "gzip" })
+    const entry = {
+      name: "zip",
+      manifest: {
+        kind: "eikon.package",
+        schemaVersion: "1.0",
+        id: "liftaris/zip",
+        name: "zip",
+        version: "1.0.0",
+        compatibility: { eikon: ">=1 <2" },
+        entrypoints: { default: "blobs/sha256/abcdef0123456789" },
+        files: [{ path: "blobs/sha256/abcdef0123456789", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", encoding: "gzip", size: info.size, digest: info.digest, decodedSize: info.decodedSize, decodedDigest: info.decodedDigest }],
+      },
+      packageUrl: "https://eikon.liftaris.dev/packages/liftaris/zip/1.0.0.json",
+    }
+    const fetcher = async (req: string | URL | Request) => {
+      const p = new URL(String(req)).pathname
+      if (p === "/index.json") return Response.json([entry])
+      if (p.includes("/blobs/sha256/")) return new Response(body(info.bytes))
+      return new Response("404", { status: 404 })
+    }
+    const cat = await loadCatalog("https://eikon.liftaris.dev", fetcher, { allowPrivate: true })
+    expect(await cat.load("zip")).toBe(raw("zip"))
+    const bad = await loadCatalog("https://eikon.liftaris.dev", async req => {
+      const p = new URL(String(req)).pathname
+      if (p === "/index.json") return Response.json([entry])
+      return new Response(body(info.bytes), { headers: { "content-encoding": "gzip" } })
+    }, { allowPrivate: true })
+    await expect(bad.load("zip")).rejects.toThrow(/Content-Encoding/)
   })
 
   test("normalizes legacy URLs", () => {

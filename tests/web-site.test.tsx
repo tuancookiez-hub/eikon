@@ -97,6 +97,9 @@ test("web build publishes catalog assets and lets eikon paths hit the filesystem
 
   const vercel = await Bun.file(join(repo, "vercel.json")).json()
   expect(vercel.rewrites).toBeUndefined()
+  const blob = vercel.headers.find((item: { source?: string }) => item.source?.includes("/blobs/sha256/"))
+  expect(blob).toBeDefined()
+  expect(blob.headers.some((item: { key: string }) => item.key.toLowerCase() === "content-encoding")).toBe(false)
 })
 
 test("web preview uses terminal-like cells, square cards, mobile drawer, and smooth timing", async () => {

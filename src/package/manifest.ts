@@ -5,6 +5,7 @@ import {
   LAUNCH_STREAM_EXTENSION,
   PACKAGE_KIND,
   PACKAGE_SCHEMA_VERSION,
+  RUNTIME_ENCODINGS,
   type EikonPackageManifest,
   type PackageFileDescriptor,
 } from "../contract/shape"
@@ -21,6 +22,7 @@ const problem = (path: string, message: string) => ({ code: "manifest", path, me
 const isObj = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
 const isSafeText = (value: string) => !/[<>\u0000-\u001f]/.test(value)
 const isSha256 = (value: unknown) => typeof value === "string" && /^sha256:[A-Za-z0-9._~+/=-]+$/.test(value)
+const isEncoding = (value: unknown): value is PackageFileDescriptor["encoding"] => typeof value === "string" && (RUNTIME_ENCODINGS as readonly string[]).includes(value)
 const isRuntimePath = (path: string) => path.endsWith(LAUNCH_STREAM_EXTENSION) || /^blobs\/sha256\/[A-Fa-f0-9]{16,}(?:\.eikon)?$/.test(path)
 const STALE_DESCRIPTOR_ROLES = new Set(["stream", "source"])
 
@@ -57,6 +59,20 @@ function validateDescriptor(file: PackageFileDescriptor, index: number, opts: Pa
   if (file.role === "runtime") {
     if (!isRuntimePath(file.path)) errs.push(problem(`${base}.path`, `runtime descriptor must point at launch ${LAUNCH_STREAM_EXTENSION} stream or content-addressed blob`))
     if (file.mediaType !== LAUNCH_MEDIA_TYPE) errs.push(problem(`${base}.mediaType`, `runtime descriptor must use ${LAUNCH_MEDIA_TYPE}`))
+    if (file.encoding != null && !isEncoding(file.encoding)) errs.push(problem(`${base}.encoding`, "runtime encoding must be identity or gzip"))
+    const enc = file.encoding ?? "identity"
+    if (file.decodedSize != null && (typeof file.decodedSize !== "number" || !Number.isFinite(file.decodedSize) || file.decodedSize < 0)) errs.push(problem(`${base}.decodedSize`, "non-negative number required"))
+    if (file.decodedDigest != null && !isSha256(file.decodedDigest)) errs.push(problem(`${base}.decodedDigest`, "sha256 digest required"))
+    if (opts.registry && enc === "gzip") {
+      const missing: string[] = []
+      if (typeof file.size !== "number" || !Number.isFinite(file.size) || file.size < 0) missing.push("size")
+      if (!isSha256(file.digest)) missing.push("digest")
+      if (typeof file.decodedSize !== "number" || !Number.isFinite(file.decodedSize) || file.decodedSize < 0) missing.push("decodedSize")
+      if (!isSha256(file.decodedDigest)) missing.push("decodedDigest")
+      if (missing.length) errs.push(problem(base, `${missing.join(" ")} required for gzip registry runtime descriptors`))
+    }
+  } else {
+    if (file.encoding != null || file.decodedSize != null || file.decodedDigest != null) errs.push(problem(base, "runtime encoding metadata is only valid on runtime descriptors"))
   }
   if (opts.registry) {
     const missing: string[] = []

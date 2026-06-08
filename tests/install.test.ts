@@ -4,9 +4,14 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { spawnSync } from "node:child_process"
 import { resolve, install, peek, entries, dirty } from "../src/install"
+import { decodeRuntimeBytes, runtimeDescriptor, sha256Bytes } from "../src"
 
 const root = mkdtempSync(join(tmpdir(), "eikon-install-"))
 const dest = join(root, "dest")
+
+function body(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
 
 const man = (name: string, extra = {}) => JSON.stringify({
   name, version: 1, source: "base.png",
@@ -33,6 +38,28 @@ const pkg = (name: string) => JSON.stringify({
   ],
   source: { base: "source/base.png", states: { idle: { file: "source/idle.mp4" } } },
 }, null, 2)
+
+function gzipPkg(name: string, info = runtimeDescriptor(launch, { encoding: "gzip" })) {
+  return JSON.stringify({
+    kind: "eikon.package",
+    schemaVersion: "1.0",
+    id: `liftaris/${name}`,
+    name,
+    version: "1.0.0",
+    compatibility: { eikon: ">=1 <2" },
+    entrypoints: { default: `streams/${name}.eikon` },
+    files: [{
+      path: `streams/${name}.eikon`,
+      role: "runtime",
+      mediaType: "application/vnd.eikon.stream+jsonl",
+      encoding: "gzip",
+      size: info.size,
+      digest: info.digest,
+      decodedSize: info.decodedSize,
+      decodedDigest: info.decodedDigest,
+    }],
+  }, null, 2)
+}
 
 function seed(dir: string, name: string, extra = {}) {
   mkdirSync(dir, { recursive: true })
@@ -228,6 +255,61 @@ describe("resolve + install: launch package", () => {
     writeFileSync(join(bad, "streams", "other.eikon"), "other")
     await expect(install(bad, dest)).rejects.toThrow(new RegExp("missing verified descriptor.*streams/uncovered\\.eikon"))
     expect(existsSync(join(dest, "uncovered"))).toBe(false)
+  })
+
+  test("local gzip package installs stored bytes and decodes through runtime boundary", async () => {
+    const next = join(root, "gzip-local")
+    const info = runtimeDescriptor(launch, { encoding: "gzip" })
+    mkdirSync(join(next, "streams"), { recursive: true })
+    writeFileSync(join(next, "manifest.json"), gzipPkg("gzip-local", info))
+    writeFileSync(join(next, "streams", "gzip-local.eikon"), info.bytes)
+    const out = await install(next, dest)
+    const installed = readFileSync(join(out.dir, "gzip-local.eikon"))
+    expect(installed).toEqual(Buffer.from(info.bytes))
+    expect(decodeRuntimeBytes(installed)).toBe(launch)
+  })
+
+  test("remote gzip package installs exact stored bytes", async () => {
+    const info = runtimeDescriptor(launch, { encoding: "gzip" })
+    const srv = Bun.serve({ port: 0, fetch(req) {
+      const p = new URL(req.url).pathname
+      if (p.endsWith("manifest.json")) return new Response(gzipPkg("gzip-remote", info))
+      if (p.endsWith("gzip-remote.eikon")) return new Response(body(info.bytes), { headers: { "content-length": String(info.bytes.length) } })
+      return new Response("404", { status: 404 })
+    }})
+    try {
+      const out = await install(`http://localhost:${srv.port}/manifest.json`, dest)
+      expect(readFileSync(join(out.dir, "gzip-remote.eikon"))).toEqual(Buffer.from(info.bytes))
+    } finally { srv.stop() }
+  })
+
+  test("descriptor stored size and digest mismatches reject before writes", async () => {
+    const info = runtimeDescriptor(launch, { encoding: "gzip" })
+    for (const [name, bad] of [
+      ["gzip-size", { ...info, size: info.size + 1 }],
+      ["gzip-digest", { ...info, digest: "sha256:bad" }],
+    ] as const) {
+      const next = join(root, name)
+      mkdirSync(join(next, "streams"), { recursive: true })
+      writeFileSync(join(next, "manifest.json"), gzipPkg(name, bad))
+      writeFileSync(join(next, "streams", `${name}.eikon`), info.bytes)
+      await expect(install(next, dest)).rejects.toThrow(/runtime stored|mismatch: (size|digest)/)
+      expect(existsSync(join(dest, name))).toBe(false)
+    }
+  })
+
+  test("corrupt gzip descriptor rejects without leaving partial install", async () => {
+    const info = runtimeDescriptor(launch, { encoding: "gzip" })
+    const corrupt = Buffer.from(info.bytes)
+    const last = corrupt.length - 1
+    corrupt.set([corrupt[last]! ^ 0xff], last)
+    const bad = { ...info, bytes: corrupt, size: corrupt.length, digest: sha256Bytes(corrupt) }
+    const next = join(root, "gzip-corrupt")
+    mkdirSync(join(next, "streams"), { recursive: true })
+    writeFileSync(join(next, "manifest.json"), gzipPkg("gzip-corrupt", bad))
+    writeFileSync(join(next, "streams", "gzip-corrupt.eikon"), corrupt)
+    await expect(install(next, dest)).rejects.toThrow(/gzip/)
+    expect(existsSync(join(dest, "gzip-corrupt"))).toBe(false)
   })
 
   test("root packed eikon cannot overwrite package entrypoint", async () => {

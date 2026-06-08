@@ -23,6 +23,7 @@ export {
   LAUNCH_MAJOR_VERSION,
   LAUNCH_MEDIA_TYPE,
   LAUNCH_STREAM_EXTENSION,
+  RUNTIME_ENCODINGS,
   PACKAGE_KIND,
   PACKAGE_SCHEMA_VERSION,
   type CatalogEntry,
@@ -41,13 +42,15 @@ export {
   type PackageFileDescriptor,
   type PackageSourceMedia,
   type PlatformMetadata,
+  type RuntimeEncoding,
   type SignalMapping,
   type SignalName,
   type TriggerRule,
 } from "./contract/shape"
 export { validateVersionCompatibility, validateExtensionCompatibility } from "./contract/validation"
 export { parseLaunchStream, serializeLaunchStream, resolveSignal, legacyToLaunchStream, migrateLegacyEikon,
-         type ParsedLaunchStream, type ParsedClip, type ParsedLaunchMeta, type ResolvedSignal, type LegacyMigration, type MigratedEikon } from "./stream"
+         decodeRuntimeBytes, decodeRuntimeFile, encodeRuntimeText, parseRuntimeBytes, parseRuntimeFile, runtimeByteInfo, runtimeDescriptor, serializeRuntimeBytes, sha256Bytes, writeRuntimeFile,
+         type ParsedLaunchStream, type ParsedClip, type ParsedLaunchMeta, type ResolvedSignal, type LegacyMigration, type MigratedEikon, type RuntimeDescriptor, type RuntimeOptions, type RuntimeByteInfo, type RuntimeWriteOptions } from "./stream"
 export { validatePackageManifest, isSafeRelativePath } from "./package"
 export { loadCatalogEntries, normalizeCatalogEntry, searchCatalogEntries, validateCatalogEntry,
          CATALOG_VERSION, DEFAULT_PUBLIC_CATALOG, catalogEntry, loadCatalog, publicCatalogUrl, searchCatalog,

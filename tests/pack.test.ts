@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, cpSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { spawnSync } from "node:child_process"
-import { pack } from "../src/pack"
+import { pack, packRuntime } from "../src/pack"
+import { parseRuntimeBytes } from "../src"
 import { parse, STATES } from "../src/ui/eikon"
 import { lint } from "../src/ui/lint"
 
@@ -32,6 +33,16 @@ test.skipIf(skip)("pack: single image → 6 identical 1-frame states, lint-clean
   const f0 = doc.states[0]!.frames[0]!.data
   expect(doc.states.every(s => s.frames[0]!.data === f0)).toBe(true)
   expect(f0.split("\n").length).toBe(doc.header.height)
+})
+
+test.skipIf(skip)("pack: gzip writer emits deterministic parseable bytes", () => {
+  const src = join(tmp, "gzip-face.png"); png(src)
+  const a = packRuntime(src, { name: "gzip-face", author: "t", runtime: { encoding: "gzip" } })
+  const b = packRuntime(src, { name: "gzip-face", author: "t", runtime: { encoding: "gzip" } })
+  expect(a.bytes).toEqual(b.bytes)
+  expect(a.bytes[0]).toBe(0x1f)
+  expect(a.bytes[1]).toBe(0x8b)
+  expect(parseRuntimeBytes(a.bytes).meta.name).toBe("gzip-face")
 })
 
 test.skipIf(skip)("pack: gif → multi-frame loop fanned to all states", () => {

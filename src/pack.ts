@@ -15,7 +15,7 @@ import { tmpdir } from "node:os"
 import { type Doc, type StateDecl } from "./ui/format"
 import { STATES } from "./ui/spec"
 import { defaultSignalMappings, type LaunchStreamRecord } from "./contract/shape"
-import { serializeLaunchStream } from "./stream"
+import { encodeRuntimeText, serializeLaunchStream, type RuntimeWriteOptions } from "./stream"
 
 export const SYMBOLS = ["block", "ascii", "braille", "sextant", "all"] as const
 export const COLORS = ["none", "16", "256", "full"] as const
@@ -206,4 +206,9 @@ export function pack(src: string, opts: Opts = {}): { doc: Doc; text: string } {
     ]),
   ]
   return { doc, text: serializeLaunchStream(records) }
+}
+
+export function packRuntime(src: string, opts: Opts & { runtime?: RuntimeWriteOptions } = {}): { doc: Doc; text: string; bytes: Uint8Array } {
+  const out = pack(src, opts)
+  return { ...out, bytes: encodeRuntimeText(out.text, opts.runtime) }
 }

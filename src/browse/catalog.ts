@@ -2,17 +2,19 @@
 // (cheap, poster included); load() returns the full file body for preview
 // and install. Local reads a directory; remote fetches index.json + files.
 
-import { list as scan, parse, poster, type Meta } from "../ui/eikon"
+import { list as scan, parse, poster, decode, type Meta } from "../ui/eikon"
 import { dirname } from "node:path"
 import { pathToFileURL } from "node:url"
 import { CATALOG_KIND, CATALOG_SCHEMA_VERSION, type CatalogEntry } from "../contract/shape"
-import { loadCatalog, validateCatalogEntry } from "../catalog"
+import { loadCatalog, loadRuntimeArtifact, validateCatalogEntry } from "../catalog"
 
 export type Entry = CatalogEntry
 
 export type Catalog = {
   list: () => Promise<Entry[]>
   load: (name: string) => Promise<string>
+  loadBytes?: (name: string) => Promise<Uint8Array>
+  loadArtifact?: (name: string) => Promise<{ raw: string; bytes: Uint8Array }>
 }
 
 const toEntry = (meta: Meta, p: string, path: string): Entry => {
@@ -41,7 +43,7 @@ export function local(dir: string): Catalog {
     async list() {
       const out: Entry[] = []
       for (const f of found) {
-        const raw = await Bun.file(f.path).text()
+        const raw = decode(f.path)
         out.push(toEntry(f.meta, poster(parse(raw)), f.path))
       }
       return out
@@ -49,7 +51,18 @@ export function local(dir: string): Catalog {
     async load(name) {
       const p = paths.get(name)
       if (!p) throw new Error(`catalog: unknown eikon "${name}"`)
-      return Bun.file(p).text()
+      return decode(p)
+    },
+    async loadBytes(name) {
+      const p = paths.get(name)
+      if (!p) throw new Error(`catalog: unknown eikon "${name}"`)
+      return new Uint8Array(await Bun.file(p).arrayBuffer())
+    },
+    async loadArtifact(name) {
+      const p = paths.get(name)
+      if (!p) throw new Error(`catalog: unknown eikon "${name}"`)
+      const bytes = new Uint8Array(await Bun.file(p).arrayBuffer())
+      return { raw: decode(p), bytes }
     },
   }
 }
@@ -61,6 +74,19 @@ export function remote(base: string): Catalog {
     },
     async load(name) {
       return (await loadCatalog(base, fetch, { allowPrivate: true })).load(name)
+    },
+    async loadBytes(name) {
+      const cat = await loadCatalog(base, fetch, { allowPrivate: true })
+      const entry = cat.entries.find(e => e.name === name || e.id === name || e.sourceKey === name)
+      if (!entry) throw new Error(`catalog: unknown eikon "${name}"`)
+      return (await loadRuntimeArtifact(entry, fetch)).bytes
+    },
+    async loadArtifact(name) {
+      const cat = await loadCatalog(base, fetch, { allowPrivate: true })
+      const entry = cat.entries.find(e => e.name === name || e.id === name || e.sourceKey === name)
+      if (!entry) throw new Error(`catalog: unknown eikon "${name}"`)
+      const out = await loadRuntimeArtifact(entry, fetch)
+      return { raw: out.text, bytes: out.bytes }
     },
   }
 }

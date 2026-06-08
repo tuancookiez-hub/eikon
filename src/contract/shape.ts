@@ -4,6 +4,8 @@ export const LAUNCH_MAJOR_VERSION = 1
 export const LAUNCH_FORMAT_VERSION = "1.0"
 export const LAUNCH_MEDIA_TYPE = "application/vnd.eikon.stream+jsonl"
 export const LAUNCH_STREAM_EXTENSION = ".eikon"
+export const RUNTIME_ENCODINGS = ["identity", "gzip"] as const
+export type RuntimeEncoding = typeof RUNTIME_ENCODINGS[number]
 export const PACKAGE_KIND = "eikon.package"
 export const PACKAGE_SCHEMA_VERSION = "1.0"
 export const CATALOG_KIND = "eikon.catalog.entry"
@@ -86,6 +88,9 @@ export type PackageFileDescriptor = {
   mediaType: string
   size?: number
   digest?: `sha256:${string}` | string
+  encoding?: RuntimeEncoding
+  decodedSize?: number
+  decodedDigest?: `sha256:${string}` | string
   signal?: SignalName
 }
 
@@ -165,6 +170,10 @@ export type CatalogEntry = {
   trust?: {
     manifestDigest?: string
     runtimeDigest?: string
+    runtimeSize?: number
+    runtimeEncoding?: RuntimeEncoding
+    runtimeDecodedSize?: number
+    runtimeDecodedDigest?: string
     source?: string
     digest?: string
   }

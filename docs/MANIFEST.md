@@ -22,7 +22,7 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
   "compatibility": { "eikon": ">=1 <2" },
   "entrypoints": { "default": "streams/nous.eikon" },
   "files": [
-    { "path": "streams/nous.eikon", "role": "runtime", "mediaType": "application/vnd.eikon.stream+jsonl", "size": 12345, "digest": "sha256:..." }
+    { "path": "streams/nous.eikon", "role": "runtime", "mediaType": "application/vnd.eikon.stream+jsonl", "encoding": "gzip", "size": 12345, "digest": "sha256:<stored-bytes>", "decodedSize": 123456, "decodedDigest": "sha256:<decoded-ndjson>" }
   ]
 }
 ```
@@ -51,7 +51,7 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
     "default": "streams/nous.eikon"
   },
   "files": [
-    { "path": "streams/nous.eikon", "role": "runtime", "mediaType": "application/vnd.eikon.stream+jsonl", "size": 12345, "digest": "sha256:..." },
+    { "path": "streams/nous.eikon", "role": "runtime", "mediaType": "application/vnd.eikon.stream+jsonl", "encoding": "gzip", "size": 12345, "digest": "sha256:<stored-bytes>", "decodedSize": 123456, "decodedDigest": "sha256:<decoded-ndjson>" },
     { "path": "sources/base.png", "role": "source.base", "mediaType": "image/png", "size": 45678, "digest": "sha256:..." },
     { "path": "sources/states/thinking/loop.mp4", "role": "source.clip", "signal": "state.thinking", "mediaType": "video/mp4", "size": 456789, "digest": "sha256:..." },
     { "path": "posters/default.png", "role": "poster", "mediaType": "image/png", "size": 12345, "digest": "sha256:..." },
@@ -94,7 +94,7 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
 | `compatibility.eikon` | yes | Eikon contract range, for example `>=1 <2`. |
 | `compatibility.hosts` | no | Optional host ranges. Host incompatibility must not affect generic stream rendering. |
 | `entrypoints.default` | yes | Relative path to the default launch `.eikon` stream. |
-| `files` | yes for registry packages | Relative file descriptors with role, media type, size, and digest. Registry-served remote files require `size` and `digest`. |
+| `files` | yes for registry packages | Relative file descriptors with role, media type, size, and digest. Registry-served remote files require `size` and `digest`; gzip runtime descriptors also require `encoding`, `decodedSize`, and `decodedDigest`. |
 | `editability` | no | Whether editable source/project files are included and how complete they are. |
 | `poster` | no | Relative cached poster asset for cheap grid/catalog display. Standalone `.eikon` posters are derived from frames. |
 | `preview` | no | Relative selected-preview asset. |
@@ -104,6 +104,10 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
 | `legacy` | no | Migration notes for packages derived from pre-launch `.eikon` drafts. |
 
 All file paths are package-relative. Human-authored/local manifests may use descriptive paths such as `streams/nous.eikon`; registry-normalized packages usually rewrite referenced files to content-addressed paths such as `blobs/sha256/<digest>`. Package readers and registry tooling must reject parent escapes, absolute paths, private/file URLs in remote contexts, symlinks/special files in archive imports, and unsafe metadata before rendering or installing.
+
+Runtime descriptor identity is byte-exact. `size` and `digest` always describe the stored artifact bytes at `path`, whether those bytes are identity NDJSON or gzip-compressed NDJSON. `encoding` may be omitted for legacy identity descriptors and is otherwise `identity` or `gzip`. For registry gzip runtime descriptors, `decodedSize` and `decodedDigest` describe the UTF-8 NDJSON after explicit gzip decompression and are required with stored `size`/`digest`.
+
+Digest-addressed gzip runtime blobs must be served as raw bytes. Do not set HTTP `Content-Encoding: gzip` on `blobs/sha256/<digest>` responses; clients fetch `arrayBuffer()`, verify stored-byte identity, then decompress according to descriptor metadata.
 
 The package manifest does not own runtime signal-to-clip mappings. Those mappings live in the `.eikon` stream header so a standalone stream can render without a package manifest. Package tooling may validate, index, or cache derived signal information, but playback must not depend on package metadata.
 
@@ -130,7 +134,7 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
   "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/1.0.0.json",
   "detailUrl": "https://eikon.liftaris.dev/eikons/liftaris/nous",
   "compatibility": { "eikon": ">=1 <2", "hosts": { "herm": ">=0.0.0" }, "available": true },
-  "trust": { "manifestDigest": "sha256:...", "runtimeDigest": "sha256:..." }
+  "trust": { "manifestDigest": "sha256:...", "runtimeDigest": "sha256:...", "runtimeSize": 12345, "runtimeEncoding": "gzip", "runtimeDecodedSize": 123456, "runtimeDecodedDigest": "sha256:..." }
 }
 ```
 

@@ -42,7 +42,10 @@ that profile's `eikons/` directory. Removing or updating the active eikon requir
 `--active-ok` because it mutates the avatar the host is currently showing.
 
 Default catalog installs fetch built package artifacts and verify package file
-size/digest descriptors when present. Direct GitHub paths use normal git
+size/digest descriptors when present. Runtime `size`/`digest` bind the stored
+`.eikon` bytes; gzip descriptors also carry decoded NDJSON size/digest metadata.
+Digest-addressed gzip blobs are fetched as raw bytes and must not be served with
+HTTP `Content-Encoding: gzip`. Direct GitHub paths use normal git
 authentication; `github.com/owner/repo/name` selects an eikon from a catalog repo,
 while `github.com/owner/repo` keeps the single-package fallback. Trust is reported
 as `verified`, `unverified`, or `mismatch` in inspect/info/list output. Herm's
@@ -57,6 +60,7 @@ One image, one clip, or a folder of per-state media:
 eikon pack ./face.png --name mine --glyph ✦           # static
 eikon pack ./loop.mp4 --name spin                       # one loop → all states
 eikon pack ./dir/     --name full                       # per-state; see below
+eikon pack ./face.png mine.eikon --gzip                 # gzip-stored .eikon bytes
 eikon lint mine.eikon
 eikon show mine.eikon
 ```
@@ -89,7 +93,9 @@ eikon publish mine.eikon
 This creates a normal GitHub PR contribution against `EIKON_REPO` or the default
 `liftaris/eikon` catalog. The helper uses `gh` authentication and repository
 mechanics; creators can also prepare and share single-package or multi-eikon GitHub
-repos directly with `pack`, `manifest`, and `index`. There is no hosted
+repos directly with `pack`, `manifest`, and `index`. `eikon manifest --gzip`
+prepares gzip stored public package blobs after consumers are gzip-aware; the
+plain manifest path remains available for compatibility rollouts. There is no hosted
 marketplace account, upload API, dashboard, or moderation workflow in this v1
 path.
 

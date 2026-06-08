@@ -20,7 +20,11 @@ Retired pre-launch concepts stay out of the public launch shapes: no `.eikonl` r
 
 ## Stream/document shape
 
-A launch stream is UTF-8 NDJSON. Every line is a typed record with a `type` field. The first line MUST be a `header` record. Unknown fields are ignored unless required by an unsupported required extension. A renderer MUST NOT perform network requests while parsing or rendering a `.eikon` stream.
+A launch stream decodes to UTF-8 NDJSON. Every line is a typed record with a `type` field. The first line MUST be a `header` record. Unknown fields are ignored unless required by an unsupported required extension. A renderer MUST NOT perform network requests while parsing or rendering a `.eikon` stream.
+
+The `.eikon` extension names the runtime artifact, not a required storage encoding. Stored bytes may be plain identity NDJSON or gzip-compressed NDJSON. When a package file descriptor is present, its `encoding` field is authoritative: `identity` bytes must not be gzip and `gzip` bytes must carry a gzip header. Standalone `.eikon` files without a descriptor may be sniffed by gzip magic bytes for local compatibility.
+
+Digest-addressed runtime blobs bind stored bytes. `size` and `digest` describe the exact bytes fetched or installed; `decodedSize` and `decodedDigest` describe the UTF-8 NDJSON after explicit runtime decompression. Registries must serve gzip runtime blobs as raw artifact bytes, without HTTP `Content-Encoding: gzip`, because fetch clients can transparently decode that header before stored-byte digest checks run.
 
 Minimal stream:
 
