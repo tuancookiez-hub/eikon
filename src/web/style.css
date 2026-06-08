@@ -148,11 +148,13 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   flex-direction: column;
   height: var(--detail-height, calc(100dvh - 14px));
   max-height: calc(100dvh - 14px);
+  width: min(100%, var(--selected-preview-width, 100%));
   min-height: 360px;
   border: 0;
   background: transparent;
   box-shadow: none;
   padding: 0;
+  justify-self: center;
   container-type: inline-size;
 }
 .drawerHandle { display: none; }
@@ -224,6 +226,8 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
     top: auto;
     z-index: 5;
     display: block;
+    width: auto;
+    justify-self: stretch;
     height: auto;
     max-height: none;
     min-height: 0;

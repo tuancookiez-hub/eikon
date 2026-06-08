@@ -29,8 +29,11 @@ export function App() {
     if (!node) return
     const selectedPoster = document.querySelector<HTMLElement>(".card.selected .cardPoster")
     const posterFont = selectedPoster ? window.getComputedStyle(selectedPoster).fontSize : ""
+    const posterWidth = selectedPoster?.getBoundingClientRect().width ?? 0
     if (posterFont) node.style.setProperty("--selected-preview-font-size", posterFont)
     else node.style.removeProperty("--selected-preview-font-size")
+    if (posterWidth > 0) node.style.setProperty("--selected-preview-width", `${posterWidth}px`)
+    else node.style.removeProperty("--selected-preview-width")
     if (window.matchMedia("(max-width: 980px)").matches) {
       node.style.removeProperty("--detail-height")
       return
