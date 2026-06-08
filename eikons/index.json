@@ -20,7 +20,8 @@
     },
     "trust": {
       "manifestDigest": "sha256:89f48040781f4c9ec1853f8443c12f46c92e9fa4be6897bfc44d6500d0c5a727",
-      "runtimeDigest": "sha256:f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6"
+      "runtimeDigest": "sha256:f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6",
+      "runtimeSize": 1290412
     }
   },
   {
@@ -44,7 +45,8 @@
     },
     "trust": {
       "manifestDigest": "sha256:0817d7a333af180f274c6a280856f1b03e927dcbef11bedb9c0294d8ddbbe361",
-      "runtimeDigest": "sha256:44b52ecb76df67c638c44556aa002975c76d7df36a887b390a85e2d83076b862"
+      "runtimeDigest": "sha256:44b52ecb76df67c638c44556aa002975c76d7df36a887b390a85e2d83076b862",
+      "runtimeSize": 1390777
     }
   },
   {
@@ -68,7 +70,8 @@
     },
     "trust": {
       "manifestDigest": "sha256:4132596f773b3ebb563973f1efc006320cd6e92682e0497c6bd0118b59c11578",
-      "runtimeDigest": "sha256:b2685743b05ddf201920b69db58640d4fab644e637fa7d313c6dfa215fa41fb7"
+      "runtimeDigest": "sha256:b2685743b05ddf201920b69db58640d4fab644e637fa7d313c6dfa215fa41fb7",
+      "runtimeSize": 1401439
     }
   }
 ]
