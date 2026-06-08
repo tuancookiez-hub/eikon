@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react"
 import type { CatalogEntry } from "../browser"
 import { CANONICAL_STATES } from "../browser"
 import { AsciiPreview, EntryCard, browserInstructions, createWebCatalog, webPlaybackFrame, type PreviewState } from "./player"
@@ -21,14 +21,44 @@ export function App() {
   const [, rerender] = useState(0)
   const tick = useRef(0)
   const drawerDrag = useRef({ active: false, y: 0, swiped: false })
+  const detailRef = useRef<HTMLElement | null>(null)
   tick.current = tickMs
   const catalog = useMemo(() => createWebCatalog({ base: catalogBase }), [])
+  const measureDetail = () => {
+    const node = detailRef.current
+    if (!node) return
+    if (window.matchMedia("(max-width: 980px)").matches) {
+      node.style.removeProperty("--detail-height")
+      return
+    }
+    const top = Math.max(14, node.getBoundingClientRect().top)
+    const height = Math.max(360, window.innerHeight - top - 14)
+    node.style.setProperty("--detail-height", `${height}px`)
+  }
 
   useEffect(() => { void catalog.refresh().then(() => rerender(n => n + 1)) }, [catalog])
   useEffect(() => {
     const start = performance.now()
     const timer = globalThis.setInterval(() => setTickMs(performance.now() - start), WEB_PREVIEW_FRAME_MS)
     return () => globalThis.clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    let frame = 0
+    const schedule = () => {
+      if (frame) window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        measureDetail()
+      })
+    }
+    measureDetail()
+    window.addEventListener("resize", schedule)
+    window.addEventListener("scroll", schedule, { passive: true })
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame)
+      window.removeEventListener("resize", schedule)
+      window.removeEventListener("scroll", schedule)
+    }
   }, [])
 
   const matches = catalog.search(query)
@@ -45,6 +75,8 @@ export function App() {
     : catalog.state.status === "error"
       ? "catalog unavailable"
       : `${matches.length}/${catalog.state.entries.length} shown`
+
+  useEffect(() => { measureDetail() }, [drawerState, selectedKey, visibleKeys])
 
   useEffect(() => {
     if (matches.length === 0) return
@@ -158,7 +190,7 @@ export function App() {
           })}
         </div>
 
-        <aside className={`detail drawer-${drawerState}`} aria-label="Preview and instructions" data-drawer-state={drawerState}>
+        <aside ref={detailRef} className={`detail drawer-${drawerState}`} aria-label="Preview and instructions" data-drawer-state={drawerState}>
           <button
             type="button"
             className="drawerHandle"
@@ -173,19 +205,22 @@ export function App() {
             <span className="drawerCue">{selected ? drawerState === "expanded" ? "collapse" : "expand" : "collapsed"}</span>
           </button>
           <div className="detailBody">
-            {selected ? <Preview selected={selected} preview={preview} frame={frame} state={mode} setState={choose} /> : <p className="muted">Select an eikon to preview it.</p>}
-            <div className="drawerExtras">
-              {instructions ? (
-                <div className="instructions">
-                  <h2>install</h2>
-                  <code>{instructions.command}</code>
-                  <button type="button" onClick={() => void copy(instructions.command, "command")}>Copy command</button>
-                  <p>{instructions.manual}</p>
+            {selected ? (
+              <Preview selected={selected} preview={preview} frame={frame} state={mode} setState={choose}>
+                <div className="drawerExtras">
+                  {instructions ? (
+                    <div className="instructions">
+                      <h2>install</h2>
+                      <code>{instructions.command}</code>
+                      <button type="button" onClick={() => void copy(instructions.command, "command")}>Copy command</button>
+                      <p>{instructions.manual}</p>
+                    </div>
+                  ) : null}
+                  {copied ? <p className="ok">Copied {copied}.</p> : null}
+                  {err ? <p role="alert" className="error">Copy failed: {err}</p> : null}
                 </div>
-              ) : null}
-              {copied ? <p className="ok">Copied {copied}.</p> : null}
-              {err ? <p role="alert" className="error">Copy failed: {err}</p> : null}
-            </div>
+              </Preview>
+            ) : <p className="muted">Select an eikon to preview it.</p>}
           </div>
         </aside>
       </section>
@@ -193,25 +228,47 @@ export function App() {
   )
 }
 
-function Preview(props: { selected: CatalogEntry; preview: PreviewState; frame: string[]; state: string; setState: (s: string) => void }) {
+function Preview(props: { selected: CatalogEntry; preview: PreviewState; frame: string[]; state: string; setState: (s: string) => void; children?: ReactNode }) {
   const key = props.selected.sourceKey
   const ready = props.preview.status === "ready" && props.preview.entry.sourceKey === key
   const loading = props.preview.status === "loading" && props.preview.entry.sourceKey === key
   const failed = props.preview.status === "error" && props.preview.entry?.sourceKey === key
   const title = props.selected.title || props.selected.name
+  const author = props.selected.author ?? "unknown"
   const poster = (props.selected.poster || "").split("\n")
   return (
     <div className="preview">
-      <div className="previewHead">
-        <h2><span className="glyph">{props.selected.glyph ?? "⬡"}</span> {title}</h2>
-        <p>{props.selected.author ?? "unknown"}</p>
-      </div>
       <AsciiPreview lines={ready && props.frame.length > 0 ? props.frame : poster} />
-      {loading ? <p className="previewStatus muted">Loading preview…</p> : null}
-      <div className="previewOptions states">
-        {CANONICAL_STATES.map(state => <button key={state} type="button" className={state === props.state ? "active" : ""} onClick={() => props.setState(state)}>{state}</button>)}
+      <div className="previewPanel">
+        <div className="previewHead">
+          <h2><span className="glyph">{props.selected.glyph ?? "⬡"}</span> {title}</h2>
+          <p>{author}</p>
+        </div>
+        <dl className="previewMeta" aria-label="Selected eikon metadata">
+          <div>
+            <dt>Title</dt>
+            <dd>{title}</dd>
+          </div>
+          <div>
+            <dt>Author</dt>
+            <dd>{author}</dd>
+          </div>
+          <div>
+            <dt>Version</dt>
+            <dd>{props.selected.version ?? "-"}</dd>
+          </div>
+          <div>
+            <dt>State</dt>
+            <dd>{props.state}</dd>
+          </div>
+        </dl>
+        {loading ? <p className="previewStatus muted">Loading preview…</p> : null}
+        <div className="previewOptions states">
+          {CANONICAL_STATES.map(state => <button key={state} type="button" className={state === props.state ? "active" : ""} onClick={() => props.setState(state)}>{state}</button>)}
+        </div>
+        {failed && props.preview.status === "error" ? <p role="alert" className="previewStatus error">Preview failed: {props.preview.error}. Catalog remains available; use the copyable fallback instructions.</p> : null}
+        {props.children}
       </div>
-      {failed && props.preview.status === "error" ? <p role="alert" className="previewStatus error">Preview failed: {props.preview.error}. Catalog remains available; use the copyable fallback instructions.</p> : null}
     </div>
   )
 }
