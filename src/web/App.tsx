@@ -27,12 +27,17 @@ export function App() {
   const measureDetail = () => {
     const node = detailRef.current
     if (!node) return
+    const selectedPoster = document.querySelector<HTMLElement>(".card.selected .cardPoster")
+    const posterFont = selectedPoster ? window.getComputedStyle(selectedPoster).fontSize : ""
+    if (posterFont) node.style.setProperty("--selected-preview-font-size", posterFont)
+    else node.style.removeProperty("--selected-preview-font-size")
     if (window.matchMedia("(max-width: 980px)").matches) {
       node.style.removeProperty("--detail-height")
       return
     }
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight
     const top = Math.max(14, node.getBoundingClientRect().top)
-    const height = Math.max(360, window.innerHeight - top)
+    const height = Math.max(360, viewportHeight - top)
     node.style.setProperty("--detail-height", `${height}px`)
   }
 
@@ -54,10 +59,14 @@ export function App() {
     measureDetail()
     window.addEventListener("resize", schedule)
     window.addEventListener("scroll", schedule, { passive: true })
+    window.visualViewport?.addEventListener("resize", schedule)
+    window.visualViewport?.addEventListener("scroll", schedule)
     return () => {
       if (frame) window.cancelAnimationFrame(frame)
       window.removeEventListener("resize", schedule)
       window.removeEventListener("scroll", schedule)
+      window.visualViewport?.removeEventListener("resize", schedule)
+      window.visualViewport?.removeEventListener("scroll", schedule)
     }
   }, [])
 

@@ -156,8 +156,8 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   container-type: inline-size;
 }
 .drawerHandle { display: none; }
-.detailBody { display: grid; flex: 1; min-height: 0; border: 0; background: transparent; }
-.preview { display: flex; flex-direction: column; gap: 12px; min-height: 0; border: 0; background: transparent; }
+.detailBody { display: grid; flex: 1; height: 100%; min-height: 0; border: 0; background: transparent; }
+.preview { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; border: 0; background: transparent; }
 .previewHead { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
 .previewHead h2 { margin-bottom: 2px; }
 .ascii {
@@ -172,10 +172,10 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   background: transparent;
   border: 0;
   color: var(--text);
-  font-size: clamp(5.5px, .52vw, 8px);
+  font-size: var(--selected-preview-font-size, clamp(5.5px, .52vw, 8px));
 }
 .previewPanel {
-  flex: 1;
+  flex: 1 1 0;
   display: grid;
   align-content: start;
   gap: 12px;
