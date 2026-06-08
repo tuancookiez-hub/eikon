@@ -32,7 +32,7 @@ export function App() {
       return
     }
     const top = Math.max(14, node.getBoundingClientRect().top)
-    const height = Math.max(360, window.innerHeight - top - 14)
+    const height = Math.max(360, window.innerHeight - top)
     node.style.setProperty("--detail-height", `${height}px`)
   }
 

@@ -146,30 +146,31 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   align-self: start;
   display: flex;
   flex-direction: column;
-  height: var(--detail-height, calc(100dvh - 28px));
-  max-height: calc(100dvh - 28px);
+  height: var(--detail-height, calc(100dvh - 14px));
+  max-height: calc(100dvh - 14px);
   min-height: 360px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  padding: 14px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
   container-type: inline-size;
 }
 .drawerHandle { display: none; }
-.detailBody { display: grid; flex: 1; min-height: 0; }
-.preview { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.detailBody { display: grid; flex: 1; min-height: 0; border: 0; background: transparent; }
+.preview { display: flex; flex-direction: column; gap: 12px; min-height: 0; border: 0; background: transparent; }
 .previewHead { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
 .previewHead h2 { margin-bottom: 2px; }
 .ascii {
   display: grid;
   place-items: center;
-  width: max-content;
+  width: 100%;
   max-width: 100%;
   aspect-ratio: 1 / 1;
-  justify-self: center;
+  justify-self: stretch;
   overflow: hidden;
   padding: 12px;
-  background: #020202;
-  border: 1px solid var(--line);
+  background: transparent;
+  border: 0;
   color: var(--text);
   font-size: clamp(5.5px, .52vw, 8px);
 }
@@ -183,6 +184,7 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   overflow-y: auto;
   padding: 14px;
   border: 3px double var(--line);
+  border-bottom: 0;
   background: var(--panel);
 }
 .previewPanel * { min-width: 0; }
@@ -227,7 +229,7 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
     min-height: 0;
     padding: 0;
     overflow: hidden;
-    box-shadow: 0 -1px 0 var(--line), 0 -18px 40px rgba(0, 0, 0, .5);
+    box-shadow: none;
     transition: height .18s ease;
     overscroll-behavior: contain;
   }
@@ -270,7 +272,6 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .detail.drawer-peek .previewStatus { display: none; }
   .detail.drawer-peek .previewOptions { display: none; }
   .detail.drawer-peek .previewMeta { display: none; }
-  .ascii { font-size: clamp(6.5px, 2.15vw, 11px); }
   .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .states button { padding-left: 8px; padding-right: 8px; }
 }
