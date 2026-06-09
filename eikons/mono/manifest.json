@@ -50,8 +50,11 @@
       "path": "mono.eikon",
       "role": "runtime",
       "mediaType": "application/vnd.eikon.stream+jsonl",
-      "size": 1390777,
-      "digest": "sha256:44b52ecb76df67c638c44556aa002975c76d7df36a887b390a85e2d83076b862"
+      "size": 55621,
+      "digest": "sha256:51577c51bf90641911392007cc3b138c2cfb3447ad5667204bd1c8be714183d8",
+      "encoding": "gzip",
+      "decodedSize": 1390777,
+      "decodedDigest": "sha256:44b52ecb76df67c638c44556aa002975c76d7df36a887b390a85e2d83076b862"
     },
     {
       "path": "base.png",
