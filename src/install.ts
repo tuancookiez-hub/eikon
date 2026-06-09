@@ -384,6 +384,7 @@ async function catalog(name: string, url: string, opts: Pick<Opts, "downloader">
 async function resolvePackageUrl(entry: CatalogEntry, opts: Pick<Opts, "downloader"> = {}): Promise<Resolved> {
   const at = new Date().toISOString()
   const bytes = await downloadBytes(entry.packageUrl, opts.downloader ?? (/^http:\/\/localhost[:/]/.test(entry.packageUrl) ? { allowPrivate: true } : undefined))
+  if (entry.trust?.manifestDigest && sha256(bytes) !== entry.trust.manifestDigest) throw new Error(`catalog: manifest digest mismatch for ${cleanUrl(entry.packageUrl)}`)
   const man = manifest(JSON.parse(new TextDecoder().decode(bytes)))
   const base = new URL(".", entry.packageUrl).href
   return {

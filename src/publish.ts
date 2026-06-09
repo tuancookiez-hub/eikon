@@ -4,6 +4,7 @@ import { lint, lintManifest, type Manifest } from "./ui/lint"
 import { poster } from "./ui/eikon"
 import { decodeRuntimeFile } from "./stream"
 import { catalogEntry, type PublicCatalogEntry } from "./catalog"
+import { CATALOG_KIND, CATALOG_SCHEMA_VERSION } from "./contract/shape"
 
 export const DEFAULT_SUBMIT_REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 export const DEFAULT_MAX_BUNDLE_BYTES = 32 * 1024 * 1024
@@ -97,17 +98,23 @@ export async function previewSubmitBundle(opts: BundleOpts): Promise<SubmitBundl
   const mf = join(root, "manifest.json")
   const manifest = existsSync(mf) ? lintManifest(mf, readFileSync(mf, "utf8")) : undefined
   const files = bundleFiles(root, packed, manifest, opts)
+  const base = "https://eikon.liftaris.dev/eikons/"
+  const runtimeUrl = new URL(`${eikon.meta.name}/${eikon.meta.name}.eikon`, base).href
   const catalog = catalogEntry({
+    kind: CATALOG_KIND,
+    schemaVersion: CATALOG_SCHEMA_VERSION,
+    id: eikon.meta.name,
+    sourceKey: runtimeUrl,
     name: eikon.meta.name,
+    title: eikon.meta.name,
     author: eikon.meta.author,
     glyph: eikon.meta.glyph,
-    width: eikon.meta.width,
-    height: eikon.meta.height,
     poster: poster(eikon),
-    source: `${eikon.meta.name}/`,
-    preview_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
-    package_url: manifest ? `${eikon.meta.name}/manifest.json` : undefined,
-  }, "https://eikon.liftaris.dev/eikons/", { allowPrivate: true })
+    runtimeUrl,
+    packageUrl: new URL(`${eikon.meta.name}/manifest.json`, base).href,
+    compatibility: { eikon: ">=1 <2", available: true },
+    trust: {},
+  }, base, { allowPrivate: true })
   return { root, packed, files, meta: eikon.meta, ...(manifest ? { manifest } : {}), catalog }
 }
 

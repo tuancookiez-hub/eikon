@@ -25,6 +25,20 @@ function fixture() {
   return dir
 }
 
+function noPreview(value: unknown): void {
+  if (!value || typeof value !== "object") return
+  if (Array.isArray(value)) {
+    for (const item of value) noPreview(item)
+    return
+  }
+  const obj = value as Record<string, unknown>
+  expect(obj.preview).toBeUndefined()
+  expect(obj.previewUrl).toBeUndefined()
+  expect(obj.preview_url).toBeUndefined()
+  if (obj.role) expect(obj.role).not.toBe("preview")
+  for (const item of Object.values(obj)) noPreview(item)
+}
+
 test("registry generation can emit deterministic gzip runtime blobs", async () => {
   const dir = fixture()
   expect(manifest({ root: dir, encoding: "gzip" })).toBe(1)
@@ -45,7 +59,10 @@ test("registry generation can emit deterministic gzip runtime blobs", async () =
 
   expect(await index({ root: dir, base: "https://eikon.liftaris.dev" })).toBe(1)
   const [entry] = JSON.parse(readFileSync(join(dir, "index.json"), "utf8"))
+  noPreview(entry)
+  noPreview(again)
+  expect(Object.keys(entry).sort()).toEqual(["author", "compatibility", "detailUrl", "id", "kind", "name", "packageUrl", "poster", "runtimeUrl", "schemaVersion", "sourceKey", "title", "trust", "version"])
   expect(entry.runtimeUrl.endsWith(runtime.digest.replace("sha256:", ""))).toBe(true)
   expect(entry.runtimeUrl.endsWith(".gz")).toBe(false)
-  expect(entry.trust).toMatchObject({ runtimeDigest: runtime.digest, runtimeSize: runtime.size, runtimeEncoding: "gzip", runtimeDecodedSize: runtime.decodedSize, runtimeDecodedDigest: runtime.decodedDigest })
+  expect(entry.trust).toMatchObject({ manifestDigest: sha(readFileSync(join(pkg, "1.0.0.json"))), runtimeDigest: runtime.digest, runtimeSize: runtime.size, runtimeEncoding: "gzip", runtimeDecodedSize: runtime.decodedSize, runtimeDecodedDigest: runtime.decodedDigest })
 })

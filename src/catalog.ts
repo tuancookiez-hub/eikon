@@ -24,38 +24,9 @@ export type CatalogTrust = {
   runtimeDecodedSize?: number
   runtimeDecodedDigest?: string
 }
-export type CatalogIndexEntry = {
-  name: string
-  version?: string
-  author?: string
-  glyph?: string
-  tags?: string[]
-  w?: number
-  h?: number
-  width?: number
-  height?: number
-  poster?: string
-  source?: string
-  preview_url?: string
-  preview?: string
-  runtime_url?: string
-  runtimeUrl?: string
-  package_url?: string
-  packageUrl?: string
-  detail_url?: string
-  detailUrl?: string
-  source_url?: string
-  description?: string
-  [key: string]: unknown
-}
+export type CatalogIndexEntry = CatalogEntry
 export type PublicCatalogEntry = CatalogEntry & {
-  w: number
-  h: number
-  width: number
-  height: number
-  previewUrl: string
   identityKey: string
-  raw: CatalogIndexEntry | CatalogEntry
   trust: CatalogTrust & NonNullable<CatalogEntry["trust"]>
 }
 export type Catalog = {
@@ -63,9 +34,8 @@ export type Catalog = {
   entries: PublicCatalogEntry[]
   load: (entry: PublicCatalogEntry | string) => Promise<string>
 }
-export type CatalogInput = CatalogEntry | CatalogIndexEntry | PackageCatalogEntry
+export type CatalogInput = CatalogEntry | PackageCatalogEntry
 
-type LegacyCatalogEntry = CatalogIndexEntry
 type PackageCatalogEntry = {
   manifest: EikonPackageManifest
   packageUrl: string
@@ -77,24 +47,33 @@ export type RuntimeArtifact = { bytes: Uint8Array; text: string }
 
 const NAME_RE = /^[a-z0-9][a-z0-9-]{1,63}$/
 const PRIVATE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"])
-const text = (value: unknown) => typeof value === "string" && !/[<>\u0000-\u001f]/.test(value)
-const isObj = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
-const problem = (path: string, message: string) => ({ code: "catalog", path, message: `${path}: ${message}` })
-const digestRe = /^sha256:[A-Za-z0-9._~+/=-]+$/
+const SHA256_RE = /^sha256:[a-f0-9]{64}$/
+const BLOB_RE = /\/blobs\/sha256\/([a-f0-9]{64})(?:\.eikon)?$/
 const encodings = new Set<RuntimeEncoding>(["identity", "gzip"])
 const trimSlash = (s: string) => s.replace(/\/$/, "")
 const slash = (s: string) => s.replace(/\/?$/, "/")
-const pathEscape = (raw: string) => raw.split(/[?#]/, 1)[0]?.split(/[\\/]/).some(p => p === "..") ?? false
-const clean = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "") : undefined
-const cleanTextBlock = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, "") : undefined
-const safeName = (value: unknown, fallback = "unnamed") => clean(value) || fallback
-const safeNum = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : 0
-const blobDigest = (value: string): string | undefined => {
-  const m = new URL(value).pathname.match(/\/blobs\/sha256\/([A-Fa-f0-9]{64})(?:\.eikon)?$/)
-  return m ? `sha256:${m[1]!.toLowerCase()}` : undefined
+const problem = (path: string, message: string) => ({ code: "catalog", path, message: `${path}: ${message}` })
+const text = (value: unknown) => typeof value === "string" && !/[<>\u0000-\u001f]/.test(value)
+const block = (value: unknown) => typeof value !== "string" || (value.length <= 8192 && !/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/.test(value))
+const isObj = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
+const size = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+const digest = (value: unknown) => typeof value === "string" && SHA256_RE.test(value)
+const allowed = new Set(["kind", "schemaVersion", "id", "version", "sourceKey", "name", "title", "author", "description", "glyph", "tags", "poster", "runtimeUrl", "packageUrl", "detailUrl", "compatibility", "trust"])
+const trustKeys = new Set(["manifestDigest", "runtimeDigest", "runtimeSize", "runtimeEncoding", "runtimeDecodedSize", "runtimeDecodedDigest"])
+
+const defined = <T extends Record<string, unknown>>(obj: T) => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as Partial<T>
+
+function decode(raw: string): string {
+  try { return decodeURIComponent(raw) }
+  catch { return raw }
 }
-const isRuntimeUrl = (value: string) => value.endsWith(".eikon") || /\/blobs\/sha256\/[A-Fa-f0-9]{16,}(?:\.eikon)?$/.test(new URL(value).pathname)
-const goodSize = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0
+
+function pathEscape(raw: string): boolean {
+  const all = [raw, decode(raw)]
+  return all.some(value => /[\\]/.test(value)
+    || /[\u0000-\u001f\u007f]/.test(value)
+    || value.split(/[?#]/, 1)[0]?.split(/[\\/]/).some(part => part === ".."))
+}
 
 const privateIpv4 = (a: number, b: number) => {
   if (a === 10) return true
@@ -125,88 +104,65 @@ const privateHost = (host: string) => {
 export function publicCatalogUrl(raw = DEFAULT_PUBLIC_CATALOG, base?: string, opts: CatalogOptions = {}): string {
   let out: URL
   try { out = new URL(raw, base) }
-  catch { throw new Error(`public catalog URL is invalid: ${raw}`) }
-  if (pathEscape(raw)) throw new Error(`public catalog URL path escape: ${out.href}`)
+  catch { throw new Error(`public catalog URL is invalid`) }
+  if (out.username || out.password) throw new Error("public catalog URL cannot include credentials")
+  if (pathEscape(raw) || out.pathname.split("/").some(p => p === "..")) throw new Error("public catalog URL path escape")
   if (opts.allowPrivate && out.protocol === "file:") return out.href
-  if (out.protocol !== "https:" && out.protocol !== "http:") throw new Error(`public catalog URL must use http(s): ${out.href}`)
+  if (out.protocol !== "https:" && out.protocol !== "http:") throw new Error("public catalog URL must use http(s)")
   if (!opts.allowPrivate && privateHost(out.hostname)) throw new Error(`public catalog URL cannot use private host: ${out.hostname}`)
-  if (out.protocol === "http:" && !privateHost(out.hostname)) throw new Error(`public catalog URL must use https: ${out.href}`)
-  if (out.pathname.split("/").some(p => p === "..")) throw new Error(`public catalog URL path escape: ${out.href}`)
+  if (out.protocol === "http:" && !privateHost(out.hostname)) throw new Error("public catalog URL must use https")
   return out.href
 }
 
-function url(value: string, base?: string): string {
-  try {
-    return publicCatalogUrl(value, base, { allowPrivate: true })
-  } catch {
-    throw new EikonValidationError([problem("packageUrl", "http(s) URL required")])
-  }
+function safe(raw: string, field: string, base?: string, opts: CatalogOptions = {}): string {
+  try { return publicCatalogUrl(raw, base, opts) }
+  catch (err) { throw new EikonValidationError([problem(field, err instanceof Error ? err.message : String(err))]) }
 }
 
-function joinUrl(base: string, path: string): string {
-  return new URL(path, base.endsWith("/") ? base : `${base}/`).toString()
-}
-
-function relativeUrl(base: string, path?: string): string | undefined {
+function rel(base: string, path?: string, field = "path", opts: CatalogOptions = {}): string | undefined {
   if (!path) return undefined
-  if (/^https?:\/\//.test(path)) return url(path)
-  if (!isSafeRelativePath(path)) throw new EikonValidationError([problem("path", "safe relative path required")])
-  return joinUrl(base, path)
+  if (/^https?:\/\//.test(path)) return safe(path, field, undefined, opts)
+  if (!isSafeRelativePath(path)) throw new EikonValidationError([problem(field, "safe relative path required")])
+  return new URL(path, slash(base)).toString()
 }
 
-function assetUrl(raw: string | undefined, base: string, fallback: string, opts: CatalogOptions = {}) {
-  const input = raw || fallback
-  const out = publicCatalogUrl(input, input.includes("://") ? undefined : slash(base), opts)
-  const root = new URL(slash(base))
-  const parsed = new URL(out)
-  if (parsed.host !== root.host) throw new Error(`public catalog URL host must match catalog host: ${out}`)
-  if (!parsed.pathname.startsWith(root.pathname)) throw new Error(`public catalog URL path escape: ${out}`)
-  return out
+function blob(value: string): string | undefined {
+  const m = new URL(value).pathname.match(BLOB_RE)
+  return m ? `sha256:${m[1]}` : undefined
 }
 
-function sourceDir(entry: CatalogIndexEntry, base: string, name: string, opts: CatalogOptions) {
-  return assetUrl(typeof entry.source === "string" ? entry.source : undefined, base, `${name}/`, opts)
-}
-
-function runtimeDescriptor(man: EikonPackageManifest) {
-  return man.files?.find(file => file.role === "runtime" && file.path === runtimePath(man))
-}
-
-function digestFor(man: EikonPackageManifest, path: string): string | undefined {
-  return man.files?.find(file => file.path === path)?.digest
+function runtimeUrl(value: string): boolean {
+  const path = new URL(value).pathname
+  return path.endsWith(".eikon") || BLOB_RE.test(path)
 }
 
 function runtimePath(man: EikonPackageManifest): string {
   return man.entrypoints.default
 }
 
-export function catalogEntry(entry: CatalogIndexEntry, base = DEFAULT_PUBLIC_CATALOG, opts: CatalogOptions = {}): PublicCatalogEntry {
-  return publicFromEntry(fromLegacy(entry, base, opts), entry)
+function runtimeDescriptor(man: EikonPackageManifest) {
+  return man.files?.find(file => file.role === "runtime" && file.path === runtimePath(man))
 }
 
-function publicFromEntry(entry: CatalogEntry, raw: CatalogEntry | CatalogIndexEntry = entry): PublicCatalogEntry {
-  const previewUrl = entry.preview ?? entry.runtimeUrl
+function desc(man: EikonPackageManifest, path: string): string | undefined {
+  return man.files?.find(file => file.path === path)?.digest
+}
+
+function publicFromEntry(entry: CatalogEntry): PublicCatalogEntry {
   return {
     ...entry,
     trust: entry.trust ?? {},
     poster: entry.poster ?? "",
-    preview: previewUrl,
-    previewUrl,
-    w: 0,
-    h: 0,
-    width: 0,
-    height: 0,
     identityKey: entry.sourceKey || entry.id,
-    raw,
   }
 }
 
 function runtimeDesc(entry: CatalogEntry): RuntimeDescriptor | undefined {
   const trust = entry.trust
-  const digest = trust?.runtimeDigest ?? blobDigest(entry.runtimeUrl)
-  if (!digest && !trust?.runtimeSize && !trust?.runtimeEncoding && !trust?.runtimeDecodedSize && !trust?.runtimeDecodedDigest) return undefined
+  const runtimeDigest = trust?.runtimeDigest ?? blob(entry.runtimeUrl)
+  if (!runtimeDigest && !trust?.runtimeSize && !trust?.runtimeEncoding && !trust?.runtimeDecodedSize && !trust?.runtimeDecodedDigest) return undefined
   return {
-    digest,
+    digest: runtimeDigest,
     size: trust?.runtimeSize,
     encoding: trust?.runtimeEncoding,
     decodedSize: trust?.runtimeDecodedSize,
@@ -216,7 +172,7 @@ function runtimeDesc(entry: CatalogEntry): RuntimeDescriptor | undefined {
 
 function assertArtifactHeaders(res: Response, entry: CatalogEntry): void {
   const enc = res.headers.get("content-encoding")
-  if (enc && enc.toLowerCase() !== "identity" && (entry.trust?.runtimeDigest || blobDigest(entry.runtimeUrl)))
+  if (enc && enc.toLowerCase() !== "identity" && (entry.trust?.runtimeDigest || blob(entry.runtimeUrl)))
     throw new Error(`catalog: runtime artifact must be served without Content-Encoding: ${enc}`)
 }
 
@@ -232,111 +188,98 @@ export async function loadRuntimeArtifact(entry: CatalogEntry, fetcher: Fetcher 
   }
 }
 
-function fromPackage(input: PackageCatalogEntry, root?: string): CatalogEntry {
+function fromPackage(input: PackageCatalogEntry, root?: string, opts: CatalogOptions = {}): CatalogEntry {
   const man = validatePackageManifest(input.manifest)
-  const packageUrl = url(input.packageUrl, root)
-  const base = packageUrl.slice(0, packageUrl.lastIndexOf("/") + 1)
+  const pkg = safe(input.packageUrl, "packageUrl", root, opts)
+  const base = pkg.slice(0, pkg.lastIndexOf("/") + 1)
   const runtime = runtimePath(man)
-  const desc = runtimeDescriptor(man)
-  const runtimeUrl = relativeUrl(base, runtime)!
+  const file = runtimeDescriptor(man)
+  const run = rel(base, runtime, "runtimeUrl", opts)!
+  const trust = defined({
+    manifestDigest: desc(man, "manifest.json"),
+    runtimeDigest: file?.digest,
+    runtimeSize: file?.size,
+    runtimeEncoding: file?.encoding,
+    runtimeDecodedSize: file?.decodedSize,
+    runtimeDecodedDigest: file?.decodedDigest,
+  }) as CatalogTrust
   return validateCatalogEntry({
     kind: CATALOG_KIND,
     schemaVersion: CATALOG_SCHEMA_VERSION,
     id: man.id,
     version: man.version,
-    sourceKey: input.sourceKey ?? `registry:${new URL(packageUrl).host}:${man.id}${man.version ? `@${man.version}` : ""}`,
+    sourceKey: input.sourceKey ?? `registry:${new URL(pkg).host}:${man.id}${man.version ? `@${man.version}` : ""}`,
     name: man.name,
-    title: man.display?.title,
-    author: man.display?.author,
-    description: man.display?.description,
-    glyph: man.display?.glyph,
-    tags: man.display?.tags,
-    poster: relativeUrl(base, man.poster),
-    preview: relativeUrl(base, man.preview) ?? runtimeUrl,
-    runtimeUrl,
-    packageUrl,
-    detailUrl: input.detailUrl ? url(input.detailUrl, base) : undefined,
+    ...defined({
+      title: man.display?.title,
+      author: man.display?.author,
+      description: man.display?.description,
+      glyph: man.display?.glyph,
+      tags: man.display?.tags,
+      poster: rel(base, man.poster, "poster", opts),
+      detailUrl: input.detailUrl ? safe(input.detailUrl, "detailUrl", base, opts) : undefined,
+    }),
+    runtimeUrl: run,
+    packageUrl: pkg,
     compatibility: { eikon: man.compatibility.eikon, hosts: man.compatibility.hosts, available: true },
-    trust: {
-      manifestDigest: digestFor(man, "manifest.json"),
-      runtimeDigest: desc?.digest,
-      runtimeSize: desc?.size,
-      runtimeEncoding: desc?.encoding,
-      runtimeDecodedSize: desc?.decodedSize,
-      runtimeDecodedDigest: desc?.decodedDigest,
-    },
-  })
+    ...(Object.keys(trust).length ? { trust } : {}),
+  }, opts)
 }
 
-function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptions = {}): CatalogEntry {
-  if (!NAME_RE.test(input.name)) throw new EikonValidationError([problem("name", "safe catalog name required")])
-  const source = input.source ?? `${input.name}/`
-  if (/^file:|^javascript:|^data:/i.test(source)) throw new EikonValidationError([problem("packageUrl", "http(s) URL required")])
-  if (!/^https?:\/\//.test(source) && !isSafeRelativePath(source)) throw new EikonValidationError([problem("path", "path escape")])
-  const root = /^https?:\/\//.test(source) ? publicCatalogUrl(source, undefined, opts) : base ? joinUrl(base, source) : source
-  const catalogRoot = base ? slash(base) : root
-  const runtimeUrl = typeof input.runtimeUrl === "string" ? url(input.runtimeUrl, catalogRoot) : typeof input.runtime_url === "string" ? url(input.runtime_url, catalogRoot) : joinUrl(root, `${input.name}.eikon`)
-  const packageUrl = typeof input.packageUrl === "string" ? url(input.packageUrl, catalogRoot) : typeof input.package_url === "string" ? url(input.package_url, catalogRoot) : joinUrl(root, "manifest.json")
-  const preview = typeof input.preview === "string" ? assetUrl(input.preview, catalogRoot, "", opts) : typeof input.preview_url === "string" ? assetUrl(input.preview_url, catalogRoot, "", opts) : runtimeUrl
-  return validateCatalogEntry({
-    kind: CATALOG_KIND,
-    schemaVersion: CATALOG_SCHEMA_VERSION,
-    id: input.name,
-    version: input.version,
-    sourceKey: /^https?:\/\//.test(root) ? root : input.name,
-    name: input.name,
-    title: clean(input.name),
-    author: clean(input.author),
-    glyph: clean(input.glyph),
-    tags: Array.isArray(input.tags) ? input.tags.filter(text) as string[] : undefined,
-    poster: cleanTextBlock(input.poster),
-    preview,
-    runtimeUrl,
-    packageUrl,
-    detailUrl: typeof input.detailUrl === "string" ? url(input.detailUrl, root) : typeof input.detail_url === "string" ? url(input.detail_url, root) : undefined,
-    description: clean(input.description),
-    compatibility: { eikon: ">=1 <2", available: true },
-    trust: {},
-  })
-}
-
-export function validateCatalogEntry(entry: CatalogEntry): CatalogEntry {
+export function validateCatalogEntry(entry: CatalogEntry, opts: CatalogOptions = {}): CatalogEntry {
   const errs = []
+  const raw = entry as unknown as Record<string, unknown>
+  for (const key of Object.keys(raw)) {
+    if (!allowed.has(key)) errs.push(problem(key, "unsupported catalog field"))
+  }
   if (entry.kind !== CATALOG_KIND) errs.push(problem("kind", `must be ${CATALOG_KIND}`))
+  if (entry.schemaVersion !== CATALOG_SCHEMA_VERSION) errs.push(problem("schemaVersion", `must be ${CATALOG_SCHEMA_VERSION}`))
   if (!NAME_RE.test(entry.name)) errs.push(problem("name", "safe catalog name required"))
   for (const [key, value] of Object.entries({ id: entry.id, sourceKey: entry.sourceKey, title: entry.title, author: entry.author, description: entry.description, glyph: entry.glyph })) {
     if (value != null && !text(value)) errs.push(problem(key, "unsafe text"))
   }
-  try { url(entry.packageUrl) } catch { errs.push(problem("packageUrl", "http(s) URL required")) }
-  try { url(entry.runtimeUrl) } catch { errs.push(problem("runtimeUrl", "http(s) URL required")) }
-  if (entry.runtimeUrl && !isRuntimeUrl(entry.runtimeUrl)) errs.push(problem("runtimeUrl", "must point at launch .eikon stream or content-addressed blob"))
+  if (entry.tags?.some(tag => !text(tag))) errs.push(problem("tags", "unsafe text"))
+  if (!block(entry.poster)) errs.push(problem("poster", "safe poster text required"))
+  try { safe(entry.packageUrl, "packageUrl", undefined, opts) } catch (err) { if (err instanceof EikonValidationError) errs.push(...err.problems); else errs.push(problem("packageUrl", String(err))) }
+  try { safe(entry.runtimeUrl, "runtimeUrl", undefined, opts) } catch (err) { if (err instanceof EikonValidationError) errs.push(...err.problems); else errs.push(problem("runtimeUrl", String(err))) }
+  if (entry.detailUrl) try { safe(entry.detailUrl, "detailUrl", undefined, opts) } catch (err) { if (err instanceof EikonValidationError) errs.push(...err.problems); else errs.push(problem("detailUrl", String(err))) }
+  if (entry.runtimeUrl) {
+    try { if (!runtimeUrl(entry.runtimeUrl)) errs.push(problem("runtimeUrl", "must point at launch .eikon stream or content-addressed blob")) }
+    catch { errs.push(problem("runtimeUrl", "http(s) URL required")) }
+  }
   const trust = entry.trust
-  if (trust?.manifestDigest != null && !digestRe.test(trust.manifestDigest)) errs.push(problem("trust.manifestDigest", "sha256 digest required"))
-  if (trust?.runtimeDigest != null && !digestRe.test(trust.runtimeDigest)) errs.push(problem("trust.runtimeDigest", "sha256 digest required"))
-  if (trust?.runtimeDecodedDigest != null && !digestRe.test(trust.runtimeDecodedDigest)) errs.push(problem("trust.runtimeDecodedDigest", "sha256 digest required"))
-  if (trust?.runtimeSize != null && !goodSize(trust.runtimeSize)) errs.push(problem("trust.runtimeSize", "non-negative finite size required"))
-  if (trust?.runtimeDecodedSize != null && !goodSize(trust.runtimeDecodedSize)) errs.push(problem("trust.runtimeDecodedSize", "non-negative finite size required"))
+  for (const key of Object.keys(trust ?? {})) {
+    if (!trustKeys.has(key)) errs.push(problem(`trust.${key}`, "unsupported trust field"))
+  }
+  if (trust?.manifestDigest != null && !digest(trust.manifestDigest)) errs.push(problem("trust.manifestDigest", "canonical sha256 digest required"))
+  if (trust?.runtimeDigest != null && !digest(trust.runtimeDigest)) errs.push(problem("trust.runtimeDigest", "canonical sha256 digest required"))
+  if (trust?.runtimeDecodedDigest != null && !digest(trust.runtimeDecodedDigest)) errs.push(problem("trust.runtimeDecodedDigest", "canonical sha256 digest required"))
+  if (trust?.runtimeSize != null && !size(trust.runtimeSize)) errs.push(problem("trust.runtimeSize", "non-negative safe integer required"))
+  if (trust?.runtimeDecodedSize != null && !size(trust.runtimeDecodedSize)) errs.push(problem("trust.runtimeDecodedSize", "non-negative safe integer required"))
   if (trust?.runtimeEncoding != null && !encodings.has(trust.runtimeEncoding)) errs.push(problem("trust.runtimeEncoding", "unsupported runtime encoding"))
   if (trust?.runtimeEncoding === "gzip") {
     if (!trust.runtimeDigest) errs.push(problem("trust.runtimeDigest", "required for gzip runtime"))
-    if (!goodSize(trust.runtimeSize)) errs.push(problem("trust.runtimeSize", "required for gzip runtime"))
-    if (!goodSize(trust.runtimeDecodedSize)) errs.push(problem("trust.runtimeDecodedSize", "required for gzip runtime"))
+    if (!size(trust.runtimeSize)) errs.push(problem("trust.runtimeSize", "required for gzip runtime"))
+    if (!size(trust.runtimeDecodedSize)) errs.push(problem("trust.runtimeDecodedSize", "required for gzip runtime"))
     if (!trust.runtimeDecodedDigest) errs.push(problem("trust.runtimeDecodedDigest", "required for gzip runtime"))
   }
-  for (const key of ["poster", "preview", "detailUrl"] as const) {
-    const value = entry[key]
-    if (value && /^file:|^javascript:|^data:/i.test(value)) errs.push(problem(key, "unsafe URL"))
-  }
+  const pathDigest = entry.runtimeUrl ? blob(entry.runtimeUrl) : undefined
+  if (pathDigest && trust?.runtimeDigest && trust.runtimeDigest !== pathDigest) errs.push(problem("trust.runtimeDigest", "must match content-addressed runtimeUrl digest"))
   if (!entry.compatibility?.eikon) errs.push(problem("compatibility.eikon", "required"))
   if (entry.compatibility?.eikon && !/>=?\s*1/.test(entry.compatibility.eikon)) errs.push(problem("compatibility.eikon", "must support launch major version 1"))
   if (errs.length) throw new EikonValidationError(errs)
   return entry
 }
 
-export function normalizeCatalogEntry(input: CatalogInput, base?: string): CatalogEntry {
-  if (isObj(input) && "kind" in input && input.kind === CATALOG_KIND) return validateCatalogEntry(input as CatalogEntry)
-  if (isObj(input) && "manifest" in input) return fromPackage(input as PackageCatalogEntry, base)
-  return fromLegacy(input as LegacyCatalogEntry, base)
+export function normalizeCatalogEntry(input: CatalogInput, base?: string, opts: CatalogOptions = {}): CatalogEntry {
+  if (!isObj(input)) throw new EikonValidationError([problem("catalog", "catalog entry or package manifest wrapper required")])
+  if ("kind" in input && input.kind === CATALOG_KIND) return validateCatalogEntry(input as CatalogEntry, opts)
+  if ("manifest" in input) return fromPackage(input as PackageCatalogEntry, base, opts)
+  throw new EikonValidationError([problem("catalog", "launch catalog entry or package-backed entry required")])
+}
+
+export function catalogEntry(input: CatalogInput, base = DEFAULT_PUBLIC_CATALOG, opts: CatalogOptions = {}): PublicCatalogEntry {
+  return publicFromEntry(normalizeCatalogEntry(input, base, opts))
 }
 
 export function searchCatalogEntries(entries: readonly CatalogEntry[], query: string): CatalogEntry[] {
@@ -351,7 +294,7 @@ export async function loadCatalogEntries(base: string, fetcher: Fetcher = fetch,
   if (!res.ok) throw new Error(`catalog: ${res.status} loading ${root}/index.json`)
   const items = await res.json() as unknown
   if (!Array.isArray(items)) throw new EikonValidationError([problem("catalog", "index array required")])
-  return items.map(item => normalizeCatalogEntry(item as CatalogInput, `${root}/`))
+  return items.map(item => normalizeCatalogEntry(item as CatalogInput, `${root}/`, opts))
 }
 
 export function searchCatalog(entries: readonly PublicCatalogEntry[], query: string): PublicCatalogEntry[] {
@@ -364,11 +307,7 @@ export async function loadCatalog(base = DEFAULT_PUBLIC_CATALOG, fetcher: Fetche
   if (!res.ok) throw new Error(`catalog: HTTP ${res.status}`)
   const items = await res.json() as unknown
   if (!Array.isArray(items)) throw new EikonValidationError([problem("catalog", "index array required")])
-  const entries = items.map(item => {
-    if (isObj(item) && "kind" in item && item.kind === CATALOG_KIND) return publicFromEntry(normalizeCatalogEntry(item as CatalogEntry), item as CatalogEntry)
-    if (isObj(item) && "manifest" in item) return publicFromEntry(normalizeCatalogEntry(item as PackageCatalogEntry, `${root}/`), item as CatalogIndexEntry)
-    return catalogEntry(item as CatalogIndexEntry, root, opts)
-  })
+  const entries = items.map(item => publicFromEntry(normalizeCatalogEntry(item as CatalogInput, `${root}/`, opts)))
   return {
     base: root,
     entries,

@@ -86,7 +86,7 @@ describe("U1 source identity and trust", () => {
 
   test("descriptor digest mismatch blocks before writing local state", async () => {
     const dir = join(root, "bad-digest")
-    writePackage(dir, "bad", pkg("bad", [{ path: "streams/main.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: Buffer.byteLength(launch), digest: "sha256:0000" }]))
+    writePackage(dir, "bad", pkg("bad", [{ path: "streams/main.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: Buffer.byteLength(launch), digest: `sha256:${"0".repeat(64)}` }]))
     await expect(install(dir, dest)).rejects.toThrow(/mismatch.*streams\/main\.eikon/)
     expect(existsSync(join(dest, "bad"))).toBe(false)
   })

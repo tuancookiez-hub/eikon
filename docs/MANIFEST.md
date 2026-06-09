@@ -4,7 +4,7 @@
 **Schema version:** `1.0`
 **Status:** Launch implementation-aligned
 
-The package manifest is the launch install/edit/source contract for an eikon. It describes how to find renderable streams, optional editable source media, poster/preview assets, compatibility, content-addressed file descriptors, and optional edit metadata. It is separate from the `.eikon` stream format and from the public catalog entry.
+The package manifest is the launch install/edit/source contract for an eikon. It describes how to find renderable streams, optional editable source media, poster assets, compatibility, content-addressed file descriptors, and optional edit metadata. It is separate from the `.eikon` stream format and from the public catalog entry.
 
 Older source-only manifests are still accepted by migration tooling during conversion, but the launch manifest below is the shape gallery, registry, Herm marketplace, and package readers should target.
 
@@ -54,15 +54,13 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
     { "path": "streams/nous.eikon", "role": "runtime", "mediaType": "application/vnd.eikon.stream+jsonl", "encoding": "gzip", "size": 12345, "digest": "sha256:<stored-bytes>", "decodedSize": 123456, "decodedDigest": "sha256:<decoded-ndjson>" },
     { "path": "sources/base.png", "role": "source.base", "mediaType": "image/png", "size": 45678, "digest": "sha256:..." },
     { "path": "sources/states/thinking/loop.mp4", "role": "source.clip", "signal": "state.thinking", "mediaType": "video/mp4", "size": 456789, "digest": "sha256:..." },
-    { "path": "posters/default.png", "role": "poster", "mediaType": "image/png", "size": 12345, "digest": "sha256:..." },
-    { "path": "preview.mp4", "role": "preview", "mediaType": "video/mp4", "size": 234567, "digest": "sha256:..." }
+    { "path": "posters/default.png", "role": "poster", "mediaType": "image/png", "size": 12345, "digest": "sha256:..." }
   ],
   "editability": {
     "sourcesIncluded": true,
     "mode": "full"
   },
   "poster": "posters/default.png",
-  "preview": "preview.mp4",
   "bundles": [
     { "format": "zip", "role": "full-source-export", "url": "downloads/liftaris-nous-1.0.0.zip", "size": 999999, "digest": "sha256:..." }
   ],
@@ -97,7 +95,6 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
 | `files` | yes for registry packages | Relative file descriptors with role, media type, size, and digest. Registry-served remote files require `size` and `digest`; gzip runtime descriptors also require `encoding`, `decodedSize`, and `decodedDigest`. |
 | `editability` | no | Whether editable source/project files are included and how complete they are. |
 | `poster` | no | Relative cached poster asset for cheap grid/catalog display. Standalone `.eikon` posters are derived from frames. |
-| `preview` | no | Relative selected-preview asset. |
 | `bundles` | no | Optional generated import/export/offline bundles such as ZIP. Bundles are not the canonical install protocol. |
 | `triggers` | no | Reserved optional trigger-rule extension data. Trigger support is not required for launch playback. |
 | `extensions` | no | Optional and required extension declarations. |
@@ -129,7 +126,6 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
   "glyph": "⬡",
   "tags": ["monochrome"],
   "poster": "<24-line text poster>",
-  "preview": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<preview-digest>",
   "runtimeUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<runtime-digest>",
   "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/1.0.0.json",
   "detailUrl": "https://eikon.liftaris.dev/eikons/liftaris/nous",
@@ -140,7 +136,7 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
 
 Catalog clients may search by `name`, `title`, `author`, and `tags`. Installed-state matching should prefer validated registry identity, version, source key, and digest. Name-only matching is a local legacy migration fallback and must not decide remote install/active state.
 
-`poster` in a catalog entry is cheap display data, normally an inline text poster for terminal-native grids and browser cards. `preview` and `runtimeUrl` are fetchable URLs; for launch catalogs they may point at the same `.eikon` stream when no separate preview asset exists.
+`poster` in a catalog entry is cheap display data, normally an inline text poster for terminal-native grids and browser cards. `runtimeUrl` is the only fetchable runtime/live-preview URL in the launch catalog.
 
 A shadcn-like registry may expose:
 

@@ -119,7 +119,7 @@ function infoFor(name: string) {
 }
 
 function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>>, installed: boolean) {
-  const man = r.manifest as Manifest & { display?: { title?: string; author?: string }; compatibility?: { eikon?: string }; preview?: string; poster?: string }
+  const man = r.manifest as Manifest & { display?: { title?: string; author?: string }; compatibility?: { eikon?: string }; poster?: string }
   return {
     command: "inspect",
     name: r.name,
@@ -130,7 +130,6 @@ function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>
     sourceKind: r.origin.kind,
     sourceIdentity: r.origin.identityKey ?? r.origin.sourceKey ?? r.origin.repo ?? r.origin.source,
     compatibility: man.compatibility?.eikon ?? man.eikon_requires,
-    preview: !!man.preview,
     poster: !!man.poster,
     installed,
     trust: r.trust.state,

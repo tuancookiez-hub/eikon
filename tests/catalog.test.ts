@@ -8,11 +8,11 @@ import {
   loadCatalogEntries,
   publicCatalogUrl,
   searchCatalog,
-  type CatalogIndexEntry,
 } from "../src/catalog"
-import { decodeRuntimeFile, runtimeDescriptor } from "../src"
+import { decodeRuntimeFile, LAUNCH_MEDIA_TYPE, runtimeDescriptor, type EikonPackageManifest } from "../src"
 
 const dir = resolve(import.meta.dir, "../eikons")
+const A = "a".repeat(64)
 let srv: ReturnType<typeof Bun.serve>
 
 function body(bytes: Uint8Array): ArrayBuffer {
@@ -26,15 +26,15 @@ beforeAll(() => {
       const url = new URL(req.url)
       const path = url.pathname
       if (path === "/index.json") {
-        const entries = await Bun.file(resolve(dir, "index.json")).json() as Array<Record<string, unknown> & { name: string }>
+        const entries = await Bun.file(resolve(dir, "index.json")).json() as Array<Record<string, unknown> & { runtimeUrl?: string; packageUrl?: string; detailUrl?: string }>
         return Response.json(entries.map(entry => ({
           ...entry,
-          preview: new URL(`${entry.name}/${entry.name}.eikon`, `${url.origin}/`).href,
-          runtimeUrl: new URL(`${entry.name}/${entry.name}.eikon`, `${url.origin}/`).href,
-          packageUrl: new URL(`${entry.name}/manifest.json`, `${url.origin}/`).href,
+          runtimeUrl: entry.runtimeUrl?.replace("https://eikon.liftaris.dev", url.origin),
+          packageUrl: entry.packageUrl?.replace("https://eikon.liftaris.dev", url.origin),
+          detailUrl: entry.detailUrl?.replace("https://eikon.liftaris.dev", url.origin),
         })))
       }
-      const pkg = path.match(/^\/packages\/liftaris\/([^/]+)\/blobs\/sha256\//)
+      const pkg = path.match(/^\/packages\/liftaris\/([^/]+)\/(?:blobs\/sha256\/|)(?:[a-f0-9]{64}|[^/]+\.eikon)$/)
       const local = pkg ? `${pkg[1]}/${pkg[1]}.eikon` : path.slice(1)
       return new Response(Bun.file(resolve(dir, local)))
     },
@@ -58,6 +58,30 @@ function raw(name: string, meta: Record<string, unknown> = {}) {
     .join("\n") + "\n"
 }
 
+function pkg(name: string, opts: { author?: string; title?: string; sourceKey?: string; packageUrl?: string; digest?: string; trust?: boolean } = {}) {
+  const manifest: EikonPackageManifest = {
+    kind: "eikon.package",
+    schemaVersion: "1.0",
+    id: `liftaris/${name}`,
+    name,
+    version: "1.0.0",
+    display: { title: opts.title ?? name, author: opts.author ?? "Kaio", glyph: "◆" },
+    compatibility: { eikon: ">=1 <2" },
+    entrypoints: { default: `${name}.eikon` },
+    files: [{
+      path: `${name}.eikon`,
+      role: "runtime",
+      mediaType: LAUNCH_MEDIA_TYPE,
+      ...(opts.trust === false ? {} : { size: 123, digest: opts.digest ?? `sha256:${A}` }),
+    }],
+  }
+  return {
+    manifest,
+    packageUrl: opts.packageUrl ?? `https://eikon.liftaris.dev/packages/liftaris/${name}/1.0.0.json`,
+    sourceKey: opts.sourceKey ?? `registry:eikon.liftaris.dev:liftaris/${name}@1.0.0`,
+  }
+}
+
 test("remote catalog: index + load round-trip over http", async () => {
   const cat = remote(`http://localhost:${srv.port}`)
   const xs = await cat.list()
@@ -76,24 +100,25 @@ test("lint: accepts valid launch streams, rejects missing author", async () => {
 })
 
 describe("shared catalog contract", () => {
-  test("normalizes old index entries and lazy-loads full bodies", async () => {
+  test("normalizes package-backed index entries and lazy-loads full bodies", async () => {
     let loaded = false
     const fetcher = async (req: string | URL | Request) => {
       const url = typeof req === "string" ? req : req instanceof URL ? req.href : req.url
       const p = new URL(url).pathname
-      if (p === "/index.json") return Response.json([{ name: "ares", author: "Kaio", glyph: "⚔", w: 48, h: 24, poster: "POSTER" }])
-      if (p === "/ares/ares.eikon") { loaded = true; return new Response('{"eikon":1,"name":"ares","width":48,"height":24}\n') }
+      if (p === "/index.json") return Response.json([pkg("ares", { trust: false })])
+      if (p === "/packages/liftaris/ares/ares.eikon") { loaded = true; return new Response(raw("ares")) }
       return new Response("404", { status: 404 })
     }
-    {
-      const cat = await loadCatalog("https://eikon.liftaris.dev", fetcher, { allowPrivate: true })
-      expect(loaded).toBe(false)
-      expect(cat.entries).toMatchObject([{ name: "ares", author: "Kaio", sourceKey: "https://eikon.liftaris.dev/ares/" }])
-      expect(searchCatalog(cat.entries, "kaio").map(e => e.name)).toEqual(["ares"])
-      const raw = await cat.load(cat.entries[0]!)
-      expect(raw).toContain('"name":"ares"')
-      expect(loaded).toBe(true)
-    }
+    const cat = await loadCatalog("https://eikon.liftaris.dev", fetcher, { allowPrivate: true })
+    expect(loaded).toBe(false)
+    expect(cat.entries).toMatchObject([{ name: "ares", author: "Kaio", sourceKey: "registry:eikon.liftaris.dev:liftaris/ares@1.0.0" }])
+    expect(cat.entries[0]).not.toHaveProperty("preview")
+    expect(cat.entries[0]).not.toHaveProperty("previewUrl")
+    expect(cat.entries[0]).not.toHaveProperty("raw")
+    expect(searchCatalog(cat.entries, "kaio").map(e => e.name)).toEqual(["ares"])
+    const text = await cat.load(cat.entries[0]!)
+    expect(text).toContain('"name":"ares"')
+    expect(loaded).toBe(true)
   })
 
   test("actual fetch preserves raw gzip bytes only when Content-Encoding is omitted", async () => {
@@ -116,8 +141,8 @@ describe("shared catalog contract", () => {
 
   test("loads gzip runtime bytes and rejects transparent content encoding", async () => {
     const info = runtimeDescriptor(raw("zip"), { encoding: "gzip" })
+    const hex = info.digest.slice("sha256:".length)
     const entry = {
-      name: "zip",
       manifest: {
         kind: "eikon.package",
         schemaVersion: "1.0",
@@ -125,8 +150,8 @@ describe("shared catalog contract", () => {
         name: "zip",
         version: "1.0.0",
         compatibility: { eikon: ">=1 <2" },
-        entrypoints: { default: "blobs/sha256/abcdef0123456789" },
-        files: [{ path: "blobs/sha256/abcdef0123456789", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", encoding: "gzip", size: info.size, digest: info.digest, decodedSize: info.decodedSize, decodedDigest: info.decodedDigest }],
+        entrypoints: { default: `blobs/sha256/${hex}` },
+        files: [{ path: `blobs/sha256/${hex}`, role: "runtime", mediaType: LAUNCH_MEDIA_TYPE, encoding: "gzip", size: info.size, digest: info.digest, decodedSize: info.decodedSize, decodedDigest: info.decodedDigest }],
       },
       packageUrl: "https://eikon.liftaris.dev/packages/liftaris/zip/1.0.0.json",
     }
@@ -146,31 +171,22 @@ describe("shared catalog contract", () => {
     await expect(bad.load("zip")).rejects.toThrow(/Content-Encoding/)
   })
 
-  test("normalizes legacy URLs", () => {
-    const e = catalogEntry({
-      name: "echo",
-      author: "Nous",
-      description: "speaker",
-      source: "echo/",
-      preview_url: "echo/echo.eikon",
-      package_url: "echo/manifest.json",
-      w: 48,
-      h: 24,
-      poster: "POSTER",
-    }, "https://eikon.liftaris.dev/eikons/")
+  test("normalizes package-backed URLs", () => {
+    const e = catalogEntry(pkg("echo", { author: "Nous", title: "Echo" }), "https://eikon.liftaris.dev/eikons/")
     expect(e.name).toBe("echo")
-    expect(e.description).toBe("speaker")
-    expect(e.trust).toEqual({})
-    expect(e.previewUrl).toBe("https://eikon.liftaris.dev/eikons/echo/echo.eikon")
-    expect(e.packageUrl).toBe("https://eikon.liftaris.dev/eikons/echo/manifest.json")
-    expect(e.sourceKey).toBe("https://eikon.liftaris.dev/eikons/echo/")
-    expect(e.identityKey).toBe("https://eikon.liftaris.dev/eikons/echo/")
+    expect(e.title).toBe("Echo")
+    expect(e.trust.runtimeDigest).toBe(`sha256:${A}`)
+    expect(e.runtimeUrl).toBe("https://eikon.liftaris.dev/packages/liftaris/echo/echo.eikon")
+    expect(e.packageUrl).toBe("https://eikon.liftaris.dev/packages/liftaris/echo/1.0.0.json")
+    expect(e.sourceKey).toBe("registry:eikon.liftaris.dev:liftaris/echo@1.0.0")
+    expect(e.identityKey).toBe("registry:eikon.liftaris.dev:liftaris/echo@1.0.0")
+    expect(e).not.toHaveProperty("preview")
   })
 
   test("searches name and author case-insensitively", () => {
     const xs = [
-      catalogEntry({ name: "ares", author: "Kaio", w: 48, h: 24, poster: "A" }, "https://eikon.liftaris.dev/eikons/"),
-      catalogEntry({ name: "mono", author: "Nous Research", w: 48, h: 24, poster: "M" }, "https://eikon.liftaris.dev/eikons/"),
+      catalogEntry(pkg("ares", { author: "Kaio" }), "https://eikon.liftaris.dev/eikons/"),
+      catalogEntry(pkg("mono", { author: "Nous Research" }), "https://eikon.liftaris.dev/eikons/"),
     ]
     expect(searchCatalog(xs, "NOUS").map(e => e.name)).toEqual(["mono"])
     expect(searchCatalog(xs, "are").map(e => e.name)).toEqual(["ares"])
@@ -179,8 +195,8 @@ describe("shared catalog contract", () => {
 
   test("colliding names keep distinct identity keys", () => {
     const xs = [
-      catalogEntry({ name: "echo", source: "a/", w: 48, h: 24, poster: "A" }, "https://eikon.liftaris.dev/eikons/"),
-      catalogEntry({ name: "echo", source: "b/", w: 48, h: 24, poster: "B" }, "https://eikon.liftaris.dev/eikons/"),
+      catalogEntry(pkg("echo", { sourceKey: "registry:a:liftaris/echo@1.0.0", packageUrl: "https://a.example/packages/liftaris/echo/1.0.0.json" })),
+      catalogEntry(pkg("echo", { sourceKey: "registry:b:liftaris/echo@1.0.0", packageUrl: "https://b.example/packages/liftaris/echo/1.0.0.json" })),
     ]
     expect(xs[0]!.identityKey).not.toBe(xs[1]!.identityKey)
     expect(xs.map(e => e.name)).toEqual(["echo", "echo"])
@@ -203,8 +219,7 @@ describe("shared catalog contract", () => {
     ]) {
       expect(() => publicCatalogUrl(`http://${host}/eikon.eikon`)).toThrow(/private host/)
     }
-    expect(() => catalogEntry({ name: "bad", source: "../bad/", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/path escape/)
-    expect(() => catalogEntry({ name: "bad", preview_url: "https://evil.example/bad.eikon", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/host/)
+    expect(() => catalogEntry({ name: "bad", source: "../bad/", w: 1, h: 1, poster: "" } as never, "https://eikon.liftaris.dev/eikons/")).toThrow(/launch catalog entry/)
   })
 
   test("rejects unsafe catalog bases before fetching", async () => {
@@ -218,11 +233,11 @@ describe("shared catalog contract", () => {
     await expect(loadCatalogEntries("http://169.254.169.254/eikons", fetcher)).rejects.toThrow(/private host/)
   })
 
-  test("defaults legacy trust to an empty object for compatibility", () => {
-    const e = catalogEntry({ name: "old", w: 48, h: 24, poster: "P" }, "https://eikon.liftaris.dev/eikons/")
+  test("package entries without descriptor trust default to an empty trust object", () => {
+    const e = catalogEntry(pkg("old", { trust: false }), "https://eikon.liftaris.dev/eikons/")
     expect(e.trust).toEqual({})
-    expect(e.previewUrl).toBe("https://eikon.liftaris.dev/eikons/old/old.eikon")
-    expect(e.packageUrl).toBe("https://eikon.liftaris.dev/eikons/old/manifest.json")
+    expect(e.runtimeUrl).toBe("https://eikon.liftaris.dev/packages/liftaris/old/old.eikon")
+    expect(e.packageUrl).toBe("https://eikon.liftaris.dev/packages/liftaris/old/1.0.0.json")
   })
 
   test("browser-safe import avoids host-only install exports", async () => {

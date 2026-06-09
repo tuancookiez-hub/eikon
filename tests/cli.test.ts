@@ -98,7 +98,10 @@ describe("eikon CLI lifecycle", () => {
 
     const inspected = await run(["inspect", src, "--json"], { HERM_CONFIG_DIR: profile })
     expect(inspected.code).toBe(0)
-    expect(json(inspected.stdout)).toMatchObject({ command: "inspect", name: "atlas", title: "atlas title", author: "Kaio", installed: false, trust: "verified" })
+    const data = json(inspected.stdout)
+    expect(data).toMatchObject({ command: "inspect", name: "atlas", title: "atlas title", author: "Kaio", installed: false, trust: "verified" })
+    expect(data).not.toHaveProperty("preview")
+    expect(data).not.toHaveProperty("previewUrl")
     expect(existsSync(join(profile, "eikons", "atlas"))).toBe(false)
   })
 
@@ -157,7 +160,18 @@ describe("eikon CLI lifecycle", () => {
   test("search returns stable empty JSON results", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "eikon-cli-"))
     const srv = Bun.serve({ port: 0, fetch(req) {
-      if (new URL(req.url).pathname === "/index.json") return Response.json([{ name: "ares", package_url: "https://example.com/packages/ares.json", runtime_url: "https://example.com/ares.eikon" }])
+      const origin = new URL(req.url).origin
+      if (new URL(req.url).pathname === "/index.json") return Response.json([{
+        kind: "eikon.catalog.entry",
+        schemaVersion: "1.0",
+        id: "liftaris/ares",
+        sourceKey: "registry:localhost:liftaris/ares@1.0.0",
+        name: "ares",
+        poster: "",
+        runtimeUrl: `${origin}/packages/liftaris/ares/ares.eikon`,
+        packageUrl: `${origin}/packages/liftaris/ares/1.0.0.json`,
+        compatibility: { eikon: ">=1 <2", available: true },
+      }])
       return new Response("missing", { status: 404 })
     }})
     try {

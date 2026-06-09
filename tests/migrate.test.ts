@@ -78,7 +78,7 @@ test("launch streams validate frame dimensions and required record extensions", 
 
 test("legacy eikon converts to launch stream and package manifest", () => {
   const legacy = [
-    JSON.stringify({ eikon: 1, name: "legacy", author: "t", glyph: "◆", width: 4, height: 2, local_note: "draft-only" }),
+    JSON.stringify({ eikon: 1, name: "legacy", author: "t", glyph: "◆", width: 4, height: 2, local_note: "draft-only", preview: "prototype-preview.mp4" }),
     JSON.stringify({ state: "idle", fps: 10, frame_count: 1, loop_from: 0 }),
     JSON.stringify({ f: 0, data: rows.join("\n") }),
     JSON.stringify({ state: "thinking", fps: 8, frame_count: 1 }),
@@ -96,7 +96,9 @@ test("legacy eikon converts to launch stream and package manifest", () => {
   expect(migrated.manifest.compatibility.eikon).toBe(">=1 <2")
   expect(migrated.manifest.files?.[0]?.role).toBe("runtime")
   expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/moved legacy display metadata: author/)
-  expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/dropped 1 unsupported legacy metadata field/)
+  expect(migrated.manifest.legacy?.notes?.join("\n")).toMatch(/dropped 2 unsupported legacy metadata fields/)
+  expect(migrated.manifest).not.toHaveProperty("preview")
+  expect(migrated.manifest.files?.some(file => (file as { role?: string }).role === "preview")).toBe(false)
   expect(validatePackageManifest(migrated.manifest).entrypoints.default).toBe("streams/legacy.eikon")
 })
 

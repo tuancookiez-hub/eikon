@@ -287,7 +287,7 @@ describe("resolve + install: launch package", () => {
     const info = runtimeDescriptor(launch, { encoding: "gzip" })
     for (const [name, bad] of [
       ["gzip-size", { ...info, size: info.size + 1 }],
-      ["gzip-digest", { ...info, digest: "sha256:bad" }],
+      ["gzip-digest", { ...info, digest: `sha256:${"b".repeat(64)}` }],
     ] as const) {
       const next = join(root, name)
       mkdirSync(join(next, "streams"), { recursive: true })
@@ -345,9 +345,22 @@ describe("resolve: catalog name", () => {
   beforeAll(() => {
     const avatar = join(root, "cat-ares"); seed(avatar, "ares")
     srv = Bun.serve({ port: 0, fetch(req) {
+      const origin = `${new URL(req.url).origin}/eikons`
       const p = new URL(req.url).pathname
       if (p === "/eikons/index.json")
-        return Response.json([{ name: "ares" }])
+        return Response.json([{
+          kind: "eikon.catalog.entry",
+          schemaVersion: "1.0",
+          id: "liftaris/ares",
+          sourceKey: "registry:localhost:liftaris/ares@1.0.0",
+          name: "ares",
+          title: "ares",
+          author: "kaio",
+          poster: "",
+          runtimeUrl: `${origin}/ares/ares.eikon`,
+          packageUrl: `${origin}/ares/manifest.json`,
+          compatibility: { eikon: ">=1 <2", available: true },
+        }])
       if (p === "/eikons/ares/manifest.json") return new Response(man("ares"))
       if (p.startsWith("/eikons/ares/")) return new Response(new Uint8Array(100), { headers: { "content-length": "100" } })
       return new Response("404", { status: 404 })
@@ -364,5 +377,32 @@ describe("resolve: catalog name", () => {
 
   test("unknown name throws", async () => {
     await expect(resolve("nope", { catalog: base })).rejects.toThrow(/no eikon named/)
+  })
+
+  test("catalog manifest digest mismatch rejects before package descriptors are trusted", async () => {
+    const srv = Bun.serve({ port: 0, fetch(req) {
+      const origin = `${new URL(req.url).origin}/eikons`
+      const p = new URL(req.url).pathname
+      if (p === "/eikons/index.json")
+        return Response.json([{
+          kind: "eikon.catalog.entry",
+          schemaVersion: "1.0",
+          id: "liftaris/bad",
+          sourceKey: "registry:localhost:liftaris/bad@1.0.0",
+          name: "bad",
+          poster: "",
+          runtimeUrl: `${origin}/bad/bad.eikon`,
+          packageUrl: `${origin}/bad/manifest.json`,
+          compatibility: { eikon: ">=1 <2", available: true },
+          trust: { manifestDigest: `sha256:${"b".repeat(64)}` },
+        }])
+      if (p === "/eikons/bad/manifest.json") return new Response(man("bad"))
+      return new Response("404", { status: 404 })
+    }})
+    try {
+      await expect(resolve("bad", { catalog: `http://localhost:${srv.port}/eikons` })).rejects.toThrow(/manifest digest mismatch/)
+    } finally {
+      srv.stop()
+    }
   })
 })

@@ -10,8 +10,8 @@
 The Eikon contract consists of four separate shapes:
 
 1. **Stream/document**: a line-oriented `.eikon` runtime artifact. It is enough to play an eikon without registry, package, network, or platform state.
-2. **Package manifest**: an `eikon.package` install/edit/source contract with entrypoints, content-addressed file descriptors, compatibility, source media, poster/preview assets, optional edit metadata, and optional extension declarations.
-3. **Registry/catalog entry**: cheap, normalized, browser-safe discovery metadata with stable identity/source keys and URLs to package manifests, runtime streams, poster/preview assets, and optional bundle exports.
+2. **Package manifest**: an `eikon.package` install/edit/source contract with entrypoints, content-addressed file descriptors, compatibility, source media, poster assets, optional edit metadata, and optional extension declarations.
+3. **Registry/catalog entry**: cheap, normalized, browser-safe discovery metadata with stable identity/source keys and URLs to package manifests, runtime streams, poster display data, and optional bundle exports.
 4. **Platform metadata**: mutable service data such as download counts, likes, moderation, and account data.
 
 Local rendering must not depend on package, catalog, or platform metadata. Catalog and platform fields may help users find, trust, or install an eikon, but they do not mutate stream bytes.
@@ -176,9 +176,9 @@ Reserved extension namespaces for launch planning:
 ## Conformance classes
 
 - **Stream decoder/player:** validates header, typed records, version/extension behavior, frame dimensions, clip order, loop behavior, header-owned signal mappings, and baseline lifecycle fallback. It renders without network or package metadata.
-- **Package reader:** validates package manifest shape, entrypoints, content-addressed file descriptors, compatibility, source/poster/preview descriptors, optional edit metadata, and optional trigger declarations.
+- **Package reader:** validates package manifest shape, entrypoints, content-addressed file descriptors, compatibility, source/poster descriptors, optional edit metadata, and optional trigger declarations.
 - **Catalog client:** loads cheap entries only, treats package/detail/runtime URLs as registry data, and avoids host-only imports.
-- **Registry generator:** verifies package descriptors, URL/path safety, digest/size policy, poster/preview constraints, metadata escaping, compatibility, and trusted-registry publication policy before publication.
+- **Registry generator:** verifies package descriptors, URL/path safety, digest/size policy, poster/runtime constraints, metadata escaping, compatibility, and trusted-registry publication policy before publication.
 - **Editor/migrator:** can read old pre-launch `.eikon` input, report moved/dropped metadata, write launch `.eikon`/package output with backup, or produce an explicit failure.
 
 ## Pre-launch migration expectations

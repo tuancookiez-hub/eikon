@@ -21,10 +21,35 @@ const SAFE_PATH_RE = /^[a-zA-Z0-9._/-]+$/
 const problem = (path: string, message: string) => ({ code: "manifest", path, message: `${path}: ${message}` })
 const isObj = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
 const isSafeText = (value: string) => !/[<>\u0000-\u001f]/.test(value)
-const isSha256 = (value: unknown) => typeof value === "string" && /^sha256:[A-Za-z0-9._~+/=-]+$/.test(value)
+const SHA256_RE = /^sha256:[a-f0-9]{64}$/
+const isSha256 = (value: unknown) => typeof value === "string" && SHA256_RE.test(value)
 const isEncoding = (value: unknown): value is PackageFileDescriptor["encoding"] => typeof value === "string" && (RUNTIME_ENCODINGS as readonly string[]).includes(value)
-const isRuntimePath = (path: string) => path.endsWith(LAUNCH_STREAM_EXTENSION) || /^blobs\/sha256\/[A-Fa-f0-9]{16,}(?:\.eikon)?$/.test(path)
-const STALE_DESCRIPTOR_ROLES = new Set(["stream", "source"])
+const contentDigestForPath = (path: string): string | undefined => {
+  const match = path.match(/^blobs\/sha256\/([a-f0-9]{64})(?:\.eikon)?$/)
+  return match ? `sha256:${match[1]}` : undefined
+}
+const isRuntimePath = (path: string) => path.endsWith(LAUNCH_STREAM_EXTENSION) || contentDigestForPath(path) != null
+const safeSize = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+const ALLOWED_MANIFEST_KEYS = new Set([
+  "kind",
+  "schemaVersion",
+  "id",
+  "name",
+  "version",
+  "display",
+  "compatibility",
+  "entrypoints",
+  "files",
+  "source",
+  "editability",
+  "poster",
+  "bundles",
+  "triggers",
+  "extensions",
+  "legacy",
+])
+const ALLOWED_DESCRIPTOR_KEYS = new Set(["path", "role", "mediaType", "size", "digest", "encoding", "decodedSize", "decodedDigest", "signal"])
+const ALLOWED_DESCRIPTOR_ROLES = new Set<PackageFileDescriptor["role"]>(["runtime", "source.base", "source.clip", "poster", "manifest"])
 
 export function isSafeRelativePath(path: string): boolean {
   if (!path || path.startsWith("/") || path.startsWith("./") || path.includes("../") || path === "..") return false
@@ -52,22 +77,30 @@ function validateDescriptor(file: PackageFileDescriptor, index: number, opts: Pa
     errs.push(problem(base, "descriptor object required"))
     return
   }
+  for (const key of Object.keys(file as Record<string, unknown>)) {
+    if (!ALLOWED_DESCRIPTOR_KEYS.has(key)) errs.push(problem(`${base}.${key}`, "unsupported descriptor field"))
+  }
   if (typeof file.path !== "string" || !isSafeRelativePath(file.path)) errs.push(problem(`${base}.path`, "safe relative path required"))
   if (typeof file.role !== "string" || !file.role) errs.push(problem(`${base}.role`, "role required"))
-  else if (STALE_DESCRIPTOR_ROLES.has(file.role)) errs.push(problem(`${base}.role`, `stale descriptor role "${file.role}"; use final runtime/source.base/source.clip roles`))
+  else if (!ALLOWED_DESCRIPTOR_ROLES.has(file.role as PackageFileDescriptor["role"])) errs.push(problem(`${base}.role`, `unsupported descriptor role "${file.role}"; allowed roles are runtime/source.base/source.clip/poster/manifest`))
   if (typeof file.mediaType !== "string" || !file.mediaType) errs.push(problem(`${base}.mediaType`, "mediaType required"))
+  if (file.size != null && !safeSize(file.size)) errs.push(problem(`${base}.size`, "non-negative safe integer required"))
+  if (file.digest != null && !isSha256(file.digest)) errs.push(problem(`${base}.digest`, "canonical sha256 digest required"))
   if (file.role === "runtime") {
     if (!isRuntimePath(file.path)) errs.push(problem(`${base}.path`, `runtime descriptor must point at launch ${LAUNCH_STREAM_EXTENSION} stream or content-addressed blob`))
     if (file.mediaType !== LAUNCH_MEDIA_TYPE) errs.push(problem(`${base}.mediaType`, `runtime descriptor must use ${LAUNCH_MEDIA_TYPE}`))
     if (file.encoding != null && !isEncoding(file.encoding)) errs.push(problem(`${base}.encoding`, "runtime encoding must be identity or gzip"))
+    const pathDigest = typeof file.path === "string" ? contentDigestForPath(file.path) : undefined
+    if (pathDigest && !isSha256(file.digest)) errs.push(problem(`${base}.digest`, "canonical sha256 digest required for content-addressed runtime descriptor"))
+    if (pathDigest && isSha256(file.digest) && file.digest !== pathDigest) errs.push(problem(`${base}.digest`, "runtime descriptor digest must match content-addressed path"))
     const enc = file.encoding ?? "identity"
-    if (file.decodedSize != null && (typeof file.decodedSize !== "number" || !Number.isFinite(file.decodedSize) || file.decodedSize < 0)) errs.push(problem(`${base}.decodedSize`, "non-negative number required"))
-    if (file.decodedDigest != null && !isSha256(file.decodedDigest)) errs.push(problem(`${base}.decodedDigest`, "sha256 digest required"))
+    if (file.decodedSize != null && !safeSize(file.decodedSize)) errs.push(problem(`${base}.decodedSize`, "non-negative safe integer required"))
+    if (file.decodedDigest != null && !isSha256(file.decodedDigest)) errs.push(problem(`${base}.decodedDigest`, "canonical sha256 digest required"))
     if (opts.registry && enc === "gzip") {
       const missing: string[] = []
-      if (typeof file.size !== "number" || !Number.isFinite(file.size) || file.size < 0) missing.push("size")
+      if (!safeSize(file.size)) missing.push("size")
       if (!isSha256(file.digest)) missing.push("digest")
-      if (typeof file.decodedSize !== "number" || !Number.isFinite(file.decodedSize) || file.decodedSize < 0) missing.push("decodedSize")
+      if (!safeSize(file.decodedSize)) missing.push("decodedSize")
       if (!isSha256(file.decodedDigest)) missing.push("decodedDigest")
       if (missing.length) errs.push(problem(base, `${missing.join(" ")} required for gzip registry runtime descriptors`))
     }
@@ -76,7 +109,7 @@ function validateDescriptor(file: PackageFileDescriptor, index: number, opts: Pa
   }
   if (opts.registry) {
     const missing: string[] = []
-    if (typeof file.size !== "number" || !Number.isFinite(file.size) || file.size < 0) missing.push("size")
+    if (!safeSize(file.size)) missing.push("size")
     if (!isSha256(file.digest)) missing.push("digest")
     if (missing.length) errs.push(problem(base, `${missing.join(" ")} required for registry descriptors`))
   }
@@ -87,6 +120,9 @@ export function validatePackageManifest(value: unknown, opts: PackageValidationO
   if (!isObj(value)) throw new EikonValidationError([problem("manifest", "object required")])
   const raw = value as Record<string, unknown>
   const man = value as EikonPackageManifest
+  for (const key of Object.keys(raw)) {
+    if (!ALLOWED_MANIFEST_KEYS.has(key)) errs.push(problem(key, "unsupported manifest field"))
+  }
   if (man.kind !== PACKAGE_KIND) errs.push(problem("kind", `must be ${PACKAGE_KIND}`))
   if (man.schemaVersion !== PACKAGE_SCHEMA_VERSION) errs.push(problem("schemaVersion", `must be ${PACKAGE_SCHEMA_VERSION}`))
   if (!NAME_RE.test(String(man.name ?? ""))) errs.push(problem("name", "safe package name required"))
@@ -109,7 +145,6 @@ export function validatePackageManifest(value: unknown, opts: PackageValidationO
   }
   for (const ext of man.extensions?.required ?? []) errs.push(problem("extensions.required", `unknown required Eikon extension ${ext}`))
   if (man.poster && !isSafeRelativePath(man.poster)) errs.push(problem("poster", "safe relative path required"))
-  if (man.preview && !isSafeRelativePath(man.preview)) errs.push(problem("preview", "safe relative path required"))
   for (const bundle of man.bundles ?? []) {
     if (!bundle || typeof bundle !== "object" || typeof bundle.url !== "string") errs.push(problem("bundles.url", "bundle URL required"))
   }

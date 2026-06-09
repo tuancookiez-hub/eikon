@@ -217,7 +217,6 @@ export async function index(input: string | RegistryOptions = DEFAULT_CATALOG) {
     const entry = validateCatalogEntry({
       ...normalized,
       poster: poster(stream),
-      preview: packageBlobUrl(base, man.id, runtime.digest),
       runtimeUrl: packageBlobUrl(base, man.id, runtime.digest),
       detailUrl: detailUrl(base, e.name),
       trust: {

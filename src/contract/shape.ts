@@ -80,7 +80,7 @@ export type LaunchStreamDocument = {
   records: LaunchStreamRecord[]
 }
 
-export type PackageFileRole = "runtime" | "source.base" | "source.clip" | "poster" | "preview" | "manifest" | string
+export type PackageFileRole = "runtime" | "source.base" | "source.clip" | "poster" | "manifest"
 
 export type PackageFileDescriptor = {
   path: string
@@ -133,7 +133,6 @@ export type EikonPackageManifest = {
     mode?: "none" | "partial" | "full" | string
   }
   poster?: string
-  preview?: string
   bundles?: Array<{ format: "zip" | string; role?: string; url: string; size?: number; digest?: string }>
   triggers?: TriggerRule[]
   extensions?: ExtensionSet
@@ -157,7 +156,6 @@ export type CatalogEntry = {
   glyph?: string
   tags?: string[]
   poster?: string
-  preview?: string
   runtimeUrl: string
   packageUrl: string
   detailUrl?: string
@@ -174,8 +172,6 @@ export type CatalogEntry = {
     runtimeEncoding?: RuntimeEncoding
     runtimeDecodedSize?: number
     runtimeDecodedDigest?: string
-    source?: string
-    digest?: string
   }
 }
 
