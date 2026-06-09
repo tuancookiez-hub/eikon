@@ -43,15 +43,18 @@
     }
   },
   "entrypoints": {
-    "default": "blobs/sha256/f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6"
+    "default": "blobs/sha256/23df2f6bba83c2db8ef580050b55e2f7a057122dbc5615639cf3377b008cbf49"
   },
   "files": [
     {
-      "path": "blobs/sha256/f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6",
+      "path": "blobs/sha256/23df2f6bba83c2db8ef580050b55e2f7a057122dbc5615639cf3377b008cbf49",
       "role": "runtime",
       "mediaType": "application/vnd.eikon.stream+jsonl",
-      "size": 1290412,
-      "digest": "sha256:f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6"
+      "size": 172082,
+      "digest": "sha256:23df2f6bba83c2db8ef580050b55e2f7a057122dbc5615639cf3377b008cbf49",
+      "encoding": "gzip",
+      "decodedSize": 1290412,
+      "decodedDigest": "sha256:f527b782d4fba18706faabbf681af43c8598bff1f5339bf4325f22a56be16bd6"
     },
     {
       "path": "blobs/sha256/fc7ec459ba9b6e434b9c402c54aaed0d86d26dccaaa8143ab75ac7adb20e8add",

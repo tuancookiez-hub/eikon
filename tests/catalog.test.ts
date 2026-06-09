@@ -10,7 +10,7 @@ import {
   searchCatalog,
   type CatalogIndexEntry,
 } from "../src/catalog"
-import { runtimeDescriptor } from "../src"
+import { decodeRuntimeFile, runtimeDescriptor } from "../src"
 
 const dir = resolve(import.meta.dir, "../eikons")
 let srv: ReturnType<typeof Bun.serve>
@@ -68,7 +68,7 @@ test("remote catalog: index + load round-trip over http", async () => {
 })
 
 test("lint: accepts valid launch streams, rejects missing author", async () => {
-  const good = await Bun.file(resolve(dir, "ares/ares.eikon")).text()
+  const good = decodeRuntimeFile(resolve(dir, "ares/ares.eikon"))
   expect(lint(good).meta.name).toBe("ares")
 
   const bad = good.replace('"author":{"name":"kaio"}', '"author":{}')
