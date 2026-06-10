@@ -264,16 +264,6 @@ function Preview(props: { selected: CatalogEntry; preview: PreviewState; frame: 
           <h2><span className="glyph">{props.selected.glyph ?? "⬡"}</span> {title}</h2>
           <p>{author}</p>
         </div>
-        <dl className="previewMeta" aria-label="Selected eikon metadata">
-          <div>
-            <dt>Title</dt>
-            <dd>{title}</dd>
-          </div>
-          <div>
-            <dt>Author</dt>
-            <dd>{author}</dd>
-          </div>
-        </dl>
         {loading ? <p className="previewStatus muted">Loading preview…</p> : null}
         <div className="previewOptions states">
           {CANONICAL_STATES.map(state => <button key={state} type="button" className={state === props.state ? "active" : ""} onClick={() => props.setState(state)}>{state}</button>)}

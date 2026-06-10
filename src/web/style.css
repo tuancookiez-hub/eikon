@@ -33,7 +33,6 @@ main { width: min(1440px, calc(100% - 32px)); min-width: 0; margin: 0 auto; padd
 .detailBody,
 .preview,
 .previewPanel,
-.previewMeta,
 .instructions,
 .card,
 .cardPreview,
@@ -192,17 +191,6 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   background: var(--panel);
 }
 .previewPanel * { min-width: 0; }
-.previewMeta { display: grid; margin: 0; }
-.previewMeta div {
-  display: grid;
-  grid-template-columns: 9ch minmax(0, 1fr);
-  gap: 16px;
-  padding: 7px 0;
-  border-top: 1px solid var(--line);
-}
-.previewMeta div:last-child { border-bottom: 1px solid var(--line); }
-.previewMeta dt { color: var(--dim); }
-.previewMeta dd { color: var(--text); overflow-wrap: anywhere; }
 .states { display: flex; flex-wrap: wrap; gap: 8px; }
 .states .active { border-color: var(--line-strong); background: #161616; }
 .previewStatus { margin-top: -2px; }
@@ -277,7 +265,6 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .detail.drawer-peek .drawerExtras,
   .detail.drawer-peek .previewStatus { display: none; }
   .detail.drawer-peek .previewOptions { display: none; }
-  .detail.drawer-peek .previewMeta { display: none; }
   .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .states button { padding-left: 8px; padding-right: 8px; }
 }
