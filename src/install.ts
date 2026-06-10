@@ -173,10 +173,8 @@ function manifest(value: unknown): EikonPackageManifest {
 }
 
 function installManifest(man: EikonPackageManifest, origin: Origin): EikonPackageManifest & { origin: Origin } {
-  const { license: _license, provenance: _provenance, review: _review, reviewer: _reviewer, bundles: _bundles, legacy: _legacy, ...clean } = man as Record<string, unknown>
-  const next = { ...(clean as EikonPackageManifest), origin }
-  if (next.compatibility) delete (next.compatibility as Record<string, unknown>).hosts
-  return next
+  const { license: _license, provenance: _provenance, ...clean } = man as Record<string, unknown>
+  return { ...(clean as EikonPackageManifest), origin }
 }
 
 const gitish = (s: string) => {

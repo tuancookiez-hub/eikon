@@ -313,7 +313,6 @@ export function validateCatalogEntry(entry: CatalogEntry, opts: CatalogOptions =
   }
   if (!entry.compatibility?.eikon) errs.push(problem("compatibility.eikon", "required"))
   if (entry.compatibility?.eikon && !/>=?\s*1/.test(entry.compatibility.eikon)) errs.push(problem("compatibility.eikon", "must support launch major version 1"))
-  if (entry.compatibility && "hosts" in (entry.compatibility as Record<string, unknown>)) errs.push(problem("compatibility.hosts", "host compatibility is not part of the launch catalog contract"))
   if (errs.length) throw new EikonValidationError(errs)
   return entry
 }

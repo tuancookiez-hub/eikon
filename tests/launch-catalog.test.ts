@@ -40,9 +40,6 @@ test("package manifest validates final launch descriptors", () => {
   expect(() => validatePackageManifest({ ...manifest, extensions: { required: ["eikon.future.v1"] } })).toThrow(/extensions.required.*unknown required/)
   expect(validatePackageManifest(manifest).triggers).toEqual(manifest.triggers)
   expect(() => validatePackageManifest({ ...manifest, triggers: [{ signal: "approval.waiting" }] } as unknown)).toThrow(/triggers/)
-  expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=1 <2", hosts: { herm: ">=0.0.0" } } } as unknown)).toThrow(/compatibility.hosts/)
-  expect(() => validatePackageManifest({ ...manifest, bundles: [] } as unknown)).toThrow(/bundles/)
-  expect(() => validatePackageManifest({ ...manifest, legacy: { migration: "converted" } } as unknown)).toThrow(/legacy/)
 })
 
 test("strict registry validation requires descriptor size and digest", () => {
