@@ -18,7 +18,7 @@
       "available": true
     },
     "trust": {
-      "manifestDigest": "sha256:3011f2e52d43e146f506e5e4497169895d2fba1c66f4e8e68c1c454897e97279",
+      "manifestDigest": "sha256:52c34c6122dab28aedfd3422eb211ba167cd52156e35f2c05669ab7c6b66b33d",
       "runtimeDigest": "sha256:23df2f6bba83c2db8ef580050b55e2f7a057122dbc5615639cf3377b008cbf49",
       "runtimeSize": 172082,
       "runtimeEncoding": "gzip",
@@ -45,7 +45,7 @@
       "available": true
     },
     "trust": {
-      "manifestDigest": "sha256:3350505b61535775d14011a9bd3eecadb418c34a1eb7b1261620cf97d4e20714",
+      "manifestDigest": "sha256:076b98be70632739b33517d336002562b9752ecb51e287d21abe073912fe3023",
       "runtimeDigest": "sha256:51577c51bf90641911392007cc3b138c2cfb3447ad5667204bd1c8be714183d8",
       "runtimeSize": 55621,
       "runtimeEncoding": "gzip",
@@ -72,7 +72,7 @@
       "available": true
     },
     "trust": {
-      "manifestDigest": "sha256:4703623c3ac2f0930698bd906525824c4e5be358c6f200fd68f13e65b6a6c152",
+      "manifestDigest": "sha256:f0f49fb8a5baef97af50f31811c96061c5aa1cfdaea6987c8458d39e7bfe4ac3",
       "runtimeDigest": "sha256:6a74e9ae20ecafe6cf268230272582ef618b31927cd13e11ce59ed8931413883",
       "runtimeSize": 139822,
       "runtimeEncoding": "gzip",

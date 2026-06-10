@@ -241,7 +241,7 @@ function fromPackage(input: PackageCatalogEntry, root?: string, opts: CatalogOpt
     runtimeUrl,
     packageUrl,
     detailUrl: input.detailUrl ? url(input.detailUrl, base) : undefined,
-    compatibility: { eikon: man.compatibility.eikon, hosts: man.compatibility.hosts, available: true },
+    compatibility: { eikon: man.compatibility.eikon, available: true },
     trust: {
       manifestDigest: input.trust?.manifestDigest ?? digestFor(man, "manifest.json"),
       runtimeDigest: input.trust?.runtimeDigest ?? desc?.digest,

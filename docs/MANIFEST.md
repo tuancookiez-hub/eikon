@@ -8,7 +8,7 @@ The package manifest is the launch install/edit/source contract for an eikon. It
 
 Older source-only manifests are still accepted by explicit migration/conversion tooling during conversion. Normal install/package readers reject source-only manifests and require the launch manifest below.
 
-Launch public shapes do not define first-class `license`, `provenance`, `review`, or `reviewer` metadata fields. Legacy readers may reject, strip, or report those fields during migration, but packages, catalog entries, platform metadata, and publish payloads should not expose them as active data.
+Launch public shapes do not define first-class `license`, `provenance`, `review`, or `reviewer` metadata fields. Migration/conversion tooling may reject, strip, or report those fields, but packages, catalog entries, platform metadata, and publish payloads should not expose them as active data.
 
 ## Minimal manifest
 
@@ -44,8 +44,7 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
     "tags": ["monochrome"]
   },
   "compatibility": {
-    "eikon": ">=1 <2",
-    "hosts": { "herm": ">=0.0.0" }
+    "eikon": ">=1 <2"
   },
   "entrypoints": {
     "default": "streams/nous.eikon"
@@ -67,20 +66,12 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
     "mode": "full"
   },
   "poster": "posters/default.png",
-  "bundles": [
-    { "format": "zip", "role": "full-source-export", "url": "downloads/liftaris-nous-1.0.0.zip", "size": 999999, "digest": "sha256:..." }
-  ],
   "triggers": [
     { "signal": "approval.waiting", "when": "reserved.host-rule", "fallback": "state.thinking" }
   ],
   "extensions": {
     "used": ["eikon.triggers.v1"],
     "required": []
-  },
-  "legacy": {
-    "sourceFormat": "pre-launch .eikon draft",
-    "migration": "converted",
-    "notes": ["legacy draft metadata normalized for the launch contract"]
   }
 }
 ```
@@ -96,20 +87,17 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
 | `version` | yes for registry packages | Package content version. Registry-published versions should be immutable. |
 | `display` | no | Human-facing title, author, glyph, description, and tags. Display text is untrusted. |
 | `compatibility.eikon` | yes | Eikon contract range, for example `>=1 <2`. |
-| `compatibility.hosts` | no | Optional host ranges. Host incompatibility must not affect generic stream rendering. |
 | `entrypoints.default` | yes | Relative path to the default launch `.eikon` stream. |
 | `files` | yes for registry packages | Relative file descriptors with role, media type, size, and digest. Registry-served remote files require `size` and `digest`; gzip runtime descriptors also require `encoding`, `decodedSize`, and `decodedDigest`. |
 | `source` | no | Optional editable source-media map. `source.base` and `source.states.<state>.file` point to package-relative files already covered by `files` descriptors when published through the registry. Runtime playback must not depend on these source files. |
 | `editability` | no | Whether editable source/project files are included and how complete they are. |
 | `poster` | no | Relative cached poster asset for cheap grid/catalog display. Standalone `.eikon` posters are derived from frames. |
-| `bundles` | no | Optional generated import/export/offline bundles such as ZIP. Bundles are not the canonical install protocol. |
 | `triggers` | no | Reserved optional trigger-rule extension data. Trigger support is not required for launch playback. |
 | `extensions` | no | Optional and required extension declarations. |
-| `legacy` | no | Migration notes for packages derived from pre-launch `.eikon` drafts. |
 
-All file paths are package-relative. Human-authored/local manifests may use descriptive paths such as `streams/nous.eikon`; registry-normalized packages usually rewrite referenced files to content-addressed paths such as `blobs/sha256/<digest>`. Package readers and registry tooling must reject parent escapes, absolute paths, private/file URLs in remote contexts, symlinks/special files in archive imports, and unsafe metadata before rendering or installing.
+All file paths are package-relative. Human-authored/local manifests may use descriptive paths such as `streams/nous.eikon`; registry-normalized packages usually rewrite referenced files to content-addressed paths such as `blobs/sha256/<digest>`. Package readers and registry tooling must reject parent escapes, absolute paths, private/file URLs in remote contexts, symlinks/special files, and unsafe metadata before rendering or installing.
 
-Runtime descriptor identity is byte-exact. `size` and `digest` always describe the stored artifact bytes at `path`, whether those bytes are identity NDJSON or gzip-compressed NDJSON. `encoding` may be omitted for legacy identity descriptors and is otherwise `identity` or `gzip`. For registry gzip runtime descriptors, `decodedSize` and `decodedDigest` describe the UTF-8 NDJSON after explicit gzip decompression and are required with stored `size`/`digest`.
+Runtime descriptor identity is byte-exact. `size` and `digest` always describe the stored artifact bytes at `path`, whether those bytes are identity NDJSON or gzip-compressed NDJSON. `encoding` may be omitted for identity descriptors and is otherwise `identity` or `gzip`. For registry gzip runtime descriptors, `decodedSize` and `decodedDigest` describe the UTF-8 NDJSON after explicit gzip decompression and are required with stored `size`/`digest`.
 
 Digest-addressed gzip runtime blobs must be served as raw bytes. Do not set HTTP `Content-Encoding: gzip` on `blobs/sha256/<digest>` responses; clients fetch `arrayBuffer()`, verify stored-byte identity, then decompress according to descriptor metadata.
 
@@ -136,12 +124,12 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
   "runtimeUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/blobs/sha256/<runtime-digest>",
   "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous/1.0.0.json",
   "detailUrl": "https://eikon.liftaris.dev/eikons/liftaris/nous",
-  "compatibility": { "eikon": ">=1 <2", "hosts": { "herm": ">=0.0.0" }, "available": true },
+  "compatibility": { "eikon": ">=1 <2", "available": true },
   "trust": { "manifestDigest": "sha256:...", "runtimeDigest": "sha256:...", "runtimeSize": 12345, "runtimeEncoding": "gzip", "runtimeDecodedSize": 123456, "runtimeDecodedDigest": "sha256:..." }
 }
 ```
 
-Catalog clients may search by `name`, `title`, `author`, and `tags`. Installed-state matching should prefer validated registry identity, version, source key, and digest. Name-only matching is a local legacy migration fallback and must not decide remote install/active state.
+Catalog clients may search by `name`, `title`, `author`, and `tags`. Installed-state matching should prefer validated registry identity, version, source key, and digest. Name-only matching must not decide remote install/active state.
 
 `poster` in a catalog entry is cheap display data, normally an inline text poster for terminal-native grids and browser cards. `runtimeUrl` is the fetchable live-preview/runtime URL.
 
@@ -152,7 +140,6 @@ registry.json
 packages/<namespace>/<name>/index.json
 packages/<namespace>/<name>/<version>.json
 packages/<namespace>/<name>/blobs/sha256/<digest>
-downloads/<namespace>-<name>-<version>.zip
 ```
 
 Inside a published package manifest, descriptor paths remain package-relative (`blobs/sha256/<digest>`). Catalog URLs expand those paths under the package root (`packages/<namespace>/<name>/blobs/sha256/<digest>`). A root-level `blobs/` mirror is not part of the launch registry shape unless a future registry explicitly chooses global deduplication.
@@ -190,14 +177,6 @@ Reserved launch/future extension names:
 - `eikon.decorators.v1`
 - `eikon.layers.v1`
 
-## Archive import/export
-
-Archives are convenience transports, not the canonical package protocol. Registry upload, Studio export, offline transfer, and “download all” may use ZIP bundles, but a registry should validate and normalize the uploaded contents into package manifests plus registry-controlled files/blobs.
-
-Archive import must reject path traversal, absolute paths, symlinks, hardlinks, special files, unsafe file modes, nested archive surprises, excessive file counts, oversized files, and decompression bombs. Uploaded manifests must not preserve arbitrary external URLs; registry tooling should rewrite descriptors to registry-controlled paths and recompute sizes/digests.
-
-ORAS/OCI is not an active launch dependency. The descriptor model should stay transport-neutral enough to map elsewhere later, but current launch direction is shadcn-like static/dynamic HTTPS registries.
-
 ## Legacy manifest migration
 
 The previous source-only manifest shape described editable source media only:
@@ -212,7 +191,7 @@ The previous source-only manifest shape described editable source media only:
 }
 ```
 
-Installers and migration tools may read that legacy shape only to preserve existing assets during conversion. Launch migration should produce an `eikon.package` manifest and report moved/dropped metadata:
+Migration tools may read that legacy shape only to preserve existing assets during conversion. Normal package readers and installers reject it. Launch migration should produce an `eikon.package` manifest and report moved/dropped metadata outside the package manifest:
 
 - `eikon_requires` becomes `compatibility.eikon`.
 - source and state media move under file descriptors and optional editability metadata.

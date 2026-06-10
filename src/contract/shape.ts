@@ -120,7 +120,6 @@ export type EikonPackageManifest = {
   }
   compatibility: {
     eikon: string
-    hosts?: Record<string, string>
   }
   entrypoints: {
     default: string
@@ -133,14 +132,8 @@ export type EikonPackageManifest = {
     mode?: "none" | "partial" | "full" | string
   }
   poster?: string
-  bundles?: Array<{ format: "zip" | string; role?: string; url: string; size?: number; digest?: string }>
   triggers?: TriggerRule[]
   extensions?: ExtensionSet
-  legacy?: {
-    sourceFormat?: "pre-launch .eikon draft" | ".eikon" | string
-    migration?: "adapt" | "converted" | string
-    notes?: string[]
-  }
 }
 
 export type CatalogEntry = {
@@ -161,7 +154,6 @@ export type CatalogEntry = {
   detailUrl?: string
   compatibility: {
     eikon: string
-    hosts?: Record<string, string>
     available?: boolean
     reason?: string
   }

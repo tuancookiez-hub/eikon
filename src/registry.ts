@@ -327,7 +327,6 @@ export function manifest(opts: RegistryOptions = {}) {
       version: "1.0.0",
       display: displayFrom(prior, launch, e.name),
       compatibility: { eikon: ">=1 <2" },
-      legacy: migrated ? { sourceFormat: "pre-launch .eikon draft", migration: "converted", notes: migrated.warnings } : (prior.legacy as EikonPackageManifest["legacy"] | undefined),
     } satisfies Omit<EikonPackageManifest, "entrypoints" | "files" | "source">
 
     const localManifest: EikonPackageManifest = {

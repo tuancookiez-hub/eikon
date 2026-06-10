@@ -12,13 +12,6 @@
   "compatibility": {
     "eikon": ">=1 <2"
   },
-  "legacy": {
-    "sourceFormat": "pre-launch .eikon draft",
-    "migration": "converted",
-    "notes": [
-      "moved legacy metadata: author, created, source_url"
-    ]
-  },
   "source": {
     "base": "blobs/sha256/8c4dc411ca159253cc90fa31f5263799054592e6eaeb4e5c99881c8cac29e67b",
     "states": {
