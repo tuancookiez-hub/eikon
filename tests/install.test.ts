@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, utimes
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { spawnSync } from "node:child_process"
-import { resolve, install, peek, entries, dirty } from "../src/install"
+import { resolve, install, peek, entries, dirty, downloadBytes } from "../src/install"
 import { decodeRuntimeBytes, runtimeDescriptor, sha256Bytes } from "../src"
 
 const root = mkdtempSync(join(tmpdir(), "eikon-install-"))
@@ -13,7 +13,7 @@ function body(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 }
 
-const man = (name: string, extra = {}) => JSON.stringify({
+const legacyMan = (name: string, extra = {}) => JSON.stringify({
   name, version: 1, source: "base.png",
   states: { idle: { file: "idle.mp4" }, error: { file: "error.mp4" } }, ...extra,
 }, null, 2)
@@ -23,18 +23,22 @@ const launch = [
   JSON.stringify({ type: "clip", name: "idle", fps: 12, frameCount: 1 }),
   JSON.stringify({ type: "frame", clip: "idle", index: 0, rows: ["abcd", "efgh"] }),
 ].join("\n") + "\n"
+const launchBytes = new TextEncoder().encode(launch)
+const baseBytes = Buffer.from([137, 80, 78, 71])
+const idleBytes = Buffer.alloc(1024)
 
 const pkg = (name: string) => JSON.stringify({
   kind: "eikon.package",
   schemaVersion: "1.0",
   id: `liftaris/${name}`,
   name,
+  version: "1.0.0",
   compatibility: { eikon: ">=1 <2" },
   entrypoints: { default: `streams/${name}.eikon` },
   files: [
-    { path: `streams/${name}.eikon`, role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl" },
-    { path: "source/base.png", role: "source.base", mediaType: "image/png" },
-    { path: "source/idle.mp4", role: "source.clip", mediaType: "video/mp4", signal: "state.idle" },
+    { path: `streams/${name}.eikon`, role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: launchBytes.length, digest: sha256Bytes(launchBytes) },
+    { path: "source/base.png", role: "source.base", mediaType: "image/png", size: baseBytes.length, digest: sha256Bytes(baseBytes) },
+    { path: "source/idle.mp4", role: "source.clip", mediaType: "video/mp4", signal: "state.idle", size: idleBytes.length, digest: sha256Bytes(idleBytes) },
   ],
   source: { base: "source/base.png", states: { idle: { file: "source/idle.mp4" } } },
 }, null, 2)
@@ -63,22 +67,23 @@ function gzipPkg(name: string, info = runtimeDescriptor(launch, { encoding: "gzi
 
 function seed(dir: string, name: string, extra = {}) {
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, "manifest.json"), man(name, extra))
-  writeFileSync(join(dir, "base.png"), Buffer.from([137, 80, 78, 71]))
-  writeFileSync(join(dir, "idle.mp4"), Buffer.alloc(1024))
-  writeFileSync(join(dir, "error.mp4"), Buffer.alloc(512))
+  mkdirSync(join(dir, "streams"), { recursive: true })
+  mkdirSync(join(dir, "source"), { recursive: true })
+  writeFileSync(join(dir, "manifest.json"), JSON.stringify({ ...JSON.parse(pkg(name)), ...extra }, null, 2))
+  writeFileSync(join(dir, "streams", `${name}.eikon`), launch)
+  writeFileSync(join(dir, "source", "base.png"), baseBytes)
+  writeFileSync(join(dir, "source", "idle.mp4"), idleBytes)
 }
 
 describe("entries", () => {
-  test("eikon shape + legacy files[]", () => {
-    expect(entries(JSON.parse(man("x")))).toEqual([["base", "base.png"], ["idle", "idle.mp4"], ["error", "error.mp4"]])
-    expect(entries({ files: ["base.png", "thinking.png", "odd.jpg"] }))
-      .toEqual([["base", "base.png"], ["thinking", "thinking.png"], ["base", "odd.jpg"]])
-  })
-
   test("launch package source descriptors map to editable source roles", () => {
     expect(entries(JSON.parse(pkg("launch"))))
       .toEqual([["base", "source/base.png"], ["idle", "source/idle.mp4"]])
+  })
+
+  test("source-only legacy manifests are not normal install input", () => {
+    expect(() => entries(JSON.parse(legacyMan("x")))).toThrow(/eikon\.package/)
+    expect(() => entries({ files: ["base.png", "thinking.png", "odd.jpg"] })).toThrow(/eikon\.package/)
   })
 })
 
@@ -98,10 +103,10 @@ describe("resolve + install: local dir", () => {
     let seen = 0
     const out = await install(src, dest, { progress: () => seen++ })
     expect(out.dir).toBe(join(dest, "ares"))
-    expect(out.n).toBe(3)
-    expect(out.bytes).toBe(4 + 1024 + 512)
-    expect(seen).toBe(3)
-    expect(out.sources).toEqual({ base: "base.png", idle: "idle.mp4", error: "error.mp4" })
+    expect(out.n).toBe(2)
+    expect(out.bytes).toBe(4 + 1024)
+    expect(seen).toBe(2)
+    expect(out.sources).toEqual({ base: "base.png", idle: "idle.mp4" })
     expect(existsSync(join(out.dir, "source", "idle.mp4"))).toBe(true)
     const m = JSON.parse(readFileSync(join(out.dir, "manifest.json"), "utf8"))
     expect(m.origin.source).toBe(src)
@@ -109,7 +114,7 @@ describe("resolve + install: local dir", () => {
 
   test("--no-source skips media but still writes manifest", async () => {
     const out = await install(src, dest, { name: "ares-lite", media: false })
-    expect(out.n).toBe(3); expect(out.bytes).toBe(0)
+    expect(out.n).toBe(2); expect(out.bytes).toBe(0)
     expect(existsSync(join(out.dir, "source", "idle.mp4"))).toBe(false)
     expect(existsSync(join(out.dir, "manifest.json"))).toBe(true)
   })
@@ -118,13 +123,22 @@ describe("resolve + install: local dir", () => {
     const a = peek(src), b = peek(src)
     expect(a).toBe(b)
     const r = await a
-    expect(r!.n).toBe(3)
-    expect(r!.bytes).toBe(4 + 1024 + 512)
+    expect(r!.n).toBe(2)
+    expect(r!.bytes).toBe(4 + 1024)
   })
 
-  test("eikon_requires gate", async () => {
-    const bad = join(root, "future"); seed(bad, "future", { eikon_requires: ">=99" })
-    await expect(install(bad, dest)).rejects.toThrow(/eikon_requires/)
+  test("package compatibility gate", async () => {
+    const bad = join(root, "future"); seed(bad, "future", { compatibility: { eikon: ">=99" } })
+    await expect(install(bad, dest)).rejects.toThrow(/compatibility\.eikon/)
+  })
+
+  test("source-only legacy manifests are rejected before media copy", async () => {
+    const bad = join(root, "legacy-escape")
+    mkdirSync(bad, { recursive: true })
+    writeFileSync(join(root, "secret.txt"), "SECRET")
+    writeFileSync(join(bad, "manifest.json"), legacyMan("legacy", { source: "../secret.txt" }))
+    await expect(install(bad, dest)).rejects.toThrow(/eikon\.package/)
+    expect(existsSync(join(dest, "legacy"))).toBe(false)
   })
 
   test("install name rejects path escapes", async () => {
@@ -164,9 +178,10 @@ describe("resolve + install: http base", () => {
   beforeAll(() => {
     srv = Bun.serve({ port: 0, fetch(req) {
       const p = new URL(req.url).pathname
-      if (p.endsWith("manifest.json")) return new Response(man("remote"))
-      if (p.endsWith("base.png")) return new Response(new Uint8Array(4), { headers: { "content-length": "4" } })
-      if (p.endsWith(".mp4")) return new Response(new Uint8Array(1000), { headers: { "content-length": "1000" } })
+      if (p.endsWith("manifest.json")) return new Response(pkg("remote"))
+      if (p.endsWith("remote.eikon")) return new Response(launch, { headers: { "content-length": String(Buffer.byteLength(launch)) } })
+      if (p.endsWith("base.png")) return new Response(baseBytes, { headers: { "content-length": String(baseBytes.length) } })
+      if (p.endsWith(".mp4")) return new Response(idleBytes, { headers: { "content-length": String(idleBytes.length) } })
       return new Response("404", { status: 404 })
     }})
     url = `http://localhost:${srv.port}/x/`
@@ -183,15 +198,20 @@ describe("resolve + install: http base", () => {
     expect(r.name).toBe("remote"); expect(r.base).toBe(url); expect(r.staged).toBe("")
   })
 
+  test("resolve() accepts explicit pkg: package URL specs", async () => {
+    const r = await resolve(`pkg:${url}manifest.json`)
+    expect(r.name).toBe("remote"); expect(r.base).toBe(url); expect(r.origin.sourceKey).toBe(`package:${url}manifest.json`)
+  })
+
   test("install() fetches each file in parallel", async () => {
     const out = await install(url, dest)
-    expect(out.n).toBe(3); expect(out.bytes).toBe(2004)
+    expect(out.n).toBe(2); expect(out.bytes).toBe(1028)
     expect(existsSync(join(dest, "remote", "source", "idle.mp4"))).toBe(true)
   })
 
   test("peek() HEADs content-length", async () => {
     const r = await peek(url)
-    expect(r!.bytes).toBe(2004)
+    expect(r!.bytes).toBe(1028)
   })
 })
 
@@ -330,7 +350,7 @@ describe("resolve + install: launch package", () => {
 
 describe("dirty()", () => {
   test("false right after install; true after touching a file", async () => {
-    const src = join(root, "d"); seed(src, "d")
+    const src = join(root, "dirty"); seed(src, "dirty")
     const out = await install(src, dest)
     expect(dirty(out.dir)).toBe(false)
     // Bump a file's mtime past origin.at + 2s guard.
@@ -348,8 +368,10 @@ describe("resolve: catalog name", () => {
       const p = new URL(req.url).pathname
       if (p === "/eikons/index.json")
         return Response.json([{ name: "ares" }])
-      if (p === "/eikons/ares/manifest.json") return new Response(man("ares"))
-      if (p.startsWith("/eikons/ares/")) return new Response(new Uint8Array(100), { headers: { "content-length": "100" } })
+      if (p === "/eikons/ares/manifest.json") return new Response(pkg("ares"))
+      if (p === "/eikons/ares/streams/ares.eikon") return new Response(launch)
+      if (p === "/eikons/ares/source/base.png") return new Response(baseBytes)
+      if (p === "/eikons/ares/source/idle.mp4") return new Response(idleBytes)
       return new Response("404", { status: 404 })
     }})
     base = `http://localhost:${srv.port}/eikons`
@@ -358,8 +380,9 @@ describe("resolve: catalog name", () => {
 
   test("bare name → catalog → source URL → install", async () => {
     const out = await install("ares", dest, { name: "ares-cat", catalog: base })
-    expect(out.n).toBe(3)
-    expect(out.origin.source).toMatch(/\/eikons\/ares\/manifest\.json$/)
+    expect(out.n).toBe(2)
+    expect(out.origin.source).toBe("ares")
+    expect(out.origin.packageUrl).toMatch(/\/eikons\/ares\/manifest\.json$/)
   })
 
   test("unknown name throws", async () => {

@@ -47,7 +47,6 @@ const entry: CatalogEntry = {
   glyph: "⬡",
   tags: ["loop"],
   poster: "A",
-  preview: `https://eikon.liftaris.dev${runtimePath}`,
   runtimeUrl: `https://eikon.liftaris.dev${runtimePath}`,
   packageUrl: "https://eikon.liftaris.dev/packages/liftaris/cycle/1.0.0.json",
   detailUrl: "https://eikon.liftaris.dev/eikons/cycle",

@@ -1,5 +1,6 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { dirname, join, relative } from "node:path"
+import { tmpdir } from "node:os"
 import { createHash } from "node:crypto"
 import { DEFAULT_CATALOG } from "./ui/spec"
 import { poster } from "./ui/eikon"
@@ -22,6 +23,8 @@ export type RegistryOptions = {
   base?: string
   encoding?: RuntimeEncoding
 }
+
+export type FreshnessResult = { ok: boolean; diffs: string[] }
 
 const root = (opts: RegistryOptions = {}) => {
   if (opts.root) return opts.root
@@ -217,7 +220,6 @@ export async function index(input: string | RegistryOptions = DEFAULT_CATALOG) {
     const entry = validateCatalogEntry({
       ...normalized,
       poster: poster(stream),
-      preview: packageBlobUrl(base, man.id, runtime.digest),
       runtimeUrl: packageBlobUrl(base, man.id, runtime.digest),
       detailUrl: detailUrl(base, e.name),
       trust: {
@@ -231,6 +233,57 @@ export async function index(input: string | RegistryOptions = DEFAULT_CATALOG) {
   out.sort((a, b) => a.name.localeCompare(b.name))
   await Bun.write(join(dir, "index.json"), JSON.stringify(out, null, 2) + "\n")
   return out.length
+}
+
+function walk(dir: string, base = dir): string[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir, { withFileTypes: true }).flatMap(item => {
+    const path = join(dir, item.name)
+    if (item.isDirectory()) return walk(path, base)
+    if (!item.isFile()) return []
+    return [relative(base, path)]
+  }).sort()
+}
+
+function sameFile(a: string, b: string): boolean {
+  if (!existsSync(a) || !existsSync(b)) return false
+  const left = readFileSync(a)
+  const right = readFileSync(b)
+  return left.length === right.length && left.every((byte, i) => byte === right[i])
+}
+
+export async function verifyArtifacts(opts: RegistryOptions = {}): Promise<FreshnessResult> {
+  const srcRoot = root(opts)
+  const srcSite = siteRoot(opts)
+  const tmp = mkdtempSync(join(tmpdir(), "eikon-fresh-"))
+  const tmpRoot = join(tmp, "eikons")
+  const tmpSite = dirname(tmpRoot)
+  const diffs: string[] = []
+  try {
+    cpSync(srcRoot, tmpRoot, { recursive: true })
+    manifest({ ...opts, root: tmpRoot, encoding: opts.encoding ?? "gzip" })
+    await index({ ...opts, root: tmpRoot })
+    mkdirSync(join(tmpSite, "dist", "web"), { recursive: true })
+    cpSync(tmpRoot, join(tmpSite, "dist", "web", "eikons"), { recursive: true })
+    cpSync(join(tmpSite, "packages"), join(tmpSite, "dist", "web", "packages"), { recursive: true })
+    const roots = ["eikons", "packages", ...(existsSync(join(srcSite, "dist", "web")) ? ["dist/web/eikons", "dist/web/packages"] : [])]
+    for (const rel of roots) {
+      const a = join(srcSite, rel)
+      const b = join(tmpSite, rel)
+      if ((existsSync(a) && statSync(a).isFile()) || (existsSync(b) && statSync(b).isFile())) {
+        if (!sameFile(a, b)) diffs.push(rel)
+        continue
+      }
+      const left = walk(a).map(file => join(rel, file))
+      const right = walk(b).map(file => join(rel, file))
+      for (const file of new Set([...left, ...right])) {
+        if (!sameFile(join(srcSite, file), join(tmpSite, file))) diffs.push(file)
+      }
+    }
+    return { ok: diffs.length === 0, diffs }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
 }
 
 export function manifest(opts: RegistryOptions = {}) {

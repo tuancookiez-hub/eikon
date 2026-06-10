@@ -21,10 +21,8 @@ const manifest: EikonPackageManifest = {
   files: [
     { path: "streams/nous.eikon", role: "runtime", mediaType: LAUNCH_MEDIA_TYPE, size: 123, digest: "sha256:runtime" },
     { path: "poster.txt", role: "poster", mediaType: "text/plain", size: 4, digest: "sha256:poster" },
-    { path: "preview.mp4", role: "preview", mediaType: "video/mp4", size: 42, digest: "sha256:preview" },
   ],
   poster: "poster.txt",
-  preview: "preview.mp4",
   triggers: [{ signal: "approval.waiting", when: "reserved.host-rule", fallback: "state.thinking" }],
   extensions: { used: ["eikon.triggers.v1"], required: [] },
 }
@@ -32,7 +30,7 @@ const manifest: EikonPackageManifest = {
 test("package manifest validates final launch descriptors", () => {
   const validated = validatePackageManifest(manifest, { registry: true })
   expect(validated.entrypoints.default).toBe("streams/nous.eikon")
-  expect(validated.files?.map(file => file.role)).toEqual(["runtime", "poster", "preview"])
+  expect(validated.files?.map(file => file.role)).toEqual(["runtime", "poster"])
   expect(() => validatePackageManifest({ ...manifest, schemaVersion: undefined })).toThrow(/schemaVersion/)
   expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=2 <3" } })).toThrow(/compatibility.eikon/)
   expect(() => validatePackageManifest({ ...manifest, entrypoints: { default: "../escape.eikon" } })).toThrow(/entrypoints.default.*safe relative path/)
@@ -77,7 +75,7 @@ test("enriched package registry entries normalize to final catalog entries", () 
   expect(entry.title).toBe("Nous")
   expect(entry.author).toBe("Liftaris")
   expect(entry.poster).toBe("https://example.test/packages/liftaris/nous/poster.txt")
-  expect(entry.preview).toBe("https://example.test/packages/liftaris/nous/preview.mp4")
+  expect(entry).not.toHaveProperty("preview")
   expect(entry.runtimeUrl).toBe("https://example.test/packages/liftaris/nous/streams/nous.eikon")
   expect(entry.packageUrl).toBe("https://example.test/packages/liftaris/nous/1.0.0.json")
   expect(entry.compatibility.available).toBe(true)
@@ -150,7 +148,7 @@ test("checked-in public index points launch package runtimes under the catalog b
     expect(entry.id).toMatch(/^liftaris\//)
     expect(entry.packageUrl).toMatch(/^https:\/\/eikon\.liftaris\.dev\/packages\/[^/]+\/[^/]+\/[^/]+\.json$/)
     expect(entry.runtimeUrl).toMatch(/^https:\/\/eikon\.liftaris\.dev\/packages\/[^/]+\/[^/]+\/blobs\/sha256\/[a-f0-9]{64}$/)
-    expect(entry.preview).toBe(entry.runtimeUrl)
+    expect(entry).not.toHaveProperty("preview")
     expect(entry.compatibility.eikon).toBe(">=1 <2")
   }
 })

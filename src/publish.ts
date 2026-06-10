@@ -63,9 +63,16 @@ function add(root: string, rel: string, out: Map<string, BundleFile>, opts: Bund
   if (!existsSync(path.abs)) throw new Error(`submission bundle missing source: ${path.rel}`)
   if (!opts.allowHidden && hidden(path.rel)) return
   if (!opts.allowSecrets && secret(path.rel)) return
+  const parts = path.rel.split("/")
+  let cur = root
+  for (const part of parts) {
+    cur = join(cur, part)
+    const st = lstatSync(cur)
+    if (st.isSymbolicLink()) throw new Error(`submission bundle symlink unsupported: ${path.rel}`)
+    if (part !== parts.at(-1) && !st.isDirectory()) return
+    if (part === parts.at(-1) && !st.isFile()) return
+  }
   const st = lstatSync(path.abs)
-  if (st.isSymbolicLink()) throw new Error(`submission bundle symlink unsupported: ${path.rel}`)
-  if (!st.isFile()) return
   const bytes = st.size
   out.set(path.rel, { path: path.rel, abs: path.abs, bytes })
 }
@@ -105,7 +112,7 @@ export async function previewSubmitBundle(opts: BundleOpts): Promise<SubmitBundl
     height: eikon.meta.height,
     poster: poster(eikon),
     source: `${eikon.meta.name}/`,
-    preview_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
+    runtime_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
     package_url: manifest ? `${eikon.meta.name}/manifest.json` : undefined,
   }, "https://eikon.liftaris.dev/eikons/", { allowPrivate: true })
   return { root, packed, files, meta: eikon.meta, ...(manifest ? { manifest } : {}), catalog }

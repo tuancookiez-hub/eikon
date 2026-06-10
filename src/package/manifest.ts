@@ -109,7 +109,6 @@ export function validatePackageManifest(value: unknown, opts: PackageValidationO
   }
   for (const ext of man.extensions?.required ?? []) errs.push(problem("extensions.required", `unknown required Eikon extension ${ext}`))
   if (man.poster && !isSafeRelativePath(man.poster)) errs.push(problem("poster", "safe relative path required"))
-  if (man.preview && !isSafeRelativePath(man.preview)) errs.push(problem("preview", "safe relative path required"))
   for (const bundle of man.bundles ?? []) {
     if (!bundle || typeof bundle !== "object" || typeof bundle.url !== "string") errs.push(problem("bundles.url", "bundle URL required"))
   }

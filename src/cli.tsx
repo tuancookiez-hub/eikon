@@ -5,7 +5,7 @@ import { resolve, basename, join } from "node:path"
 import { homedir } from "node:os"
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs"
 import { parse, poster } from "./ui/eikon"
-import { lint, lintManifest, type Manifest } from "./ui/lint"
+import { lint, lintManifest } from "./ui/lint"
 import { resolve as resolveInstall, install, dirty, verifyPackageFiles, TRUST_STATES, type Origin, type TrustState } from "./install"
 import { pack } from "./pack"
 import * as reg from "./registry"
@@ -13,10 +13,11 @@ import { Browser } from "./browse/Browser"
 import { local, resolve as cat } from "./browse/catalog"
 import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
-import { PACKAGE_KIND } from "./contract/shape"
+import { PACKAGE_KIND, type EikonPackageManifest } from "./contract/shape"
 import { validatePackageManifest } from "./package/manifest"
 import { loadCatalogEntries, searchCatalogEntries } from "./catalog"
 import { decodeRuntimeFile, writeRuntimeFile } from "./stream"
+import { summarizeLifecycle, updatePlan } from "./lifecycle"
 
 const REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 const profileRoot = () => process.env.HERM_CONFIG_DIR ?? join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "herm")
@@ -87,17 +88,26 @@ function installedNames() {
   return readdirSync(root(), { withFileTypes: true }).filter(e => e.isDirectory() && existsSync(join(root(), e.name, "manifest.json"))).map(e => e.name).sort()
 }
 
-function trustOf(man: Manifest & { files?: unknown[] }, dir: string): TrustState {
-  const originTrust = (man as { origin?: { trust?: TrustState } }).origin?.trust
+type InstalledManifest = Record<string, unknown> & {
+  name?: string
+  version?: string | number
+  display?: { title?: string; author?: string }
+  origin?: Origin
+  files?: unknown[]
+  compatibility?: { eikon?: string }
+}
+
+function trustOf(man: InstalledManifest, dir: string): TrustState {
+  const originTrust = man.origin?.trust
   if (originTrust && TRUST_STATES.includes(originTrust)) return originTrust
-  if ((man as Record<string, unknown>).kind === PACKAGE_KIND) return verifyPackageFiles(validatePackageManifest(man), dir).state
+  if (man.kind === PACKAGE_KIND) return verifyPackageFiles(validatePackageManifest(man), dir).state
   return "unverified"
 }
 
 function infoFor(name: string) {
   const path = manifestPath(name)
   if (!existsSync(path)) die(`${name}: not installed`)
-  const man = JSON.parse(readFileSync(path, "utf8")) as Manifest & { origin?: Origin; display?: { title?: string; author?: string }; files?: unknown[]; compatibility?: { eikon?: string } }
+  const man = JSON.parse(readFileSync(path, "utf8")) as InstalledManifest
   const isActive = active() === name
   const trust = trustOf(man, installedDir(name))
   return {
@@ -107,10 +117,10 @@ function infoFor(name: string) {
     version: man.version,
     status: isActive ? "active" : "installed",
     active: isActive,
-    sourceKind: man.origin?.kind ?? "legacy",
+    sourceKind: man.origin?.kind ?? "unknown",
     sourceIdentity: man.origin?.identityKey ?? man.origin?.sourceKey ?? man.origin?.repo ?? man.origin?.source,
     source: man.origin?.source,
-    compatibility: man.compatibility?.eikon ?? man.eikon_requires,
+    compatibility: man.compatibility?.eikon,
     trust,
     removable: true,
     updateable: !!man.origin?.source,
@@ -119,7 +129,7 @@ function infoFor(name: string) {
 }
 
 function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>>, installed: boolean) {
-  const man = r.manifest as Manifest & { display?: { title?: string; author?: string }; compatibility?: { eikon?: string }; preview?: string; poster?: string }
+  const man = r.manifest as EikonPackageManifest
   return {
     command: "inspect",
     name: r.name,
@@ -129,8 +139,8 @@ function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>
     source: src,
     sourceKind: r.origin.kind,
     sourceIdentity: r.origin.identityKey ?? r.origin.sourceKey ?? r.origin.repo ?? r.origin.source,
-    compatibility: man.compatibility?.eikon ?? man.eikon_requires,
-    preview: !!man.preview,
+    compatibility: man.compatibility?.eikon,
+    runtime: true,
     poster: !!man.poster,
     installed,
     trust: r.trust.state,
@@ -245,14 +255,22 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     const dir = installedDir(name)
     const mf = manifestPath(name)
     if (!existsSync(mf)) die(`${name}: not installed (no manifest.json)`)
-    const man = JSON.parse(readFileSync(mf, "utf8")) as Manifest & { origin?: Origin }
+    const man = JSON.parse(readFileSync(mf, "utf8")) as InstalledManifest
     const origin = man.origin
     if (!origin?.source) die(`${name}: no origin recorded; reinstall with a source`)
+    const updateOrigin = origin as Origin & { source: string }
     if (active() === name && !a.kv["active-ok"]) die(`${name}: update would change the active avatar backing package; pass --active-ok to acknowledge`)
     if (dirty(dir) && !a.kv.force) die(`${name}: locally modified since install; pass --force to overwrite`)
-    const src = man.origin?.source ?? die(`${name}: no origin recorded; reinstall with a source`)
+    const src = updateOrigin.source
+    const currentTrust = trustOf(man, dir)
+    const current = summarizeLifecycle({ name, manifest: man, origin: updateOrigin, trust: { state: currentTrust } }, updateOrigin.scope)
+    const candidate = await resolveInstall(src)
+    const next = summarizeLifecycle({ name: candidate.name, manifest: candidate.manifest, origin: candidate.origin, trust: candidate.trust }, updateOrigin.scope)
+    const plan = updatePlan(current, next)
+    if (candidate.tmp) rmSync(candidate.cleanup ?? candidate.staged, { recursive: true, force: true })
+    if (!plan.available) die(`${name}: update unavailable: ${plan.reason}`)
     const installed = await install(src, root(), { name })
-    out(a, { command: "update", name: installed.name, source: src, active: active() === name, trust: installed.trust.state }, () => `✓ ${installed.name}  ${installed.n} files  ${mb(installed.bytes)}  (${src})`)
+    out(a, { command: "update", name: installed.name, source: src, active: active() === name, trust: installed.trust.state, from: plan.from, to: plan.to }, () => `✓ ${installed.name}  ${installed.n} files  ${mb(installed.bytes)}  (${src})`)
   },
 
   async remove(argv) {
@@ -322,6 +340,13 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async manifest(argv) {
     const a = args(argv)
     console.log(`wrote ${reg.manifest({ encoding: a.kv.gzip ? "gzip" : "identity" })} manifests`)
+  },
+
+  async verify(argv) {
+    const a = args(argv)
+    const result = await reg.verifyArtifacts({ base: a.pos[0], encoding: a.kv.identity ? "identity" : "gzip" })
+    if (!result.ok) die(`generated artifacts are stale:\n${result.diffs.join("\n")}`)
+    out(a, result, () => "✓ generated artifacts are fresh")
   },
 }
 
