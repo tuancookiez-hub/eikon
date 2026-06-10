@@ -2,7 +2,8 @@
   color-scheme: dark;
   background: #050505;
   color: #e7e7e7;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --mono: "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  font-family: var(--mono);
   --bg: #050505;
   --panel: #090909;
   --panel-2: #0d0d0d;
@@ -14,7 +15,7 @@
   --dim: #686868;
   --ok: #a8d5a8;
   --err: #ffb4b4;
-  --terminal-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  --terminal-font: var(--mono);
   --terminal-line-height: 2.44ch;
 }
 
