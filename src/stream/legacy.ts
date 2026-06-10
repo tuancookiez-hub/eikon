@@ -125,7 +125,6 @@ export function migrateLegacyEikon(text: string, opts: LegacyMigrationOptions = 
     compatibility: { eikon: ">=1 <2" },
     entrypoints: { default: entrypoint },
     files: [{ path: entrypoint, mediaType: LAUNCH_MEDIA_TYPE, role: "runtime" }],
-    legacy: { sourceFormat: "pre-launch .eikon draft", migration: "converted", notes: migrated.warnings },
   }
   return { stream: serializeLaunchStream(migrated.records), records: migrated.records, manifest, warnings: migrated.warnings }
 }

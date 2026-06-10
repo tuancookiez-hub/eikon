@@ -38,6 +38,11 @@ test("package manifest validates final launch descriptors", () => {
   expect(() => validatePackageManifest({ ...manifest, source: { states: { idle: { file: "/abs/idle.mp4" } } } })).toThrow(/source.states.idle.file.*safe relative path/)
   expect(() => validatePackageManifest({ ...manifest, signals: { "state.working": { clip: "working" } } } as unknown)).toThrow(/signals/)
   expect(() => validatePackageManifest({ ...manifest, extensions: { required: ["eikon.future.v1"] } })).toThrow(/extensions.required.*unknown required/)
+  expect(validatePackageManifest(manifest).triggers).toEqual(manifest.triggers)
+  expect(() => validatePackageManifest({ ...manifest, triggers: [{ signal: "approval.waiting" }] } as unknown)).toThrow(/triggers/)
+  expect(() => validatePackageManifest({ ...manifest, compatibility: { eikon: ">=1 <2", hosts: { herm: ">=0.0.0" } } } as unknown)).toThrow(/compatibility.hosts/)
+  expect(() => validatePackageManifest({ ...manifest, bundles: [] } as unknown)).toThrow(/bundles/)
+  expect(() => validatePackageManifest({ ...manifest, legacy: { migration: "converted" } } as unknown)).toThrow(/legacy/)
 })
 
 test("strict registry validation requires descriptor size and digest", () => {

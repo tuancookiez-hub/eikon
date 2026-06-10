@@ -103,15 +103,15 @@ export function validatePackageManifest(value: unknown, opts: PackageValidationO
   for (const [index, file] of (man.files ?? []).entries()) validateDescriptor(file, index, opts, errs)
   const runtime = (man.files ?? []).find(file => file.role === "runtime" && file.path === man.entrypoints.default)
   if (opts.registry && !runtime) errs.push(problem("files", "runtime descriptor for entrypoints.default required"))
+  if ("hosts" in ((man.compatibility ?? {}) as Record<string, unknown>)) errs.push(problem("compatibility.hosts", "host compatibility is not part of the launch package contract"))
+  if ("bundles" in raw) errs.push(problem("bundles", "archive/export bundles are not part of the launch package contract"))
+  if ("legacy" in raw) errs.push(problem("legacy", "legacy metadata belongs to migration tooling, not package manifests"))
   if (man.source?.base && !isSafeRelativePath(man.source.base)) errs.push(problem("source.base", "safe relative path required"))
   for (const [key, source] of Object.entries(man.source?.states ?? {})) {
     if (!source || typeof source !== "object" || typeof source.file !== "string" || !isSafeRelativePath(source.file)) errs.push(problem(`source.states.${key}.file`, "safe relative path required"))
   }
   for (const ext of man.extensions?.required ?? []) errs.push(problem("extensions.required", `unknown required Eikon extension ${ext}`))
   if (man.poster && !isSafeRelativePath(man.poster)) errs.push(problem("poster", "safe relative path required"))
-  for (const bundle of man.bundles ?? []) {
-    if (!bundle || typeof bundle !== "object" || typeof bundle.url !== "string") errs.push(problem("bundles.url", "bundle URL required"))
-  }
   for (const [key, value] of Object.entries(man.display ?? {})) {
     if (typeof value === "string" && !isSafeText(value)) errs.push(problem(`display.${key}`, "unsafe text"))
     if (Array.isArray(value) && value.some(item => typeof item !== "string" || !isSafeText(item))) errs.push(problem(`display.${key}`, "unsafe text"))

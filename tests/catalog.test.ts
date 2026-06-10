@@ -166,6 +166,7 @@ describe("shared catalog contract", () => {
     expect(() => validateCatalogEntry({ kind: "eikon.catalog.entry", schemaVersion: "0.9", id: "xx", sourceKey: "xx", name: "xx", runtimeUrl: "https://cdn.example/x.eikon", packageUrl: "https://cdn.example/x.json", compatibility: { eikon: ">=1 <2" } })).toThrow(/schemaVersion/)
     expect(() => validateCatalogEntry({ kind: "eikon.catalog.entry", schemaVersion: "1.0", id: "xx", sourceKey: "xx", name: "xx", runtimeUrl: "http://127.0.0.1/x.eikon", packageUrl: "https://cdn.example/x.json", compatibility: { eikon: ">=1 <2" } })).toThrow(/runtimeUrl/)
     expect(() => validateCatalogEntry({ kind: "eikon.catalog.entry", schemaVersion: "1.0", id: "xx", sourceKey: "xx", name: "xx", runtimeUrl: "https://cdn.example/x.eikon", packageUrl: "https://user:secret@cdn.example/x.json", compatibility: { eikon: ">=1 <2" } })).toThrow(/packageUrl/)
+    expect(() => validateCatalogEntry({ kind: "eikon.catalog.entry", schemaVersion: "1.0", id: "xx", sourceKey: "xx", name: "xx", runtimeUrl: "https://cdn.example/x.eikon", packageUrl: "https://cdn.example/x.json", compatibility: { eikon: ">=1 <2", hosts: { herm: ">=0.0.0" } } } as never)).toThrow(/compatibility.hosts/)
   })
 
   test("normalizes legacy URLs", () => {

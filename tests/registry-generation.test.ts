@@ -34,6 +34,9 @@ test("registry generation can emit deterministic gzip runtime blobs", async () =
   const blob = readFileSync(join(pkg, runtime.path))
 
   expect(runtime).toMatchObject({ role: "runtime", encoding: "gzip", size: blob.length, digest: sha(blob), decodedSize: new TextEncoder().encode(text).length, decodedDigest: sha(text) })
+  expect(man).not.toHaveProperty("bundles")
+  expect(man).not.toHaveProperty("legacy")
+  expect(man.compatibility).not.toHaveProperty("hosts")
   expect(blob[0]).toBe(0x1f)
   expect(blob[1]).toBe(0x8b)
   expect(decodeRuntimeBytes(blob, { descriptor: runtime })).toBe(text)
@@ -47,5 +50,6 @@ test("registry generation can emit deterministic gzip runtime blobs", async () =
   const [entry] = JSON.parse(readFileSync(join(dir, "index.json"), "utf8"))
   expect(entry.runtimeUrl.endsWith(runtime.digest.replace("sha256:", ""))).toBe(true)
   expect(entry.runtimeUrl.endsWith(".gz")).toBe(false)
+  expect(entry.compatibility).not.toHaveProperty("hosts")
   expect(entry.trust).toMatchObject({ runtimeDigest: runtime.digest, runtimeSize: runtime.size, runtimeEncoding: "gzip", runtimeDecodedSize: runtime.decodedSize, runtimeDecodedDigest: runtime.decodedDigest })
 })
