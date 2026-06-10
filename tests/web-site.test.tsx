@@ -43,8 +43,7 @@ test("public page copy presents gallery search and Herm install flow", () => {
 test("install instructions use the Herm CLI command", () => {
   const instructions = browserInstructions(cardEntry)
 
-  expect(instructions.command).toBe("herm eikon install https://eikon.liftaris.dev/eikons/ares/manifest.json")
-  expect(instructions.manual).toBe("Copy the command into Herm locally. Preview source: https://eikon.liftaris.dev/eikons/ares/ares.eikon")
+  expect(instructions).toEqual({ command: "herm eikon install https://eikon.liftaris.dev/eikons/ares/manifest.json" })
 })
 
 test("catalog cards render poster and author metadata", () => {

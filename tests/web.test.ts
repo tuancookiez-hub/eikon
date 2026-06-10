@@ -204,8 +204,7 @@ describe("web gallery model", () => {
 
   test("instructions are copyable and discovery-only", () => {
     const safe = browserInstructions(entry)
-    expect(safe.command).toBe(`herm eikon install ${entry.packageUrl}`)
-    expect(safe.manual).toBe(`Copy the command into Herm locally. Preview source: ${entry.runtimeUrl}`)
+    expect(safe).toEqual({ command: `herm eikon install ${entry.packageUrl}` })
     expect(() => browserInstructions({ ...entry, packageUrl: "javascript:alert(1)" })).toThrow(/unsafe/)
   })
 

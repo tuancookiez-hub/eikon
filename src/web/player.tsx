@@ -125,12 +125,8 @@ function browserCatalogBase(raw = defaultCatalogBase): { base: string; options: 
 
 export function browserInstructions(entry: CatalogEntry) {
   const target = safePublicUrl(entry.packageUrl)
-  const preview = safePublicUrl(previewFor(entry))
   const command = `herm eikon install ${shellArg(target)}`
-  return {
-    command,
-    manual: `Copy the command into Herm locally. Preview source: ${preview}`,
-  }
+  return { command }
 }
 
 class Limiter {

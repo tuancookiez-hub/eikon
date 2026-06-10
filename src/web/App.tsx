@@ -234,7 +234,6 @@ export function App() {
                       <h2>install</h2>
                       <code>{instructions.command}</code>
                       <button type="button" onClick={() => void copy(instructions.command, "command")}>Copy command</button>
-                      <p>{instructions.manual}</p>
                     </div>
                   ) : null}
                   {copied ? <p className="ok">Copied {copied}.</p> : null}
@@ -273,14 +272,6 @@ function Preview(props: { selected: CatalogEntry; preview: PreviewState; frame: 
           <div>
             <dt>Author</dt>
             <dd>{author}</dd>
-          </div>
-          <div>
-            <dt>Version</dt>
-            <dd>{props.selected.version ?? "-"}</dd>
-          </div>
-          <div>
-            <dt>State</dt>
-            <dd>{props.state}</dd>
           </div>
         </dl>
         {loading ? <p className="previewStatus muted">Loading preview…</p> : null}
