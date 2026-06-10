@@ -82,7 +82,11 @@ const digestRe = /^sha256:[A-Za-z0-9._~+/=-]+$/
 const encodings = new Set<RuntimeEncoding>(["identity", "gzip"])
 const trimSlash = (s: string) => s.replace(/\/$/, "")
 const slash = (s: string) => s.replace(/\/?$/, "/")
-const pathEscape = (raw: string) => raw.split(/[?#]/, 1)[0]?.split(/[\\/]/).some(p => p === "..") ?? false
+const pathEscape = (raw: string) => {
+  const path = raw.split(/[?#]/, 1)[0] ?? raw
+  const decoded = (() => { try { return decodeURIComponent(path) } catch { return path } })()
+  return [path, decoded].some(value => /%5c/i.test(value) || value.split(/[\/]/).some(p => p === ".."))
+}
 const clean = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "") : undefined
 const cleanTextBlock = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, "") : undefined
 const safeName = (value: unknown, fallback = "unnamed") => clean(value) || fallback
@@ -129,8 +133,8 @@ const privateHost = (host: string) => {
 export function publicCatalogUrl(raw = DEFAULT_PUBLIC_CATALOG, base?: string, opts: CatalogOptions = {}): string {
   let out: URL
   try { out = new URL(raw, base) }
-  catch { throw new Error(`public catalog URL is invalid: ${raw}`) }
-  if (pathEscape(raw)) throw new Error(`public catalog URL path escape: ${out.href}`)
+  catch { throw new Error(`public catalog URL is invalid`) }
+  if (pathEscape(raw)) throw new Error(`public catalog URL path escape: ${out.origin}${out.pathname}`)
   if (opts.allowPrivate && out.protocol === "file:") return out.href
   if (out.protocol !== "https:" && out.protocol !== "http:") throw new Error(`public catalog URL must use http(s): ${out.href}`)
   if (out.username || out.password) throw new Error(`public catalog URL cannot include credentials: ${out.protocol}//[redacted]@${out.host}${out.pathname}`)
@@ -281,7 +285,6 @@ function fromPackage(input: PackageCatalogEntry, root?: string, opts: CatalogOpt
 }
 
 function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptions = {}): CatalogEntry {
-  if ("preview" in input || "preview_url" in input || "previewUrl" in input) throw new EikonValidationError([problem("preview", "serialized preview fields are retired; use runtimeUrl")])
   if (!NAME_RE.test(input.name)) throw new EikonValidationError([problem("name", "safe catalog name required")])
   const source = input.source ?? `${input.name}/`
   if (/^file:|^javascript:|^data:/i.test(source)) throw new EikonValidationError([problem("packageUrl", "http(s) URL required")])
@@ -313,8 +316,6 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptio
 
 export function validateCatalogEntry(entry: CatalogEntry, opts: CatalogOptions = {}): CatalogEntry {
   const errs = []
-  const raw = entry as CatalogEntry & { preview?: unknown; previewUrl?: unknown; preview_url?: unknown }
-  if (raw.preview != null || raw.previewUrl != null || raw.preview_url != null) errs.push(problem("preview", "serialized preview fields are retired; use runtimeUrl"))
   if (entry.kind !== CATALOG_KIND) errs.push(problem("kind", `must be ${CATALOG_KIND}`))
   if (!NAME_RE.test(entry.name)) errs.push(problem("name", "safe catalog name required"))
   for (const [key, value] of Object.entries({ id: entry.id, sourceKey: entry.sourceKey, title: entry.title, author: entry.author, description: entry.description, glyph: entry.glyph })) {
@@ -361,6 +362,7 @@ export function searchCatalogEntries(entries: readonly CatalogEntry[], query: st
 export async function loadCatalogEntries(base: string, fetcher: Fetcher = fetch, opts: CatalogOptions = {}): Promise<CatalogEntry[]> {
   const root = trimSlash(publicCatalogUrl(base, undefined, opts))
   const res = await fetcher(`${root}/index.json`)
+  if (res.url) publicCatalogUrl(res.url, undefined, opts)
   if (!res.ok) throw new Error(`catalog: ${res.status} loading ${root}/index.json`)
   const items = await res.json() as unknown
   if (!Array.isArray(items)) throw new EikonValidationError([problem("catalog", "index array required")])
@@ -374,6 +376,7 @@ export function searchCatalog(entries: readonly PublicCatalogEntry[], query: str
 export async function loadCatalog(base = DEFAULT_PUBLIC_CATALOG, fetcher: Fetcher = fetch, opts: CatalogOptions = {}): Promise<Catalog> {
   const root = trimSlash(publicCatalogUrl(base, undefined, opts))
   const res = await fetcher(`${root}/index.json`)
+  if (res.url) publicCatalogUrl(res.url, undefined, opts)
   if (!res.ok) throw new Error(`catalog: HTTP ${res.status}`)
   const items = await res.json() as unknown
   if (!Array.isArray(items)) throw new EikonValidationError([problem("catalog", "index array required")])

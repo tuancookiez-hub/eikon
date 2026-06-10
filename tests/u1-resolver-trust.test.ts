@@ -162,6 +162,20 @@ describe("U1 source identity and trust", () => {
     await expect(install(symlinked, dest)).rejects.toThrow(/symlink|special file/)
     expect(existsSync(join(dest, "symlinked"))).toBe(false)
   })
+
+  test("intermediate symlink source dirs are rejected before writes", async () => {
+    const outside = join(root, "outside-source")
+    mkdirSync(outside, { recursive: true })
+    writeFileSync(join(outside, "secret.png"), "SECRET")
+    const dir = join(root, "mid-symlink")
+    writePackage(dir, "mid", pkg("mid", [
+      { path: "streams/main.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: Buffer.byteLength(launch), digest: digest(launch) },
+      { path: "source/secret.png", role: "source.base", mediaType: "image/png", size: 6, digest: digest("SECRET") },
+    ]))
+    symlinkSync(outside, join(dir, "source"))
+    await expect(install(dir, dest)).rejects.toThrow(/symlink|special file/)
+    expect(existsSync(join(dest, "mid"))).toBe(false)
+  })
 })
 
 describe("U1 GitHub catalog resolver", () => {
@@ -248,7 +262,10 @@ describe("U1 production downloader boundary", () => {
   test("blocks credential redirects and URL path tricks", async () => {
     await expect(downloadBytes("https://cdn.example/pkg", { fetcher: async () => new Response("", { status: 302, headers: { location: "https://user:secret@cdn.example/pkg" } }) })).rejects.toThrow(/credentials/)
     await expect(downloadBytes("https://cdn.example/a/../pkg", { fetcher: async () => new Response("ok") })).rejects.toThrow(/path escape/)
+    await expect(downloadBytes("https://cdn.example/a/%2e%2e/pkg?token=secret", { fetcher: async () => new Response("ok") })).rejects.toThrow(/path escape/)
+    await expect(downloadBytes("https://cdn.example/a/%5cpkg", { fetcher: async () => new Response("ok") })).rejects.toThrow(/unsafe characters/)
     await expect(downloadBytes("https://cdn.example/a\\pkg", { fetcher: async () => new Response("ok") })).rejects.toThrow(/unsafe characters/)
+    try { await downloadBytes("https://cdn.example/a/%2e%2e/pkg?token=secret", { fetcher: async () => new Response("ok") }) } catch (err) { expect(String(err)).not.toContain("secret") }
   })
 })
 
@@ -279,6 +296,8 @@ describe("source and lifecycle helpers", () => {
     expect(parseSourceSpec("github:user/repo#v1?selector=liftaris/mono")).toMatchObject({ kind: "github", owner: "user", repo: "repo", ref: "v1", selector: "liftaris/mono" })
     expect(parseSourceSpec("npm:@scope/eikon@1.0.0")).toMatchObject({ kind: "registry", supported: false })
     expect(() => parseSourceSpec("catalog+https://cdn.example/a/../index.json#x")).toThrow(/unsafe|escape/)
+    expect(() => parseSourceSpec("pkg:https://cdn.example/a/%2e%2e/manifest.json?token=secret")).toThrow(/unsafe|escape/)
+    try { parseSourceSpec("pkg:https://cdn.example/a/%2e%2e/manifest.json?token=secret") } catch (err) { expect(String(err)).not.toContain("secret") }
   })
 
   test("lifecycle helpers separate source identity from content identity", () => {

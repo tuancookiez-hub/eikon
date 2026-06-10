@@ -136,7 +136,7 @@ A catalog entry is not a package manifest. It is cheap discovery data that point
 
 Catalog clients may search by `name`, `title`, `author`, and `tags`. Installed-state matching should prefer validated registry identity, version, source key, and digest. Name-only matching is a local legacy migration fallback and must not decide remote install/active state.
 
-`poster` in a catalog entry is cheap display data, normally an inline text poster for terminal-native grids and browser cards. `runtimeUrl` is the fetchable live-preview/runtime URL; launch catalogs do not serialize separate `preview`, `previewUrl`, `preview_url`, or package `role: "preview"` fields.
+`poster` in a catalog entry is cheap display data, normally an inline text poster for terminal-native grids and browser cards. `runtimeUrl` is the fetchable live-preview/runtime URL.
 
 A shadcn-like registry may expose:
 

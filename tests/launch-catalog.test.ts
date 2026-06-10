@@ -37,8 +37,6 @@ test("package manifest validates final launch descriptors", () => {
   expect(() => validatePackageManifest({ ...manifest, source: { base: "../escape.png" } })).toThrow(/source.base.*safe relative path/)
   expect(() => validatePackageManifest({ ...manifest, source: { states: { idle: { file: "/abs/idle.mp4" } } } })).toThrow(/source.states.idle.file.*safe relative path/)
   expect(() => validatePackageManifest({ ...manifest, signals: { "state.working": { clip: "working" } } } as unknown)).toThrow(/signals/)
-  expect(() => validatePackageManifest({ ...manifest, preview: "preview.mp4" } as unknown)).toThrow(/preview.*retired/)
-  expect(() => validatePackageManifest({ ...manifest, files: [...manifest.files!, { path: "preview.mp4", role: "preview", mediaType: "video/mp4", size: 42, digest: "sha256:preview" }] } as unknown)).toThrow(/stale descriptor role "preview"/)
   expect(() => validatePackageManifest({ ...manifest, extensions: { required: ["eikon.future.v1"] } })).toThrow(/extensions.required.*unknown required/)
 })
 

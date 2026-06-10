@@ -226,7 +226,6 @@ describe("shared catalog contract", () => {
     }
     expect(() => catalogEntry({ name: "bad", source: "../bad/", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/path escape/)
     expect(() => catalogEntry({ name: "bad", runtime_url: "https://evil.example/bad.eikon", w: 1, h: 1, poster: "" }, "https://eikon.liftaris.dev/eikons/")).toThrow(/host/)
-    expect(() => catalogEntry({ name: "bad", preview_url: "bad.eikon", w: 1, h: 1, poster: "" } as never, "https://eikon.liftaris.dev/eikons/")).toThrow(/preview.*retired/)
   })
 
   test("rejects unsafe catalog bases before fetching", async () => {
@@ -237,6 +236,8 @@ describe("shared catalog contract", () => {
     await expect(loadCatalog("file:///tmp/eikons", fetcher)).rejects.toThrow(/public catalog URL/)
     await expect(loadCatalog("http://localhost:1234/eikons", fetcher)).rejects.toThrow(/private host/)
     await expect(loadCatalog("https://eikon.liftaris.dev/eikons/../private", fetcher)).rejects.toThrow(/path escape/)
+    await expect(loadCatalog("https://eikon.liftaris.dev/eikons/%2e%2e/private?token=secret", fetcher)).rejects.toThrow(/path escape/)
+    try { await loadCatalog("https://eikon.liftaris.dev/eikons/%2e%2e/private?token=secret", fetcher) } catch (err) { expect(String(err)).not.toContain("secret") }
     await expect(loadCatalogEntries("http://169.254.169.254/eikons", fetcher)).rejects.toThrow(/private host/)
   })
 

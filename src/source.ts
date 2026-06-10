@@ -16,12 +16,21 @@ const safe = (value: string) => /^[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+$/.test(va
 const esc = (value: string) => value.replace(/[#?].*$/, "").split("/").some(part => part === "..")
 const key = (kind: string, value: string) => `${kind}:${value}`
 
+function cleanUrl(raw: string): string {
+  try {
+    const url = new URL(raw)
+    for (const key of [...url.searchParams.keys()]) if (/token|secret|key|credential|password/i.test(key)) url.searchParams.set(key, "[redacted]")
+    return `${url.origin}${url.pathname}${url.search}`
+  } catch { return raw.replace(/([?&][^=]*(?:token|secret|key|credential|password)[^=]*=)[^&\s]+/ig, "$1[redacted]") }
+}
+
 function http(raw: string): string | undefined {
   try {
     const rawPath = raw.split(/[?#]/, 1)[0] ?? raw
+    const decoded = (() => { try { return decodeURIComponent(rawPath) } catch { return rawPath } })()
     const url = new URL(raw)
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined
-    if (!safe(raw) || esc(rawPath) || esc(url.pathname)) throw new Error(`unsafe source URL: ${raw}`)
+    if (!safe(raw) || esc(rawPath) || esc(decoded) || esc(url.pathname) || /%5c/i.test(raw)) throw new Error(`unsafe source URL: ${cleanUrl(raw)}`)
     return url.href
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("unsafe")) throw err

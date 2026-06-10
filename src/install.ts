@@ -110,12 +110,17 @@ function privateHost(host: string) {
   return false
 }
 
+function pathParts(raw: string): string[] {
+  const path = raw.split(/[?#]/, 1)[0] ?? raw
+  const decoded = (() => { try { return decodeURIComponent(path) } catch { return path } })()
+  return [path, decoded]
+}
+
 function assertDownloadUrl(raw: string, opts: DownloadOptions) {
-  if (/[\u0000-\u001f\u007f]/.test(raw) || raw.includes("\\")) throw new Error(`download URL contains unsafe characters: ${cleanUrl(raw)}`)
-  const rawPath = raw.split(/[?#]/, 1)[0] ?? raw
-  if (rawPath.split("/").some(part => part === "..")) throw new Error(`download URL path escape: ${cleanUrl(raw)}`)
+  if (/[\u0000-\u001f\u007f]/.test(raw) || raw.includes("\\") || /%5c/i.test(raw)) throw new Error(`download URL contains unsafe characters: ${cleanUrl(raw)}`)
+  if (pathParts(raw).some(path => path.split(/[\\/]/).some(part => part === ".."))) throw new Error(`download URL path escape: ${cleanUrl(raw)}`)
   const url = new URL(raw)
-  if (url.pathname.split("/").some(part => part === "..")) throw new Error(`download URL path escape: ${cleanUrl(raw)}`)
+  if (pathParts(url.pathname).some(path => path.split(/[\\/]/).some(part => part === ".."))) throw new Error(`download URL path escape: ${cleanUrl(raw)}`)
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(`download URL must use https: ${cleanUrl(raw)}`)
   if (url.username || url.password) throw new Error(`download URL cannot include credentials: ${cleanUrl(raw)}`)
   if (!opts.allowPrivate && privateHost(url.hostname)) throw new Error(`download URL cannot use private host: ${url.hostname}`)
