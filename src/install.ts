@@ -11,20 +11,20 @@ import { join, extname, basename, dirname } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { createHash } from "node:crypto"
-import { STATES, FORMAT_VERSION, DEFAULT_CATALOG, type State } from "./ui/spec"
+import { STATES, DEFAULT_CATALOG, type State } from "./ui/spec"
 import { loadCatalogEntries, normalizeCatalogEntry } from "./catalog"
-import { PACKAGE_KIND, type CatalogEntry, type EikonPackageManifest } from "./contract/shape"
+import type { CatalogEntry, EikonPackageManifest } from "./contract/shape"
 import { validatePackageManifest, isSafeRelativePath } from "./package/manifest"
 import { parseRuntimeBytes } from "./stream"
 import { assertWritableScope, parseSourceSpec, type InstallScope } from "./source"
-import type { Manifest } from "./ui/lint"
+import { pathParts, privateHost } from "./url-policy"
 
 export type Role = State | "base"
 export type Sources = Partial<Record<Role, string>>
 export const TRUST_STATES = ["verified", "unverified", "mismatch"] as const
 export type TrustState = typeof TRUST_STATES[number]
 export type TrustResult = { state: TrustState; reason?: string; verified?: string[] }
-export type SourceKind = "default-catalog" | "catalog-package" | "github-catalog" | "github-package" | "local" | "legacy"
+export type SourceKind = "default-catalog" | "catalog-package" | "github-catalog" | "github-package" | "local"
 export type Origin = {
   source: string
   at: string
@@ -42,17 +42,20 @@ export type Origin = {
   repo?: string
   selector?: string
   catalogRoot?: string
+  trust?: TrustState
 }
 
 export type Resolved = {
   name: string
-  manifest: Manifest | EikonPackageManifest
+  manifest: EikonPackageManifest
   /** Local dir where manifest.json + any staged media live. */
   staged: string
   /** When staged came from an http base (no local tree). */
   base?: string
   /** Staged is a clone-owned tempdir; install() rm's it after copy. */
   tmp?: boolean
+  /** Clone root/temp tree to remove when it differs from staged. */
+  cleanup?: string
   origin: Origin
   trust: TrustResult
 }
@@ -91,29 +94,6 @@ const cleanUrl = (raw: string) => {
     if (u.username || u.password) return `${u.protocol}//[redacted]@${u.host}${u.pathname}${u.search}${u.hash}`
     return u.href
   } catch { return raw.replace(/\/\/[^/@\s]+@/, "//[redacted]@").replace(/([?&][^=]*(?:token|secret|key|credential|password)[^=]*=)[^&\s]+/ig, "$1[redacted]") }
-}
-
-function privateIpv4(a: number, b: number) {
-  if (a === 10 || a === 127) return true
-  if (a === 169 && b === 254) return true
-  if (a === 192 && b === 168) return true
-  return a === 172 && b >= 16 && b <= 31
-}
-
-function privateHost(host: string) {
-  const h = host.toLowerCase().replace(/^\[|\]$/g, "")
-  if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(h)) return true
-  if (h.endsWith(".localhost")) return true
-  const ip = h.match(/^(\d+)\.(\d+)\./)
-  if (ip && privateIpv4(Number(ip[1]), Number(ip[2]))) return true
-  if (h.startsWith("fe80:") || /^f[cd][0-9a-f]{2}:/.test(h)) return true
-  return false
-}
-
-function pathParts(raw: string): string[] {
-  const path = raw.split(/[?#]/, 1)[0] ?? raw
-  const decoded = (() => { try { return decodeURIComponent(path) } catch { return path } })()
-  return [path, decoded]
 }
 
 function assertDownloadUrl(raw: string, opts: DownloadOptions) {
@@ -176,40 +156,25 @@ export function resolveGithubSource(raw: string): GithubSource {
   return { owner, repo, selector, cloneUrl: `https://github.com/${owner}/${repo}.git`, display: `github.com/${owner}/${repo}${selector ? `/${selector}` : ""}` }
 }
 
-/** Role-tagged (role, relpath) pairs from either manifest shape. */
-export function entries(man: Manifest | Record<string, unknown>): Array<[Role, string]> {
-  if ((man as Record<string, unknown>).kind === PACKAGE_KIND) {
-    const pkg = validatePackageManifest(man)
-    const xs: Array<[Role, string]> = []
-    if (pkg.source?.base) xs.push(["base", pkg.source.base])
-    for (const k of STATES) {
-      const f = pkg.source?.states?.[k]?.file
-      if (f) xs.push([k, f])
-    }
-    return xs
-  }
+/** Role-tagged editable source media from a launch package manifest. */
+export function entries(man: EikonPackageManifest | Record<string, unknown>): Array<[Role, string]> {
+  const pkg = validatePackageManifest(man)
   const xs: Array<[Role, string]> = []
-  const src = (man as Manifest).source
-  if (typeof src === "string") xs.push(["base", src])
-  const st = (man as Manifest).states as Record<string, { file?: string }> | undefined
-  if (st) for (const k of STATES) { const f = st[k]?.file; if (f) xs.push([k, f]) }
-  if (xs.length === 0 && Array.isArray((man as Record<string, unknown>).files))
-    for (const f of (man as { files: unknown[] }).files) {
-      if (typeof f !== "string") continue
-      const stem = basename(f, extname(f)).toLowerCase() as Role
-      xs.push([stem === "base" || (STATES as readonly string[]).includes(stem) ? stem : "base", f])
-    }
+  if (pkg.source?.base) xs.push(["base", pkg.source.base])
+  for (const k of STATES) {
+    const f = pkg.source?.states?.[k]?.file
+    if (f) xs.push([k, f])
+  }
   return xs
 }
 
-function manifest(value: unknown): Manifest | EikonPackageManifest {
-  if ((value as Record<string, unknown>).kind === PACKAGE_KIND) return validatePackageManifest(value)
-  return value as Manifest
+function manifest(value: unknown): EikonPackageManifest {
+  return validatePackageManifest(value)
 }
 
-function installManifest(man: Manifest | EikonPackageManifest, origin: Origin): Manifest | EikonPackageManifest {
+function installManifest(man: EikonPackageManifest, origin: Origin): EikonPackageManifest & { origin: Origin } {
   const { license: _license, provenance: _provenance, ...clean } = man as Record<string, unknown>
-  return { ...clean, origin } as Manifest | EikonPackageManifest
+  return { ...(clean as EikonPackageManifest), origin }
 }
 
 const gitish = (s: string) => {
@@ -306,8 +271,7 @@ function catalogResolution(repo: string, selector: string): { entry: CatalogEntr
   return undefined
 }
 
-function trustFor(man: Manifest | EikonPackageManifest, staged: string, base?: string): TrustResult {
-  if ((man as Record<string, unknown>).kind !== PACKAGE_KIND) return { state: "unverified", reason: "legacy manifest has no package descriptors" }
+function trustFor(man: EikonPackageManifest, staged: string, base?: string): TrustResult {
   const pkg = validatePackageManifest(man)
   const files = pkg.files ?? []
   if (!files.length) return { state: "unverified", reason: "package descriptors missing" }
@@ -352,6 +316,10 @@ function installName(name: string) {
   return name
 }
 
+function cleanupResolved(r: Pick<Resolved, "tmp" | "cleanup" | "staged">) {
+  if (r.tmp) rmSync(r.cleanup ?? r.staged, { recursive: true, force: true })
+}
+
 function assertSafePackageFile(staged: string, rel: string) {
   const parts = rel.split("/")
   let current = staged
@@ -385,17 +353,6 @@ function locate(dir: string): string {
     if (e.isDirectory() && existsSync(join(dir, e.name, "manifest.json")))
       return join(dir, e.name)
   throw new Error(`no manifest.json in ${dir} (or one level deep)`)
-}
-
-function checkRequires(spec: string | undefined): void {
-  if (!spec) return
-  const m = spec.match(/^\s*(>=|>|<=|<|==|=)?\s*(\d+)/)
-  if (!m) return
-  const [, op = ">=", v] = m
-  const n = Number(v), cur = FORMAT_VERSION
-  const ok = op === ">=" ? cur >= n : op === ">" ? cur > n
-           : op === "<=" ? cur <= n : op === "<" ? cur < n : cur === n
-  if (!ok) throw new Error(`eikon_requires ${spec}: this build supports format ${cur}`)
 }
 
 async function catalog(name: string, url: string, opts: Pick<Opts, "downloader"> = {}): Promise<CatalogEntry> {
@@ -475,7 +432,7 @@ export async function resolve(src: string, opts: Pick<Opts, "catalog" | "clone" 
       rmSync(join(tmp, ".git"), { recursive: true, force: true })
       const staged = locate(tmp)
       const man = manifest(JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8")))
-      return { name: man.name, manifest: man, staged, tmp: true, origin: { source: src, sourceSpec, at, kind: "github-package", sourceKey: parsed.sourceKey, sha: sha.trim() || undefined, resolvedRef: sha.trim() || undefined }, trust: trustFor(man, staged) }
+      return { name: man.name, manifest: man, staged, tmp: true, cleanup: tmp, origin: { source: src, sourceSpec, at, kind: "github-package", sourceKey: parsed.sourceKey, sha: sha.trim() || undefined, resolvedRef: sha.trim() || undefined }, trust: trustFor(man, staged) }
     }
     const cloneUrl = parsed.kind === "github" && parsed.ref ? `${gh.cloneUrl}#${parsed.ref}` : gh.cloneUrl
     const cloned = await (opts.clone ?? defaultClone)(cloneUrl, tmp)
@@ -487,6 +444,7 @@ export async function resolve(src: string, opts: Pick<Opts, "catalog" | "clone" 
         manifest: selected.manifest,
         staged: selected.staged,
         tmp: cloned.cleanup !== false,
+        cleanup: cloned.cleanup !== false ? repo : undefined,
         origin: { source: src, sourceSpec, at, kind: "github-catalog", sha: cloned.sha, resolvedRef: cloned.sha ?? (parsed.kind === "github" ? parsed.ref : undefined), repo: gh.display, selector: gh.selector, catalogRoot: selected.root, sourceKey: selected.entry.sourceKey, identityKey: selected.entry.sourceKey || selected.entry.id, packageUrl: selected.entry.packageUrl, runtimeUrl: selected.entry.runtimeUrl },
         trust: trustFor(selected.manifest, selected.staged),
       }
@@ -496,14 +454,16 @@ export async function resolve(src: string, opts: Pick<Opts, "catalog" | "clone" 
         manifest: indexed.manifest,
         staged: indexed.staged,
         tmp: cloned.cleanup !== false,
+        cleanup: cloned.cleanup !== false ? repo : undefined,
         origin: { source: src, sourceSpec, at, kind: "github-catalog", sha: cloned.sha, resolvedRef: cloned.sha ?? (parsed.kind === "github" ? parsed.ref : undefined), repo: gh.display, selector: gh.selector, catalogRoot: indexed.root, sourceKey: parsed.sourceKey },
         trust: trustFor(indexed.manifest, indexed.staged),
       }
+      if (cloned.cleanup !== false) rmSync(repo, { recursive: true, force: true })
       throw new Error(`no eikon named "${gh.selector}" in GitHub catalog`)
     }
     const staged = locate(repo)
     const man = manifest(JSON.parse(readFileSync(join(staged, "manifest.json"), "utf8")))
-    return { name: man.name, manifest: man, staged, tmp: cloned.cleanup !== false, origin: { source: src, sourceSpec, at, kind: "github-package", sourceKey: parsed.sourceKey, sha: cloned.sha, resolvedRef: cloned.sha ?? (parsed.kind === "github" ? parsed.ref : undefined), repo: gh.display }, trust: trustFor(man, staged) }
+    return { name: man.name, manifest: man, staged, tmp: cloned.cleanup !== false, cleanup: cloned.cleanup !== false ? repo : undefined, origin: { source: src, sourceSpec, at, kind: "github-package", sourceKey: parsed.sourceKey, sha: cloned.sha, resolvedRef: cloned.sha ?? (parsed.kind === "github" ? parsed.ref : undefined), repo: gh.display }, trust: trustFor(man, staged) }
   }
 
   throw new Error(`cannot resolve "${src}": expected catalog name, git URL, local dir, or http(s) base`)
@@ -537,7 +497,6 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
   const scope = assertWritableScope(opts.scope ?? "profile")
   const r = await resolve(src, opts)
   r.origin.scope = scope
-  checkRequires((r.manifest as Manifest & { eikon_requires?: string }).eikon_requires)
   const name = installName(opts.name ?? r.name)
   mkdirSync(root, { recursive: true })
   const dst = join(root, name)
@@ -546,35 +505,28 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
   const old = join(root, `.${name}.old-${process.pid}-${Date.now()}`)
   try {
     let remote: Awaited<ReturnType<typeof verifyRemotePackageFiles>> | undefined
-    let launchBytes: Uint8Array | undefined
-    const pkg = (r.manifest as Record<string, unknown>).kind === PACKAGE_KIND
-    if (pkg) {
-      const man = validatePackageManifest(r.manifest)
-      const dl: DownloadOptions = opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base ?? "") ? { allowPrivate: true } : {})
-      if (r.base) {
-        remote = await verifyRemotePackageFiles(man, r.base, dl)
-        assertRemotePackageWriteCoverage(man, remote.files)
-        validatePackageManifest(man, { registry: true })
-        r.trust = remote.trust
-      }
-      if (!r.base && r.staged) {
-        r.trust = verifyPackageFiles(man, r.staged)
-        assertVerifiedPackageWriteCoverage(man, r.trust)
-      }
-      const rel = man.entrypoints.default
-      const desc = man.files?.find(file => file.role === "runtime" && file.path === rel)
-      if (r.base) launchBytes = remote!.files!.get(rel)!
-      else launchBytes = readFileSync(join(r.staged, rel))
-      parseRuntimeBytes(launchBytes, { descriptor: desc })
+    let launchBytes: Uint8Array
+    const man = validatePackageManifest(r.manifest)
+    const dl: DownloadOptions = opts.downloader ?? (/^http:\/\/localhost[:/]/.test(r.base ?? "") ? { allowPrivate: true } : {})
+    if (r.base) {
+      remote = await verifyRemotePackageFiles(man, r.base, dl)
+      assertRemotePackageWriteCoverage(man, remote.files)
+      validatePackageManifest(man, { registry: true })
+      r.trust = remote.trust
     }
+    if (!r.base && r.staged) {
+      r.trust = verifyPackageFiles(man, r.staged)
+      assertVerifiedPackageWriteCoverage(man, r.trust)
+    }
+    const rel = man.entrypoints.default
+    const desc = man.files?.find(file => file.role === "runtime" && file.path === rel)
+    if (r.base) launchBytes = remote!.files!.get(rel)!
+    else launchBytes = readFileSync(assertSafePackageFile(r.staged, rel))
+    parseRuntimeBytes(launchBytes, { descriptor: desc })
 
     mkdirSync(srcd, { recursive: true })
 
-    if (launchBytes) writeFileSync(join(tmp, `${name}.eikon`), launchBytes)
-
-    const packed = `${r.name}.eikon`
-    if (!pkg && r.staged && existsSync(join(r.staged, packed)))
-      copyFileSync(join(r.staged, packed), join(tmp, `${name}.eikon`))
+    writeFileSync(join(tmp, `${name}.eikon`), launchBytes)
 
     const xs = entries(r.manifest)
     const sources: Sources = {}
@@ -589,7 +541,7 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
         const buf = remote ? remote.files!.get(rel)! : await downloadBytes(new URL(rel, r.base).href, dl)
         await Bun.write(to, buf); bytes += buf.length
       } else {
-        const from = join(r.staged, rel)
+        const from = assertSafePackageFile(r.staged, rel)
         if (!existsSync(from)) throw new Error(`${rel}: missing in ${r.staged}`)
         copyFileSync(from, to); bytes += statSync(to).size
       }
@@ -606,12 +558,12 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
       throw err
     }
     if (existsSync(old)) rmSync(old, { recursive: true, force: true })
-    if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
+    cleanupResolved(r)
 
     return { ...r, name, dir: dst, sources, n: xs.length, bytes }
   } catch (err) {
     rmSync(tmp, { recursive: true, force: true })
-    if (r.tmp) rmSync(r.staged, { recursive: true, force: true })
+    cleanupResolved(r)
     throw err
   }
 }
@@ -621,7 +573,7 @@ export async function install(src: string, root: string, opts: Opts = {}): Promi
 export function dirty(dir: string): boolean {
   const mf = join(dir, "manifest.json")
   if (!existsSync(mf)) return false
-  const man = JSON.parse(readFileSync(mf, "utf8")) as Manifest & { origin?: Origin }
+  const man = JSON.parse(readFileSync(mf, "utf8")) as { origin?: Origin }
   if (!man.origin?.at) return false
   const since = Date.parse(man.origin.at)
   for (const e of readdirSync(dir, { withFileTypes: true, recursive: true }) as Array<{ name: string; parentPath: string }>)

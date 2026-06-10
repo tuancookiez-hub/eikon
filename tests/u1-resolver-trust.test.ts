@@ -225,6 +225,17 @@ describe("U1 GitHub catalog resolver", () => {
     expect(out.name).toBe("mono")
   })
 
+  test("selector install cleans the cloned repository root, not only selected package subdir", async () => {
+    let cloneRoot = ""
+    const out = await install("github.com/user/repo/liftaris/mono", dest, { name: "mono-cleanup", clone: async (_src, dst) => {
+      cloneRoot = dst
+      writeRegistryPackage(dst, "liftaris", "mono")
+      return { dir: dst, sha: "abc777", cleanup: true }
+    } })
+    expect(out.name).toBe("mono-cleanup")
+    expect(existsSync(cloneRoot)).toBe(false)
+  })
+
   test("ambiguous package-index selector fails instead of picking first", async () => {
     const repo = join(root, "ambiguous-repo")
     writeRegistryPackage(repo, "liftaris", "mono")
@@ -244,8 +255,9 @@ describe("U1 production downloader boundary", () => {
     await expect(downloadBytes("http://example.com/pkg", { fetcher: async () => new Response("ok") })).rejects.toThrow(/https/i)
   })
 
-  test("blocks private hosts by default, supports explicit fixture allowance", async () => {
+  test("blocks private hosts by default, including IPv4-mapped IPv6, supports explicit fixture allowance", async () => {
     await expect(downloadBytes("http://127.0.0.1/pkg", { fetcher: fetch })).rejects.toThrow(/private host/)
+    await expect(downloadBytes("https://[::ffff:7f00:1]/pkg", { fetcher: async () => new Response("should-not-fetch") })).rejects.toThrow(/private host/)
     const bytes = await downloadBytes("http://127.0.0.1/pkg", { allowPrivate: true, fetcher: async () => new Response("ok") })
     expect(new TextDecoder().decode(bytes)).toBe("ok")
   })
@@ -316,5 +328,6 @@ describe("source and lifecycle helpers", () => {
     expect(summarizeLifecycle({ name: "b", origin: { sourceKey: "registry:b" } }).sourceKey).toBe("registry:b")
     expect(catalogMatchesInstalled(entry, { name: "b", origin: { sourceKey: "registry:b" } })).toBe(false)
     expect(catalogMatchesInstalled(entry, { name: "a", origin: { sourceKey: "registry:a" } })).toBe(true)
+    expect(catalogMatchesInstalled(entry, { name: "a", origin: { identityKey: "liftaris/a" } })).toBe(false)
   })
 })

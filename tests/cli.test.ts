@@ -102,6 +102,22 @@ describe("eikon CLI lifecycle", () => {
     expect(existsSync(join(profile, "eikons", "atlas"))).toBe(false)
   })
 
+  test("update rejects source identity drift before reinstalling", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "eikon-cli-"))
+    const profile = join(tmp, "profile")
+    const src = join(tmp, "drift")
+    pkg(src, "drift")
+    await run(["install", src, "--json"], { HERM_CONFIG_DIR: profile })
+    const installedManifest = join(profile, "eikons", "drift", "manifest.json")
+    const man = JSON.parse(readFileSync(installedManifest, "utf8"))
+    man.origin.sourceKey = "local:/different/source"
+    writeFileSync(installedManifest, JSON.stringify(man, null, 2) + "\n")
+
+    const updated = await run(["update", "drift", "--force", "--json"], { HERM_CONFIG_DIR: profile })
+    expect(updated.code).toBe(1)
+    expect(updated.stderr).toContain("source identity differs")
+  })
+
   test("remove and update require acknowledgement before active mutations", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "eikon-cli-"))
     const profile = join(tmp, "profile")

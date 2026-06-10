@@ -11,6 +11,7 @@ import { validatePackageManifest, isSafeRelativePath } from "./package/manifest"
 import { DEFAULT_CATALOG } from "./ui/spec"
 import { decodeRuntimeBytes } from "./stream/runtime-browser"
 import type { RuntimeDescriptor } from "./stream/runtime"
+import { pathEscape, privateHost } from "./url-policy"
 
 export const CATALOG_VERSION = 1
 export const DEFAULT_PUBLIC_CATALOG = DEFAULT_CATALOG
@@ -74,7 +75,6 @@ type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Re
 export type RuntimeArtifact = { bytes: Uint8Array; text: string }
 
 const NAME_RE = /^[a-z0-9][a-z0-9-]{1,63}$/
-const PRIVATE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"])
 const text = (value: unknown) => typeof value === "string" && !/[<>\u0000-\u001f]/.test(value)
 const isObj = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
 const problem = (path: string, message: string) => ({ code: "catalog", path, message: `${path}: ${message}` })
@@ -82,11 +82,6 @@ const digestRe = /^sha256:[A-Za-z0-9._~+/=-]+$/
 const encodings = new Set<RuntimeEncoding>(["identity", "gzip"])
 const trimSlash = (s: string) => s.replace(/\/$/, "")
 const slash = (s: string) => s.replace(/\/?$/, "/")
-const pathEscape = (raw: string) => {
-  const path = raw.split(/[?#]/, 1)[0] ?? raw
-  const decoded = (() => { try { return decodeURIComponent(path) } catch { return path } })()
-  return [path, decoded].some(value => /%5c/i.test(value) || value.split(/[\/]/).some(p => p === ".."))
-}
 const clean = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "") : undefined
 const cleanTextBlock = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, "") : undefined
 const safeName = (value: unknown, fallback = "unnamed") => clean(value) || fallback
@@ -102,32 +97,6 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   const copy = new Uint8Array(bytes)
   const hash = await crypto.subtle.digest("SHA-256", copy.buffer as ArrayBuffer)
   return `sha256:${[...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, "0")).join("")}`
-}
-
-const privateIpv4 = (a: number, b: number) => {
-  if (a === 10) return true
-  if (a === 127) return true
-  if (a === 169 && b === 254) return true
-  if (a === 192 && b === 168) return true
-  return a === 172 && b >= 16 && b <= 31
-}
-
-const mappedIpv4Private = (host: string) => {
-  const hex = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
-  if (!hex) return false
-  const n = Number.parseInt(hex[1]!, 16) * 0x10000 + Number.parseInt(hex[2]!, 16)
-  return privateIpv4(Math.floor(n / 0x1000000), Math.floor(n / 0x10000) & 0xff)
-}
-
-const privateHost = (host: string) => {
-  const h = host.toLowerCase().replace(/^\[|\]$/g, "")
-  if (PRIVATE_HOSTS.has(h)) return true
-  if (h.endsWith(".localhost")) return true
-  const ip = h.match(/^(\d+)\.(\d+)\./)
-  if (ip && privateIpv4(Number(ip[1]), Number(ip[2]))) return true
-  if (h.startsWith("fe80:")) return true
-  if (/^f[cd][0-9a-f]{2}:/.test(h)) return true
-  return mappedIpv4Private(h)
 }
 
 export function publicCatalogUrl(raw = DEFAULT_PUBLIC_CATALOG, base?: string, opts: CatalogOptions = {}): string {
@@ -317,6 +286,7 @@ function fromLegacy(input: LegacyCatalogEntry, base?: string, opts: CatalogOptio
 export function validateCatalogEntry(entry: CatalogEntry, opts: CatalogOptions = {}): CatalogEntry {
   const errs = []
   if (entry.kind !== CATALOG_KIND) errs.push(problem("kind", `must be ${CATALOG_KIND}`))
+  if (entry.schemaVersion !== CATALOG_SCHEMA_VERSION) errs.push(problem("schemaVersion", `must be ${CATALOG_SCHEMA_VERSION}`))
   if (!NAME_RE.test(entry.name)) errs.push(problem("name", "safe catalog name required"))
   for (const [key, value] of Object.entries({ id: entry.id, sourceKey: entry.sourceKey, title: entry.title, author: entry.author, description: entry.description, glyph: entry.glyph })) {
     if (value != null && !text(value)) errs.push(problem(key, "unsafe text"))

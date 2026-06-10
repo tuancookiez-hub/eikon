@@ -55,8 +55,11 @@ export function sourceAvailable(manifest: EikonPackageManifest): boolean {
 export function catalogMatchesInstalled(entry: CatalogEntry, installed: LifecycleInput): boolean {
   const origin = installed.origin ?? {}
   const keys = new Set([origin.sourceKey, origin.identityKey, origin.packageUrl, origin.source].filter(Boolean))
-  if (keys.has(entry.sourceKey) || keys.has(entry.id) || keys.has(entry.packageUrl)) return true
-  return (origin.kind === "local" || origin.kind === "legacy") && !!installed.name && installed.name === entry.name
+  if (keys.has(entry.sourceKey) || keys.has(entry.packageUrl)) return true
+  const digest = installed.manifest && (installed.manifest as Record<string, unknown>).kind === PACKAGE_KIND
+    ? runtimeDescriptor(installed.manifest as EikonPackageManifest)?.digest
+    : undefined
+  return !!digest && digest === entry.trust?.runtimeDigest
 }
 
 export function summarizeLifecycle(input: LifecycleInput, scope: InstallScope = "profile"): LifecycleSummary {

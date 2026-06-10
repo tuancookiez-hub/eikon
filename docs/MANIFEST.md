@@ -6,7 +6,7 @@
 
 The package manifest is the launch install/edit/source contract for an eikon. It describes how to find renderable streams, optional editable source media, poster assets, compatibility, content-addressed file descriptors, and optional edit metadata. It is separate from the `.eikon` stream format and from the public catalog entry.
 
-Older source-only manifests are still accepted by migration tooling during conversion, but the launch manifest below is the shape gallery, registry, Herm marketplace, and package readers should target.
+Older source-only manifests are still accepted by explicit migration/conversion tooling during conversion. Normal install/package readers reject source-only manifests and require the launch manifest below.
 
 Launch public shapes do not define first-class `license`, `provenance`, `review`, or `reviewer` metadata fields. Legacy readers may reject, strip, or report those fields during migration, but packages, catalog entries, platform metadata, and publish payloads should not expose them as active data.
 
@@ -56,6 +56,12 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
     { "path": "sources/states/thinking/loop.mp4", "role": "source.clip", "signal": "state.thinking", "mediaType": "video/mp4", "size": 456789, "digest": "sha256:..." },
     { "path": "posters/default.png", "role": "poster", "mediaType": "image/png", "size": 12345, "digest": "sha256:..." }
   ],
+  "source": {
+    "base": "sources/base.png",
+    "states": {
+      "thinking": { "file": "sources/states/thinking/loop.mp4" }
+    }
+  },
   "editability": {
     "sourcesIncluded": true,
     "mode": "full"
@@ -93,6 +99,7 @@ Launch public shapes do not define first-class `license`, `provenance`, `review`
 | `compatibility.hosts` | no | Optional host ranges. Host incompatibility must not affect generic stream rendering. |
 | `entrypoints.default` | yes | Relative path to the default launch `.eikon` stream. |
 | `files` | yes for registry packages | Relative file descriptors with role, media type, size, and digest. Registry-served remote files require `size` and `digest`; gzip runtime descriptors also require `encoding`, `decodedSize`, and `decodedDigest`. |
+| `source` | no | Optional editable source-media map. `source.base` and `source.states.<state>.file` point to package-relative files already covered by `files` descriptors when published through the registry. Runtime playback must not depend on these source files. |
 | `editability` | no | Whether editable source/project files are included and how complete they are. |
 | `poster` | no | Relative cached poster asset for cheap grid/catalog display. Standalone `.eikon` posters are derived from frames. |
 | `bundles` | no | Optional generated import/export/offline bundles such as ZIP. Bundles are not the canonical install protocol. |
