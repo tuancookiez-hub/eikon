@@ -18,7 +18,6 @@ function entry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
     author: "kaio",
     glyph: "⚔",
     poster: "STATIC",
-    preview: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
     runtimeUrl: "https://eikon.liftaris.dev/eikons/ares/ares.eikon",
     packageUrl: "https://eikon.liftaris.dev/eikons/ares/manifest.json",
     sourceKey: "registry:eikon.liftaris.dev:liftaris/ares@1.0.0",

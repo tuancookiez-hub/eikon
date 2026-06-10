@@ -52,6 +52,10 @@ export { parseLaunchStream, serializeLaunchStream, resolveSignal, legacyToLaunch
          decodeRuntimeBytes, decodeRuntimeFile, encodeRuntimeText, parseRuntimeBytes, parseRuntimeFile, runtimeByteInfo, runtimeDescriptor, serializeRuntimeBytes, sha256Bytes, writeRuntimeFile,
          type ParsedLaunchStream, type ParsedClip, type ParsedLaunchMeta, type ResolvedSignal, type LegacyMigration, type MigratedEikon, type RuntimeDescriptor, type RuntimeOptions, type RuntimeByteInfo, type RuntimeWriteOptions } from "./stream"
 export { validatePackageManifest, isSafeRelativePath } from "./package"
+export { parseSourceSpec, sourceIdentity, assertWritableScope, SOURCE_KINDS, INSTALL_SCOPES,
+         type EikonSourceKind, type InstallScope, type ParsedSource } from "./source"
+export { runtimeDescriptor as lifecycleRuntimeDescriptor, sourceDescriptors, sourceAvailable, catalogMatchesInstalled, summarizeLifecycle, previewLifecycle, updatePlan,
+         type LifecycleInput, type LifecycleSummary, type LifecycleTrust } from "./lifecycle"
 export { loadCatalogEntries, normalizeCatalogEntry, searchCatalogEntries, validateCatalogEntry,
          CATALOG_VERSION, DEFAULT_PUBLIC_CATALOG, catalogEntry, loadCatalog, publicCatalogUrl, searchCatalog,
          type Catalog, type CatalogInput, type CatalogIndexEntry, type CatalogOptions, type CatalogTrust, type PublicCatalogEntry } from "./catalog"

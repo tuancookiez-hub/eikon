@@ -183,6 +183,11 @@ describe("resolve + install: http base", () => {
     expect(r.name).toBe("remote"); expect(r.base).toBe(url); expect(r.staged).toBe("")
   })
 
+  test("resolve() accepts explicit pkg: package URL specs", async () => {
+    const r = await resolve(`pkg:${url}manifest.json`)
+    expect(r.name).toBe("remote"); expect(r.base).toBe(url); expect(r.origin.sourceKey).toBe(`package:${url}manifest.json`)
+  })
+
   test("install() fetches each file in parallel", async () => {
     const out = await install(url, dest)
     expect(out.n).toBe(3); expect(out.bytes).toBe(2004)
@@ -359,7 +364,8 @@ describe("resolve: catalog name", () => {
   test("bare name → catalog → source URL → install", async () => {
     const out = await install("ares", dest, { name: "ares-cat", catalog: base })
     expect(out.n).toBe(3)
-    expect(out.origin.source).toMatch(/\/eikons\/ares\/manifest\.json$/)
+    expect(out.origin.source).toBe("ares")
+    expect(out.origin.packageUrl).toMatch(/\/eikons\/ares\/manifest\.json$/)
   })
 
   test("unknown name throws", async () => {

@@ -105,7 +105,7 @@ export async function previewSubmitBundle(opts: BundleOpts): Promise<SubmitBundl
     height: eikon.meta.height,
     poster: poster(eikon),
     source: `${eikon.meta.name}/`,
-    preview_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
+    runtime_url: `${eikon.meta.name}/${eikon.meta.name}.eikon`,
     package_url: manifest ? `${eikon.meta.name}/manifest.json` : undefined,
   }, "https://eikon.liftaris.dev/eikons/", { allowPrivate: true })
   return { root, packed, files, meta: eikon.meta, ...(manifest ? { manifest } : {}), catalog }

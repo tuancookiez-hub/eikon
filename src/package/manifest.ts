@@ -24,7 +24,7 @@ const isSafeText = (value: string) => !/[<>\u0000-\u001f]/.test(value)
 const isSha256 = (value: unknown) => typeof value === "string" && /^sha256:[A-Za-z0-9._~+/=-]+$/.test(value)
 const isEncoding = (value: unknown): value is PackageFileDescriptor["encoding"] => typeof value === "string" && (RUNTIME_ENCODINGS as readonly string[]).includes(value)
 const isRuntimePath = (path: string) => path.endsWith(LAUNCH_STREAM_EXTENSION) || /^blobs\/sha256\/[A-Fa-f0-9]{16,}(?:\.eikon)?$/.test(path)
-const STALE_DESCRIPTOR_ROLES = new Set(["stream", "source"])
+const STALE_DESCRIPTOR_ROLES = new Set(["stream", "source", "preview"])
 
 export function isSafeRelativePath(path: string): boolean {
   if (!path || path.startsWith("/") || path.startsWith("./") || path.includes("../") || path === "..") return false
@@ -99,6 +99,7 @@ export function validatePackageManifest(value: unknown, opts: PackageValidationO
     if (typeof path !== "string" || !isSafeRelativePath(path)) errs.push(problem(`entrypoints.${key}`, "safe relative path required"))
   }
   if ("signals" in raw) errs.push(problem("signals", "runtime signal mappings belong in the .eikon header"))
+  if ("preview" in raw || "previewUrl" in raw || "preview_url" in raw) errs.push(problem("preview", "serialized preview fields are retired; use runtimeUrl/runtime descriptor for live preview"))
   if (opts.registry && !Array.isArray(man.files)) errs.push(problem("files", "files descriptors required for registry packages"))
   for (const [index, file] of (man.files ?? []).entries()) validateDescriptor(file, index, opts, errs)
   const runtime = (man.files ?? []).find(file => file.role === "runtime" && file.path === man.entrypoints.default)
@@ -109,7 +110,6 @@ export function validatePackageManifest(value: unknown, opts: PackageValidationO
   }
   for (const ext of man.extensions?.required ?? []) errs.push(problem("extensions.required", `unknown required Eikon extension ${ext}`))
   if (man.poster && !isSafeRelativePath(man.poster)) errs.push(problem("poster", "safe relative path required"))
-  if (man.preview && !isSafeRelativePath(man.preview)) errs.push(problem("preview", "safe relative path required"))
   for (const bundle of man.bundles ?? []) {
     if (!bundle || typeof bundle !== "object" || typeof bundle.url !== "string") errs.push(problem("bundles.url", "bundle URL required"))
   }

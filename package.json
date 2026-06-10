@@ -5,8 +5,14 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./browser": "./src/browser.ts",
+    "./stream": "./src/stream/index.ts",
+    "./package": "./src/package/index.ts",
     "./catalog": "./src/catalog.ts",
+    "./install": "./src/install.ts",
+    "./source": "./src/source.ts",
+    "./lifecycle": "./src/lifecycle.ts",
+    "./submit": "./src/publish.ts",
+    "./browser": "./src/browser.ts",
     "./player": "./src/web/player.tsx"
   },
   "scripts": {
@@ -14,6 +20,7 @@
     "sshd": "bun run src/browse/sshd.tsx",
     "index": "bun src/cli.tsx index",
     "manifest": "bun src/cli.tsx manifest",
+    "verify:artifacts": "bun src/cli.tsx verify",
     "web:build": "bun run src/web/build.ts",
     "typecheck": "bunx tsc --noEmit"
   },

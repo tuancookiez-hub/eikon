@@ -33,7 +33,7 @@ const toEntry = (meta: Meta, p: string, path: string): Entry => {
     runtimeUrl,
     packageUrl,
     compatibility: { eikon: ">=1 <2", available: true },
-  })
+  }, { allowPrivate: true })
 }
 
 export function local(dir: string): Catalog {

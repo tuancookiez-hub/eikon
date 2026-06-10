@@ -119,7 +119,7 @@ function infoFor(name: string) {
 }
 
 function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>>, installed: boolean) {
-  const man = r.manifest as Manifest & { display?: { title?: string; author?: string }; compatibility?: { eikon?: string }; preview?: string; poster?: string }
+  const man = r.manifest as Manifest & { display?: { title?: string; author?: string }; compatibility?: { eikon?: string }; poster?: string }
   return {
     command: "inspect",
     name: r.name,
@@ -130,7 +130,7 @@ function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>
     sourceKind: r.origin.kind,
     sourceIdentity: r.origin.identityKey ?? r.origin.sourceKey ?? r.origin.repo ?? r.origin.source,
     compatibility: man.compatibility?.eikon ?? man.eikon_requires,
-    preview: !!man.preview,
+    runtime: true,
     poster: !!man.poster,
     installed,
     trust: r.trust.state,
@@ -322,6 +322,13 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async manifest(argv) {
     const a = args(argv)
     console.log(`wrote ${reg.manifest({ encoding: a.kv.gzip ? "gzip" : "identity" })} manifests`)
+  },
+
+  async verify(argv) {
+    const a = args(argv)
+    const result = await reg.verifyArtifacts({ base: a.pos[0], encoding: a.kv.identity ? "identity" : "gzip" })
+    if (!result.ok) die(`generated artifacts are stale:\n${result.diffs.join("\n")}`)
+    out(a, result, () => "✓ generated artifacts are fresh")
   },
 }
 

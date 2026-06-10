@@ -34,8 +34,9 @@ const stream: LaunchStreamRecord[] = [
     defaultSignal: "state.idle",
     signals: {
       ...defaultSignalMappings(),
+      "state.working": { clip: "busy", fallback: "state.thinking" },
       "approval.waiting": { clip: "thinking" },
-      "tool.running": { clip: "working", fallback: "state.thinking" },
+      "tool.running": { clip: "busy", fallback: "state.thinking" },
     },
     extensions: { used: ["eikon.triggers.v1"], required: [] },
   },
@@ -43,8 +44,8 @@ const stream: LaunchStreamRecord[] = [
   { type: "frame", clip: "idle", index: 0, rows },
   { type: "clip", name: "thinking", fps: 8, frameCount: 1, loopFrom: 0 },
   { type: "frame", clip: "thinking", index: 0, rows: ["....", "----"] },
-  { type: "clip", name: "working", fps: 16, frameCount: 1, loopFrom: 0 },
-  { type: "frame", clip: "working", index: 0, rows: ["!!!!", "++++"] },
+  { type: "clip", name: "busy", fps: 16, frameCount: 1, loopFrom: 0 },
+  { type: "frame", clip: "busy", index: 0, rows: ["!!!!", "++++"] },
   { type: "extension", extension: "eikon.triggers.v1", payload: { reserved: true } },
 ]
 
@@ -62,7 +63,7 @@ test("launch stream shape keeps signal mappings in the header", () => {
   expect(header.defaultSignal).toBe("state.idle")
   expect(Object.keys(header.signals).sort()).toContain("state.working")
   expect(Object.keys(header).sort()).toEqual(["author", "defaultSignal", "description", "eikon", "extensions", "id", "signals", "size", "title", "type", "version"])
-  expect(stream.filter(record => record.type === "clip").map(record => record.name)).toEqual(["idle", "thinking", "working"])
+  expect(stream.filter(record => record.type === "clip").map(record => record.name)).toEqual(["idle", "thinking", "busy"])
 })
 
 test("typed launch streams parse, resolve signals, and serialize round-trip", () => {
@@ -72,7 +73,8 @@ test("typed launch streams parse, resolve signals, and serialize round-trip", ()
   expect(parsed.meta.version).toBe(1)
   expect(parsed.meta.width).toBe(4)
   expect(parsed.clips.get("idle")?.frames[0]).toEqual(rows)
-  expect(resolveSignal(parsed, "state.working").clip).toBe("working")
+  expect(resolveSignal(parsed, "state.working").clip).toBe("busy")
+  expect(parsed.clips.has("working")).toBe(false)
   expect(resolveSignal(parsed, "tool.running").fallbackPath).toEqual(["tool.running"])
   expect(resolveSignal(parsed, "approval.waiting").clip).toBe("thinking")
   expect(resolveSignal(parsed, "approval.unknown").clip).toBe("idle")
@@ -134,7 +136,7 @@ test("malformed launch streams report line and record context", () => {
 
 test("launch streams reject signal fallback cycles", () => {
   const cycle = [
-    JSON.stringify({ ...stream[0], signals: { "state.idle": { clip: "idle", fallback: "state.working" }, "state.working": { clip: "working", fallback: "state.idle" } } }),
+    JSON.stringify({ ...stream[0], signals: { "state.idle": { clip: "idle", fallback: "state.working" }, "state.working": { clip: "busy", fallback: "state.idle" } } }),
     JSON.stringify(stream[1]),
     JSON.stringify(stream[2]),
     JSON.stringify(stream[5]),

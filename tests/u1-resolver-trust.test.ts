@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { resolve, install, downloadBytes, resolvePackageIndex, resolveGithubSource, verifyPackageFiles } from "../src/install"
+import { catalogMatchesInstalled, parseSourceSpec, summarizeLifecycle, previewLifecycle, updatePlan } from "../src"
 import type { EikonPackageManifest } from "../src"
 
 const root = mkdtempSync(join(tmpdir(), "eikon-u1-"))
@@ -91,6 +92,22 @@ describe("U1 source identity and trust", () => {
     expect(existsSync(join(dest, "bad"))).toBe(false)
   })
 
+  test("catalog manifest digest mismatch blocks before descriptor trust or writes", async () => {
+    const packageManifest = pkg("manifest-bad")
+    const entry = { manifest: packageManifest, packageUrl: "/packages/liftaris/manifest-bad/1.0.0.json", sourceKey: "registry:test:liftaris/manifest-bad@1.0.0", trust: { manifestDigest: "sha256:0000" } }
+    const srv = Bun.serve({ port: 0, fetch: req => {
+      const path = new URL(req.url).pathname
+      if (path === "/eikons/index.json") return Response.json([entry])
+      if (path === "/packages/liftaris/manifest-bad/1.0.0.json") return Response.json(packageManifest)
+      if (path === "/packages/liftaris/manifest-bad/streams/main.eikon") return new Response(launch)
+      return new Response("404", { status: 404 })
+    }})
+    try {
+      await expect(install("manifest-bad", dest, { catalog: `http://localhost:${srv.port}/eikons`, downloader: { allowPrivate: true } })).rejects.toThrow(/manifest digest/)
+      expect(existsSync(join(dest, "manifest-bad"))).toBe(false)
+    } finally { srv.stop() }
+  })
+
   test("remote descriptor digest mismatch blocks before writing local state", async () => {
     const remoteLaunch = launch.replace("abcd", "wxyz")
     const packageManifest = pkg("remote-bad")
@@ -172,6 +189,19 @@ describe("U1 GitHub catalog resolver", () => {
     expect(out.origin.sha).toBe("abc123")
   })
 
+  test("github: ref+selector grammar resolves through the same catalog path", async () => {
+    const repo = join(root, "catalog-ref-repo")
+    writeRegistryPackage(repo, "liftaris", "mono")
+    mkdirSync(join(repo, "eikons"), { recursive: true })
+    writeFileSync(join(repo, "eikons/index.json"), JSON.stringify([{ manifest: pkg("mono"), packageUrl: "../packages/liftaris/mono/1.0.0.json", sourceKey: "chosen:ref" }], null, 2))
+    const out = await resolve("github:user/repo#v1?selector=mono", { clone: async src => {
+      expect(src).toBe("https://github.com/user/repo.git#v1")
+      return { dir: repo, sha: "abc999", cleanup: false }
+    } })
+    expect(out.origin.sourceKey).toBe("chosen:ref")
+    expect(out.origin.resolvedRef).toBe("abc999")
+  })
+
   test("selector falls back to unambiguous package index and namespace/name selectors", async () => {
     const repo = join(root, "package-index-repo")
     writeRegistryPackage(repo, "liftaris", "mono")
@@ -214,6 +244,12 @@ describe("U1 production downloader boundary", () => {
   test("redacts credentials in download failures", async () => {
     await expect(downloadBytes("https://user:secret@cdn.example/pkg", { fetcher: async () => new Response("nope", { status: 404 }) })).rejects.toThrow(/https:\/\/\[redacted\]@cdn\.example\/pkg/)
   })
+
+  test("blocks credential redirects and URL path tricks", async () => {
+    await expect(downloadBytes("https://cdn.example/pkg", { fetcher: async () => new Response("", { status: 302, headers: { location: "https://user:secret@cdn.example/pkg" } }) })).rejects.toThrow(/credentials/)
+    await expect(downloadBytes("https://cdn.example/a/../pkg", { fetcher: async () => new Response("ok") })).rejects.toThrow(/path escape/)
+    await expect(downloadBytes("https://cdn.example/a\\pkg", { fetcher: async () => new Response("ok") })).rejects.toThrow(/unsafe characters/)
+  })
 })
 
 describe("U1 public export surface", () => {
@@ -224,9 +260,42 @@ describe("U1 public export surface", () => {
     expect("verifyPackageFiles" in eikon).toBe(true)
     expect("TRUST_STATES" in eikon).toBe(true)
 
+    for (const sub of ["stream", "package", "catalog", "install", "source", "lifecycle", "submit", "browser"]) {
+      const mod = await import(`eikon/${sub}`)
+      expect(mod).toBeTruthy()
+    }
     const catalog = await import("eikon/catalog")
     expect("resolveGithubSource" in catalog).toBe(false)
     expect("downloadBytes" in catalog).toBe(false)
     expect("verifyPackageFiles" in catalog).toBe(false)
+  })
+})
+
+
+describe("source and lifecycle helpers", () => {
+  test("normalizes launch source specs and reserves registry/project scope", () => {
+    expect(parseSourceSpec("catalog:nous")).toMatchObject({ kind: "catalog", name: "nous", sourceKey: "catalog:nous" })
+    expect(parseSourceSpec("pkg:https://cdn.example/p/manifest.json")).toMatchObject({ kind: "package-url", url: "https://cdn.example/p/manifest.json" })
+    expect(parseSourceSpec("github:user/repo#v1?selector=liftaris/mono")).toMatchObject({ kind: "github", owner: "user", repo: "repo", ref: "v1", selector: "liftaris/mono" })
+    expect(parseSourceSpec("npm:@scope/eikon@1.0.0")).toMatchObject({ kind: "registry", supported: false })
+    expect(() => parseSourceSpec("catalog+https://cdn.example/a/../index.json#x")).toThrow(/unsafe|escape/)
+  })
+
+  test("lifecycle helpers separate source identity from content identity", () => {
+    const man = pkg("life")
+    const current = summarizeLifecycle({ manifest: man, origin: { source: "catalog:life", sourceKey: "registry:test:life", packageUrl: "https://cdn.example/life/1.json" }, trust: { state: "verified" } })
+    const next = summarizeLifecycle({ manifest: { ...man, files: [{ ...man.files![0]!, digest: "sha256:changed" }] }, origin: { source: "catalog:life", sourceKey: "registry:test:life", packageUrl: "https://cdn.example/life/2.json" }, trust: { state: "verified" } })
+    expect(current.sourceKey).toBe("registry:test:life")
+    expect(current.contentDigest).not.toBe(next.contentDigest)
+    expect(updatePlan(current, next)).toMatchObject({ available: true, reason: "content digest changed" })
+    expect(previewLifecycle({ kind: "eikon.catalog.entry", schemaVersion: "1.0", id: "liftaris/life", sourceKey: "registry:test:life", name: "life", runtimeUrl: "https://cdn.example/life.eikon", packageUrl: "https://cdn.example/life.json", compatibility: { eikon: ">=1 <2" }, trust: { runtimeDigest: "sha256:runtime" } }).scope).toBe("temporary")
+    expect(previewLifecycle({ kind: "eikon.catalog.entry", schemaVersion: "1.0", id: "liftaris/life", sourceKey: "registry:test:life", name: "life", runtimeUrl: "https://cdn.example/life.eikon", packageUrl: "https://cdn.example/life.json", compatibility: { eikon: ">=1 <2" }, trust: { runtimeDigest: "sha256:runtime" } }).trust).toBe("unverified")
+  })
+
+  test("catalog matching rejects unrelated installed source identities", () => {
+    const entry = { kind: "eikon.catalog.entry", schemaVersion: "1.0", id: "liftaris/a", sourceKey: "registry:a", name: "a", runtimeUrl: "https://cdn.example/a.eikon", packageUrl: "https://cdn.example/a.json", compatibility: { eikon: ">=1 <2" } } as const
+    expect(summarizeLifecycle({ name: "b", origin: { sourceKey: "registry:b" } }).sourceKey).toBe("registry:b")
+    expect(catalogMatchesInstalled(entry, { name: "b", origin: { sourceKey: "registry:b" } })).toBe(false)
+    expect(catalogMatchesInstalled(entry, { name: "a", origin: { sourceKey: "registry:a" } })).toBe(true)
   })
 })

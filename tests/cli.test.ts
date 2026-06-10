@@ -157,7 +157,7 @@ describe("eikon CLI lifecycle", () => {
   test("search returns stable empty JSON results", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "eikon-cli-"))
     const srv = Bun.serve({ port: 0, fetch(req) {
-      if (new URL(req.url).pathname === "/index.json") return Response.json([{ name: "ares", package_url: "https://example.com/packages/ares.json", runtime_url: "https://example.com/ares.eikon" }])
+      if (new URL(req.url).pathname === "/index.json") return Response.json([{ name: "ares", package_url: "packages/ares.json", runtime_url: "ares.eikon" }])
       return new Response("missing", { status: 404 })
     }})
     try {
