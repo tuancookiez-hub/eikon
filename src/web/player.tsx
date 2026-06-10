@@ -3,9 +3,11 @@ import {
   loadCatalogEntries,
   loadRuntimeArtifact,
   parseLaunchStream,
+  publicCatalogUrl,
   type BrowserClip,
   type BrowserEikon,
   type CatalogEntry,
+  type CatalogOptions,
 } from "../browser"
 
 export type PreviewState =
@@ -38,6 +40,8 @@ export type WebCatalogOptions = Partial<WebPolicy> & {
 }
 
 const defaults: WebPolicy = { maxBytes: 5_000_000, timeoutMs: 8_000, concurrency: 3, cacheEntries: 24 }
+const defaultCatalogBase = "/eikons"
+const fallbackOrigin = "https://eikon.liftaris.dev"
 const keyFor = (entry: CatalogEntry) => entry.sourceKey || entry.id || entry.name
 const previewFor = (entry: CatalogEntry) => entry.runtimeUrl
 const cacheFor = (entry: CatalogEntry) => [
@@ -96,19 +100,33 @@ export function webPlaybackFrame(eikon: BrowserEikon, state: string, tickMs: num
 
 export function safePublicUrl(raw: string): string {
   const loc = typeof location === "undefined" ? undefined : location
-  const url = new URL(raw, loc?.origin ?? "https://eikon.liftaris.dev")
+  const url = new URL(raw, loc?.origin ?? fallbackOrigin)
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("unsafe browser URL")
   return url.toString()
 }
 
+function privateBrowserOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname.toLowerCase()
+    return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "[::1]" || host === "::1" || host.startsWith("10.") || host.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  } catch {
+    return false
+  }
+}
+
+function browserCatalogBase(raw = defaultCatalogBase): { base: string; options: CatalogOptions } {
+  const loc = typeof location === "undefined" ? undefined : location
+  const origin = loc?.origin ?? fallbackOrigin
+  const pathRelative = !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(raw)
+  const options = pathRelative && privateBrowserOrigin(origin) ? { allowPrivate: true } : {}
+  const base = publicCatalogUrl(raw, pathRelative || raw.startsWith("//") ? origin : undefined, options)
+  return { base, options }
+}
+
 export function browserInstructions(entry: CatalogEntry) {
   const target = safePublicUrl(entry.packageUrl)
-  const preview = safePublicUrl(previewFor(entry))
   const command = `herm eikon install ${shellArg(target)}`
-  return {
-    command,
-    manual: `Copy the command into Herm locally. Preview source: ${preview}`,
-  }
+  return { command }
 }
 
 class Limiter {
@@ -206,8 +224,13 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
       state.status = "loading"
       state.error = undefined
       try {
-        const base = opts.base ?? "/eikons"
-        state.entries = loader ? await loader(base, fetcher) : await loadCatalogEntries(base, fetcher)
+        const base = opts.base ?? defaultCatalogBase
+        if (loader) {
+          state.entries = await loader(base, fetcher)
+        } else {
+          const catalog = browserCatalogBase(base)
+          state.entries = await loadCatalogEntries(catalog.base, fetcher, catalog.options)
+        }
         state.previews = {}
         inflight.clear()
         state.status = "ready"

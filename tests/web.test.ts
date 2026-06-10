@@ -132,6 +132,42 @@ describe("web gallery model", () => {
     expect(seen).toEqual(["/eikons/index.json", runtimePath])
   })
 
+  test("resolves the default browser catalog against the current origin", async () => {
+    const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location")
+    Object.defineProperty(globalThis, "location", { value: new URL("https://preview.example/gallery"), configurable: true })
+    try {
+      const seen: string[] = []
+      const catalog = createWebCatalog({
+        fetch: (async (input: string | URL | Request) => {
+          seen.push(String(input))
+          if (String(input) === "https://preview.example/eikons/index.json") return new Response(index)
+          return new Response("missing", { status: 404 })
+        }) as unknown as typeof fetch,
+      })
+
+      await catalog.refresh()
+
+      expect(catalog.state.status).toBe("ready")
+      expect(catalog.state.entries.map(item => item.name)).toEqual(["cycle"])
+      expect(seen).toEqual(["https://preview.example/eikons/index.json"])
+    } finally {
+      if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation)
+      else Reflect.deleteProperty(globalThis, "location")
+    }
+  })
+
+  test("absolute private catalog URLs stay blocked in the browser model", async () => {
+    const catalog = createWebCatalog({
+      base: "http://169.254.169.254/eikons",
+      fetch: (async () => new Response(index)) as unknown as typeof fetch,
+    })
+
+    await catalog.refresh()
+
+    expect(catalog.state.status).toBe("error")
+    expect(catalog.state.error).toMatch(/private host/)
+  })
+
   test("parses launch stream previews from public exports", () => {
     const doc = parsePreview(launch)
     expect(doc.meta.version).toBe(1)
@@ -168,8 +204,7 @@ describe("web gallery model", () => {
 
   test("instructions are copyable and discovery-only", () => {
     const safe = browserInstructions(entry)
-    expect(safe.command).toBe(`herm eikon install ${entry.packageUrl}`)
-    expect(safe.manual).toBe(`Copy the command into Herm locally. Preview source: ${entry.runtimeUrl}`)
+    expect(safe).toEqual({ command: `herm eikon install ${entry.packageUrl}` })
     expect(() => browserInstructions({ ...entry, packageUrl: "javascript:alert(1)" })).toThrow(/unsafe/)
   })
 

@@ -19,6 +19,9 @@ await writeFile(join(root, "index.html"), `<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>𝝴ikon</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&display=swap" />
   <script type="module" src="/assets/main.js"></script>
   <link rel="stylesheet" href="/assets/main.css" />
 </head>

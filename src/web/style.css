@@ -2,10 +2,12 @@
   color-scheme: dark;
   background: #050505;
   color: #e7e7e7;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --mono: "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  font-family: var(--mono);
   --bg: #050505;
   --panel: #090909;
   --panel-2: #0d0d0d;
+  --preview-surface: #020202;
   --line: #2a2a2a;
   --line-strong: #6f6f6f;
   --text: #e7e7e7;
@@ -13,7 +15,7 @@
   --dim: #686868;
   --ok: #a8d5a8;
   --err: #ffb4b4;
-  --terminal-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  --terminal-font: var(--mono);
   --terminal-line-height: 2.44ch;
 }
 
@@ -30,6 +32,7 @@ main { width: min(1440px, calc(100% - 32px)); min-width: 0; margin: 0 auto; padd
 .detail,
 .detailBody,
 .preview,
+.previewPanel,
 .instructions,
 .card,
 .cardPreview,
@@ -104,7 +107,7 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  background: #020202;
+  background: var(--preview-surface);
   border: 1px solid var(--line);
   container-type: inline-size;
 }
@@ -138,31 +141,63 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
 }
 .name { color: var(--text); font-size: 17px; }
 .meta { color: var(--muted); }
-.detail { position: sticky; top: 14px; align-self: start; border: 1px solid var(--line); background: var(--panel); padding: 14px; container-type: inline-size; }
+.detail {
+  position: sticky;
+  top: 14px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  height: var(--detail-height, calc(100dvh - 14px));
+  max-height: calc(100dvh - 14px);
+  width: min(100%, var(--selected-preview-width, 100%));
+  min-height: 360px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  justify-self: center;
+  container-type: inline-size;
+}
 .drawerHandle { display: none; }
-.preview { display: grid; gap: 10px; }
+.detailBody { display: grid; flex: 1; height: 100%; min-height: 0; border: 0; background: transparent; }
+.preview { display: flex; flex-direction: column; gap: 0; height: 100%; min-height: 0; border: 0; background: transparent; }
 .previewHead { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
 .previewHead h2 { margin-bottom: 2px; }
 .ascii {
   display: grid;
-  place-items: center;
-  width: max-content;
+  justify-items: center;
+  align-items: start;
+  width: 100%;
   max-width: 100%;
-  aspect-ratio: 1 / 1;
-  justify-self: center;
-  overflow: hidden;
-  padding: 12px;
-  background: #020202;
-  border: 1px solid var(--line);
+  justify-self: stretch;
+  overflow: visible;
+  padding: 0;
+  background: var(--preview-surface);
+  border: 0;
   color: var(--text);
-  font-size: clamp(8.5px, .82vw, 11px);
+  font-size: var(--selected-preview-font-size, clamp(5.5px, .52vw, 8px));
 }
+.previewPanel {
+  flex: 1 1 0;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 14px;
+  border: 3px double var(--line);
+  border-bottom: 0;
+  background: var(--panel);
+}
+.previewPanel * { min-width: 0; }
 .states { display: flex; flex-wrap: wrap; gap: 8px; }
 .states .active { border-color: var(--line-strong); background: #161616; }
 .previewStatus { margin-top: -2px; }
-.instructions { display: grid; gap: 10px; margin-top: 18px; }
+.drawerExtras { display: grid; gap: 12px; padding-top: 2px; overflow-wrap: anywhere; word-break: break-word; }
+.instructions { display: grid; gap: 10px; overflow-wrap: anywhere; word-break: break-word; }
 code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); background: #020202; color: var(--text); overflow-wrap: anywhere; }
-.instructions > code, .notice code { display: block; padding: 10px; white-space: pre-wrap; }
+.instructions > code, .notice code { display: block; max-width: 100%; padding: 10px; white-space: pre-wrap; word-break: break-word; }
 
 @media (max-width: 980px) {
   main { width: 100%; padding: 10px 10px calc(62px + env(safe-area-inset-bottom)); }
@@ -180,9 +215,15 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
     bottom: 0;
     top: auto;
     z-index: 5;
+    display: block;
+    width: auto;
+    justify-self: stretch;
+    height: auto;
+    max-height: none;
+    min-height: 0;
     padding: 0;
     overflow: hidden;
-    box-shadow: 0 -1px 0 var(--line), 0 -18px 40px rgba(0, 0, 0, .5);
+    box-shadow: none;
     transition: height .18s ease;
     overscroll-behavior: contain;
   }
@@ -210,6 +251,7 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .drawerTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .drawerCue { color: var(--dim); font-size: 12px; text-transform: lowercase; }
   .detailBody {
+    display: grid;
     height: calc(100% - 48px);
     overflow: auto;
     padding: 12px;
@@ -223,21 +265,6 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .detail.drawer-peek .drawerExtras,
   .detail.drawer-peek .previewStatus { display: none; }
   .detail.drawer-peek .previewOptions { display: none; }
-  .previewHead { display: none; }
-  .ascii { font-size: clamp(6.5px, 2.15vw, 11px); }
   .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .states button { padding-left: 8px; padding-right: 8px; }
-  @container (min-width: 640px) {
-    .detail.drawer-peek .preview {
-      grid-template-columns: max-content minmax(160px, 1fr);
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-    }
-    .detail.drawer-peek .previewOptions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-self: center;
-    }
-  }
 }
