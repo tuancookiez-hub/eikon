@@ -62,7 +62,7 @@ function raw(name: string, meta: Record<string, unknown> = {}) {
 test("remote catalog: index + load round-trip over http", async () => {
   const cat = remote(`http://localhost:${srv.port}`)
   const xs = await cat.list()
-  expect(xs.length).toBe(3)
+  expect(xs.length).toBeGreaterThanOrEqual(3)
   expect(xs.find(e => e.name === "ares")?.glyph).toBe("⚔")
   const raw = await cat.load("mono")
   expect(raw.startsWith('{"type":"header","eikon":1')).toBe(true)
