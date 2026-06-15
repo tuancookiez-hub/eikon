@@ -163,12 +163,24 @@ describe("previewSubmitBundle", () => {
 })
 
 describe("githubSubmitBackend", () => {
+  test("auth preflight checks the active GitHub account only", async () => {
+    const calls: string[][] = []
+    const backend = githubSubmitBackend("liftaris/eikon", async args => {
+      calls.push(args)
+      if (args.join(" ") === "api user -q .login") return "kaio"
+      throw new Error(`unexpected gh call: ${args.join(" ")}`)
+    })
+
+    expect(await backend.check()).toEqual({ ok: true })
+    expect(calls).toEqual([["api", "user", "-q", ".login"]])
+  })
+
   test("updates existing files on rerun", async () => {
     const fx = seed()
     const bundle = await previewSubmitBundle({ path: fx.file })
-    const puts: Array<Record<string, string>> = []
+    const puts: Array<{ args: string[]; body: Record<string, string> }> = []
     const existing = new Set<string>()
-    const run = async (args: string[]) => {
+    const run = async (args: string[], input?: string) => {
       const path = args[3] ?? ""
       if (args[0] === "repo") return ""
       if (args[1] === "user") return "kaio"
@@ -179,7 +191,7 @@ describe("githubSubmitBackend", () => {
         return JSON.stringify({ sha: "existing-sha" })
       }
       if (args[2] === "PUT") {
-        puts.push(Object.fromEntries(args.filter(a => !a.startsWith("-f") && a.includes("=")).map(a => a.split("=", 2))))
+        puts.push({ args, body: JSON.parse(input ?? "{}") })
         existing.add(path)
         return ""
       }
@@ -192,7 +204,10 @@ describe("githubSubmitBackend", () => {
     await backend.create(submission(bundle))
 
     expect(puts).toHaveLength(2)
-    expect(puts[0]?.sha).toBeUndefined()
-    expect(puts[1]?.sha).toBe("existing-sha")
+    expect(puts[0]?.args).toEqual(["api", "-X", "PUT", "repos/kaio/eikon/contents/eikons/demo/demo.eikon", "--input", "-"])
+    expect(puts[0]?.args.some(a => a.startsWith("content="))).toBe(false)
+    expect(puts[0]?.body.sha).toBeUndefined()
+    expect(puts[0]?.body.content).toBeString()
+    expect(puts[1]?.body.sha).toBe("existing-sha")
   })
 })
