@@ -22,6 +22,7 @@ const base: Plan = {
     { filename: "packages/liftaris/ovo/index.json", status: "removed" },
     { filename: "packages/liftaris/ovo/blobs/sha256/abc", status: "removed" },
   ],
+  baseIndex: JSON.stringify([{ name: "ares", id: "liftaris/ares" }, { name: "ovo", id: "liftaris/ovo" }]),
   index: JSON.stringify([{ name: "ares", id: "liftaris/ares" }]),
 }
 
@@ -46,5 +47,10 @@ describe("auto-delist validation", () => {
 
   test("rejects index entries that still list the eikon", () => {
     expect(validate({ ...base, index: JSON.stringify([{ name: "ovo", id: "liftaris/ovo" }]) }).join("\n")).toContain("still contains")
+  })
+
+  test("rejects index changes beyond removing the delisted eikon", () => {
+    expect(validate({ ...base, index: JSON.stringify([{ name: "ares", id: "liftaris/ares", title: "changed" }]) }).join("\n")).toContain("must only remove")
+    expect(validate({ ...base, index: JSON.stringify([]) }).join("\n")).toContain("must only remove")
   })
 })

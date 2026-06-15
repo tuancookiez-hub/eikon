@@ -17,6 +17,7 @@ export type Plan = {
   submitter?: string
   files: PrFile[]
   baseFiles: string[]
+  baseIndex: string
   index: string
 }
 
@@ -84,8 +85,11 @@ export function validate(plan: Plan): string[] {
     if (map.get(file) !== "removed") errs.push(`Missing removal for ${file}`)
   }
   if (map.get("eikons/index.json") !== "modified") errs.push("eikons/index.json must be updated")
+  const base = JSON.parse(plan.baseIndex) as Array<{ name?: string; id?: string }>
   const index = JSON.parse(plan.index) as Array<{ name?: string; id?: string }>
+  const want = base.filter(entry => entry.name !== plan.name && entry.id !== plan.id)
   if (index.some(entry => entry.name === plan.name || entry.id === plan.id)) errs.push("eikons/index.json still contains the delisted eikon")
+  if (JSON.stringify(index) !== JSON.stringify(want)) errs.push("eikons/index.json must only remove the delisted eikon")
   return errs
 }
 
@@ -128,13 +132,14 @@ async function run() {
     submitter: await submitter(name, id),
     files: await pages<PrFile>(`/repos/${repo}/pulls/${pull.number}/files`),
     baseFiles,
+    baseIndex: await content(repo, "eikons/index.json", "main"),
     index: await content(headRepo, "eikons/index.json", pull.head.sha),
   }
   const errs = validate(plan)
   if (errs.length) throw new Error(errs.join("\n"))
   await req(`/repos/${repo}/pulls/${pull.number}/merge`, {
     method: "PUT",
-    body: JSON.stringify({ merge_method: "squash", commit_title: `eikons: delist ${name}` }),
+    body: JSON.stringify({ sha: pull.head.sha, merge_method: "squash", commit_title: `eikons: delist ${name}` }),
   })
   console.log(`merged delist for ${name}`)
 }
