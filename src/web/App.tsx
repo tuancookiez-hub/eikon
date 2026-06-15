@@ -244,6 +244,14 @@ export function App() {
           </div>
         </aside>
       </section>
+
+      <iframe
+        className="sponsor"
+        src="https://github.com/sponsors/liftaris/button"
+        title="Sponsor liftaris"
+        height="32"
+        width="114"
+      />
     </main>
   )
 }
