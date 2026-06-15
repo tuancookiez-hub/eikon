@@ -17,6 +17,7 @@
     "./lifecycle": "./src/lifecycle.ts",
     "./submit": "./src/publish.ts",
     "./registry/supabase": "./src/registry/supabase/index.ts",
+    "./registry/supabase/client": "./src/registry/supabase/client.ts",
     "./browser": "./src/browser.ts",
     "./player": "./src/web/player.tsx"
   },
@@ -41,14 +42,14 @@
     "@opentui/core": "^0.1.99",
     "@opentui/react": "^0.1.99",
     "@supabase/supabase-js": "^2.108.2",
-    "@tanstack/react-query": "^5.101.0",
-    "@tanstack/react-router": "^1.170.15",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "ssh2": "^1.16.0"
   },
   "devDependencies": {
     "@tanstack/router-plugin": "^1.168.18",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-router": "^1.170.15",
     "@testing-library/react": "^16.3.2",
     "@types/bun": "latest",
     "@types/react": "^19.2.14",

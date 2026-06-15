@@ -2,7 +2,7 @@
 import { admin } from "../_shared/db.ts"
 import { user } from "../_shared/auth.ts"
 import { preflight } from "../_shared/cors.ts"
-import { bad, json } from "../_shared/responses.ts"
+import { writeBad, writeJson } from "../_shared/responses.ts"
 import { bytes, sha256 } from "../_shared/digest.ts"
 
 declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Response | Promise<Response>): void }
@@ -34,16 +34,16 @@ async function init(req: Request) {
     requested_manifest: { name: body.name ?? "unknown" },
   }).select("id").single()
   if (error) throw error
-  return json({ uploadId: data.id, accepted: true })
+  return writeJson(req, { uploadId: data.id, accepted: true })
 }
 
 function find(files: UploadFile[], suffix: string) {
   return files.find(file => file.path.endsWith(suffix))
 }
 
-async function upload(db: ReturnType<typeof admin>, path: string, content: string, type: string) {
+async function upload(db: ReturnType<typeof admin>, path: string, content: string, type: string, upsert = false) {
   const raw = bytes(content)
-  const { error } = await db.storage.from("eikon-artifacts").upload(path, raw, { upsert: true, contentType: type })
+  const { error } = await db.storage.from("eikon-artifacts").upload(path, raw, { upsert, contentType: type })
   if (error) throw new Error(error.message)
   return raw
 }
@@ -67,16 +67,24 @@ async function finalize(req: Request) {
   const sourceKey = `registry:eikon.liftaris.dev:${namespace}/${name}@${version}`
   const runtime = manifest.files?.find((file: { role?: string; path?: string }) => file.role === "runtime" && file.path === manifest.entrypoints.default)
   if (!runtime?.digest || typeof runtime.size !== "number") throw new Error("runtime descriptor missing digest or size")
-  const pkg = await db.from("packages").upsert({
+  const existing = await db.from("packages").select("id,created_by,visibility,delisted_at,origin_kind").eq("source_key", sourceKey).maybeSingle()
+  if (existing.error) throw existing.error
+  if (existing.data && existing.data.created_by !== u.id) throw new Error("package already belongs to another creator")
+  if (existing.data?.delisted_at || existing.data?.visibility === "delisted") throw new Error("package is delisted; relist requires maintainer action")
+  if (existing.data?.origin_kind === "github-mirror") throw new Error("mirrored GitHub package cannot be overwritten by hosted upload")
+  const pkg = existing.data ?? (await db.from("packages").insert({
     namespace, name, canonical_id: `${namespace}/${name}`, source_key: sourceKey, created_by: u.id, origin_kind: "supabase", visibility: "public",
-  }, { onConflict: "source_key" }).select("id").single()
-  if (pkg.error) throw pkg.error
-  const manifestRaw = await upload(db, `packages/${namespace}/${name}/${version}.json`, manifestFile.content, "application/json")
+  }).select("id").single()).data
+  if (!pkg) throw new Error("package insert failed")
+  const prior = await db.from("package_versions").select("manifest_digest,runtime_digest").eq("package_id", pkg.id).eq("version", version).maybeSingle()
+  const manifestRaw = await upload(db, `packages/${namespace}/${name}/${version}.json`, manifestFile.content, "application/json", !prior.data)
+  const digest = await sha256(manifestRaw)
+  if (prior.data && (prior.data.manifest_digest !== digest || prior.data.runtime_digest !== runtime.digest)) throw new Error("package version already exists with different content")
   const ver = await db.from("package_versions").upsert({
-    package_id: pkg.data.id,
+    package_id: pkg.id,
     version,
     manifest,
-    manifest_digest: await sha256(manifestRaw),
+    manifest_digest: digest,
     runtime_digest: runtime.digest,
     runtime_size: runtime.size,
     runtime_encoding: runtime.encoding,
@@ -87,15 +95,15 @@ async function finalize(req: Request) {
     status: "published",
   }, { onConflict: "package_id,version" }).select("id").single()
   if (ver.error) throw ver.error
-  await db.from("package_files").delete().eq("version_id", ver.data.id)
+  if (!prior.data) await db.from("package_files").delete().eq("version_id", ver.data.id)
   for (const desc of manifest.files ?? []) {
     if (!safePath(desc.path)) throw new Error(`unsafe descriptor path: ${desc.path}`)
     const source = body.files.find(file => file.path.endsWith(`/${desc.path}`) || file.path === desc.path)
     if (!source?.content) throw new Error(`missing uploaded descriptor file: ${desc.path}`)
-    const raw = await upload(db, `packages/${namespace}/${name}/${desc.path}`, source.content, desc.mediaType)
+    const raw = await upload(db, `packages/${namespace}/${name}/${desc.path}`, source.content, desc.mediaType, !prior.data)
     if (raw.length !== desc.size) throw new Error(`size mismatch: ${desc.path}`)
     if (await sha256(raw) !== desc.digest) throw new Error(`digest mismatch: ${desc.path}`)
-    const row = await db.from("package_files").insert({
+    const row = await db.from("package_files").upsert({
       version_id: ver.data.id,
       path: desc.path,
       role: desc.role,
@@ -108,26 +116,26 @@ async function finalize(req: Request) {
       decoded_size: desc.decodedSize,
       decoded_digest: desc.decodedDigest,
       signal: desc.signal,
-    })
+    }, { onConflict: "version_id,path" })
     if (row.error) throw row.error
   }
-  await db.from("packages").update({ current_version_id: ver.data.id, visibility: "public" }).eq("id", pkg.data.id)
-  await db.rpc("ensure_package_stats", { pid: pkg.data.id })
+  await db.from("packages").update({ current_version_id: ver.data.id, visibility: "public" }).eq("id", pkg.id)
+  await db.rpc("ensure_package_stats", { pid: pkg.id })
   await db.from("upload_sessions").update({ status: "finalized", finalized_at: new Date().toISOString() }).eq("id", session.id)
-  return json({ url: `${Deno.env.get("EIKON_REGISTRY_PUBLIC_URL") ?? "http://127.0.0.1:55321/functions/v1/registry"}/gallery/${encodeURIComponent(sourceKey)}`, id: sourceKey, name })
+  return writeJson(req, { url: `${Deno.env.get("EIKON_REGISTRY_PUBLIC_URL") ?? "http://127.0.0.1:55321/functions/v1/registry"}/gallery/${encodeURIComponent(sourceKey)}`, id: sourceKey, name })
 }
 
 async function handle(req: Request) {
   const option = preflight(req, true)
   if (option) return option
-  if (req.method !== "POST") return bad("method not allowed", 405)
+  if (req.method !== "POST") return writeBad(req, "method not allowed", 405)
   try {
     const path = new URL(req.url).pathname
     if (path.endsWith("/init")) return await init(req)
     if (path.endsWith("/finalize")) return await finalize(req)
-    return bad("not found", 404)
+    return writeBad(req, "not found", 404)
   } catch (err) {
-    return bad(err instanceof Error ? err.message : JSON.stringify(err), err instanceof Error && err.message.includes("authentication") ? 401 : 500)
+    return writeBad(req, err instanceof Error ? err.message : JSON.stringify(err), err instanceof Error && err.message.includes("authentication") ? 401 : 500)
   }
 }
 

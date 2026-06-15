@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { Route as root } from "./__root"
 import { supabase } from "../lib/supabase"
-import { functionsUrl, config } from "../../registry/supabase"
+import { functionsUrl, config } from "../../registry/supabase/client"
 
 export const Route = createRoute({
   getParentRoute: () => root,

@@ -1,7 +1,5 @@
 create or replace view public.registry_catalog_entries as
 select
-  p.id as package_id,
-  pv.id as version_id,
   p.canonical_id,
   p.namespace,
   p.name,
@@ -39,10 +37,8 @@ grant select on public.registry_catalog_entries to anon, authenticated;
 
 create or replace view public.registry_platform_metadata as
 select
-  p.id as package_id,
   p.canonical_id as catalog_id,
   p.source_key,
-  p.created_by,
   p.origin_kind,
   p.submit_pr_url,
   coalesce(s.download_count, 0) as downloads,

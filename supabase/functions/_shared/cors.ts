@@ -18,7 +18,7 @@ export function publicHeaders(extra: HeadersInit = {}) {
 
 export function writeHeaders(req: Request, extra: HeadersInit = {}) {
   const origin = req.headers.get("origin") ?? ""
-  const allowed = writeOrigins.includes(origin) ? origin : writeOrigins[0] ?? ""
+  const allowed = !origin || writeOrigins.includes(origin) ? origin : ""
   return {
     "access-control-allow-origin": allowed,
     "access-control-allow-methods": writeMethods,

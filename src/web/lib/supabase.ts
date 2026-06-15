@@ -1,4 +1,4 @@
-import { client } from "../../registry/supabase"
+import { client } from "../../registry/supabase/client"
 
 export const supabase = client()
 

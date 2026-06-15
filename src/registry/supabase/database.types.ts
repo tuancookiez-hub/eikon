@@ -13,8 +13,8 @@ export type Database = {
       package_stats: { Row: { package_id: string; download_count: number; like_count: number; share_count: number; updated_at: string } }
     }
     Views: {
-      registry_catalog_entries: { Row: { package_id: string; version_id: string; canonical_id: string; namespace: string; name: string; version: string; source_key: string; title: string | null; author: string | null; description: string | null; glyph: string | null; tags: Json | null; poster: string | null; package_path: string; package_index_path: string; runtime_path: string; trust: Json } }
-      registry_platform_metadata: { Row: { package_id: string; catalog_id: string; source_key: string; created_by: string | null; origin_kind: string; submit_pr_url: string | null; downloads: number; likes: number; shares: number } }
+      registry_catalog_entries: { Row: { canonical_id: string; namespace: string; name: string; version: string; source_key: string; title: string | null; author: string | null; description: string | null; glyph: string | null; tags: Json | null; poster: string | null; package_path: string; package_index_path: string; runtime_path: string; trust: Json } }
+      registry_platform_metadata: { Row: { catalog_id: string; source_key: string; origin_kind: string; submit_pr_url: string | null; downloads: number; likes: number; shares: number } }
     }
     Functions: {
       record_platform_event: { Args: { pid: string; kind: string; event_source?: string; event_rate_key?: string }; Returns: Database['public']['Tables']['package_stats']['Row'] }

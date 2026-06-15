@@ -170,7 +170,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
 
   async publish(argv) {
     if (argv.includes("--help")) {
-      console.log(`eikon publish <file.eikon>\n\nGitHub PR contribution helper for ${REPO}. Set EIKON_REPO=owner/repo to target a different catalog. This prepares a normal GitHub contribution with gh; no hosted upload/auth service, dashboard, or moderation product is involved.`)
+      console.log(`eikon publish <file.eikon>\n\nContribution helper for ${REPO}. Hosted Supabase registry uploads are available when configured through eikon.liftaris.dev; this CLI path remains the GitHub PR fallback. Set EIKON_REPO=owner/repo to target a different GitHub catalog.`)
       return
     }
     const path = argv[0] ?? die("usage: eikon publish <file>")

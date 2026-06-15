@@ -50,7 +50,10 @@ async function run() {
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as EikonPackageManifest
     const manifestBytes = readFileSync(manifestPath)
     const sourceKey = entry.sourceKey || `registry:eikon.liftaris.dev:${entry.id}@${version}`
-    const pkg = await one(db.from("packages").upsert({
+    const existing = await db.from("packages").select("id,origin_kind,visibility,delisted_at,current_version_id").eq("source_key", sourceKey).maybeSingle()
+    if (existing.error) throw existing.error
+    if (existing.data?.origin_kind === "supabase") continue
+    const pkg = (existing.data ?? await one(db.from("packages").insert({
       namespace,
       name,
       canonical_id: entry.id,
@@ -60,7 +63,11 @@ async function run() {
       origin_ref: "main",
       visibility: "public",
       github_login_at_submit: entry.author,
-    }, { onConflict: "source_key" }).select("id").single())
+    }).select("id,visibility,delisted_at").single())) as { id: string; visibility: string; delisted_at: string | null }
+    const active = !pkg.delisted_at && pkg.visibility !== "delisted"
+    if (!active) continue
+    const prior = await db.from("package_versions").select("manifest_digest,runtime_digest").eq("package_id", pkg.id).eq("version", version).maybeSingle()
+    if (prior.data && (prior.data.manifest_digest !== (entry.trust?.manifestDigest ?? sha(manifestBytes)) || prior.data.runtime_digest !== (entry.trust?.runtimeDigest ?? manifest.files?.find(f => f.role === "runtime")?.digest))) continue
     const ver = await one(db.from("package_versions").upsert({
       package_id: pkg.id,
       version,
@@ -74,7 +81,7 @@ async function run() {
       poster: entry.poster,
       status: "published",
     }, { onConflict: "package_id,version" }).select("id").single())
-    await one(db.from("packages").update({ current_version_id: ver.id, visibility: "public" }).eq("id", pkg.id).select("id").single())
+    await one(db.from("packages").update({ current_version_id: ver.id, visibility: "public" }).eq("id", pkg.id).is("delisted_at", null).select("id").single())
     await db.from("package_files").delete().eq("version_id", ver.id)
     const upload = async (path: string, bytes: Uint8Array, media: string) => {
       const { error } = await db.storage.from("eikon-artifacts").upload(path, bytes, { upsert: true, contentType: media })

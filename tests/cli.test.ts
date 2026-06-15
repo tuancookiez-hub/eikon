@@ -185,12 +185,12 @@ describe("eikon CLI lifecycle", () => {
     }
   })
 
-  test("publish help frames GitHub contribution helper without hosted marketplace upload", async () => {
+  test("publish help frames hosted registry and GitHub fallback", async () => {
     const out = await run(["publish", "--help"], { HERM_CONFIG_DIR: mkdtempSync(join(tmpdir(), "eikon-cli-")) })
     expect(out.code).toBe(0)
-    expect(out.stdout).toContain("GitHub PR contribution helper")
+    expect(out.stdout).toContain("Hosted Supabase registry uploads")
+    expect(out.stdout).toContain("GitHub PR fallback")
     expect(out.stdout).toContain("EIKON_REPO")
-    expect(out.stdout).not.toContain("marketplace account")
     expect(out.stdout).not.toContain("upload token")
   })
 })

@@ -53,5 +53,3 @@ export function supabaseSubmitBackend(opts: SupabaseSubmitOptions = {}): SubmitB
     },
   }
 }
-
-
