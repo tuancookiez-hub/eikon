@@ -1,8 +1,10 @@
-import { parse, STATES, type Eikon, type State } from "./eikon"
-import { existsSync } from "node:fs"
+import { parse, STATES, type Eikon } from "./eikon"
+import { readFileSync, statSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { join, dirname, basename } from "node:path"
 import { isIP } from "node:net"
-import type { Origin } from "../install"
+import { validatePackageManifest } from "../package/manifest"
+import type { EikonPackageManifest } from "../contract/shape"
 
 export const NAME_RE = /^[a-z0-9-]{2,32}$/
 const PUBLIC_URL_FIELDS = ["source_url", "homepage_url", "repository_url"]
@@ -21,30 +23,27 @@ export function lint(raw: string): Eikon {
   return e
 }
 
-export type Manifest = {
-  name: string
-  version: number
-  eikon_requires?: string
-  source?: string
-  states: Partial<Record<State, { file: string }>>
-  origin?: Origin
+export type Manifest = EikonPackageManifest
+
+function sha(path: string): string {
+  return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`
 }
 
-/** Validate an eikons/<name>/manifest.json: schema + referenced files
- *  exist relative to its directory + name matches its folder. */
+/** Validate an eikons/<name>/manifest.json final package manifest. */
 export function lintManifest(path: string, raw: string): Manifest {
-  const man = JSON.parse(raw) as Manifest & Record<string, unknown>
+  const man = validatePackageManifest(JSON.parse(raw), { registry: true })
   const dir = dirname(path)
   const errs: string[] = []
-  if ("license" in man || "provenance" in man) errs.push("manifest must not contain license or provenance")
-  if (!NAME_RE.test(man.name)) errs.push(`name "${man.name}" must match ${NAME_RE}`)
   if (basename(dir) !== man.name) errs.push(`name "${man.name}" ≠ folder "${basename(dir)}"`)
-  if (man.source && !existsSync(join(dir, man.source))) errs.push(`source: ${man.source} missing`)
-  if (!man.states || typeof man.states !== "object") errs.push("states: object required")
-  else for (const [st, v] of Object.entries(man.states)) {
-    if (!STATES.includes(st as never)) errs.push(`states.${st}: unknown state`)
-    else if (!v?.file) errs.push(`states.${st}.file required`)
-    else if (!existsSync(join(dir, v.file))) errs.push(`states.${st}.file: ${v.file} missing`)
+  for (const file of man.files ?? []) {
+    const abs = join(dir, file.path)
+    try {
+      const st = statSync(abs)
+      if (typeof file.size === "number" && st.size !== file.size) errs.push(`${file.path}: size mismatch`)
+      if (file.digest && sha(abs) !== file.digest) errs.push(`${file.path}: digest mismatch`)
+    } catch {
+      errs.push(`${file.path}: missing`)
+    }
   }
   if (errs.length) throw new Error(`${path}:\n  ${errs.join("\n  ")}`)
   return man

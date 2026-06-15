@@ -160,14 +160,8 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
     const path = argv[0] ?? die("usage: eikon lint <file.eikon|manifest.json>")
     const raw = basename(path) === "manifest.json" ? await Bun.file(resolve(path)).text() : decodeRuntimeFile(resolve(path))
     if (basename(path) === "manifest.json") {
-      const parsed = JSON.parse(raw) as Record<string, unknown>
-      if (parsed.kind === PACKAGE_KIND) {
-        const m = validatePackageManifest(parsed)
-        console.log(`✓ ${m.name} · ${m.entrypoints.default} · ${m.compatibility.eikon}`)
-        return
-      }
       const m = lintManifest(resolve(path), raw)
-      console.log(`✓ ${m.name} · ${Object.keys(m.states).length} states${m.source ? ` · ${m.source}` : ""}`)
+      console.log(`✓ ${m.name} · ${m.entrypoints.default} · ${m.compatibility.eikon}`)
       return
     }
     const e = lint(raw)
