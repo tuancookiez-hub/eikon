@@ -107,6 +107,17 @@ describe("previewSubmitBundle", () => {
     expect(bundle.manifest?.kind).toBe("eikon.package")
   })
 
+  test("applies submit display metadata to local and registry package manifests", async () => {
+    const fx = seed()
+
+    const bundle = await previewSubmitBundle({ path: fx.file, display: { title: "Demo Title", author: "Kai", description: "ready", glyph: "◇" } })
+    const remote = JSON.parse(readFileSync(join(bundle.root, "packages", "liftaris", "demo", "1.0.0.json"), "utf8"))
+
+    expect(bundle.manifest?.display).toMatchObject({ title: "Demo Title", author: "Kai", description: "ready", glyph: "◇" })
+    expect(remote.display).toMatchObject({ title: "Demo Title", author: "Kai", description: "ready", glyph: "◇" })
+    expect(bundle.catalog).toMatchObject({ title: "Demo Title", author: "Kai", description: "ready", glyph: "◇" })
+  })
+
   test("converts gzip legacy runtime submissions to final launch-stream package artifacts", async () => {
     const fx = seed()
     const bytes = runtimeDescriptor(packed(), { encoding: "gzip" }).bytes

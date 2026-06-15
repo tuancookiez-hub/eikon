@@ -35,10 +35,17 @@ export type SubmitResult = Submitted
 
 export type BundleOpts = {
   path: string
+  display?: SubmitDisplay
   extraFiles?: string[]
   allowHidden?: boolean
   allowSecrets?: boolean
   maxBytes?: number
+}
+export type SubmitDisplay = {
+  title?: string
+  author?: string
+  description?: string
+  glyph?: string
 }
 
 export type SubmitOpts = BundleOpts & { backend?: SubmitBackend }
@@ -135,6 +142,20 @@ function mergeIndex(site: string, name: string) {
   writeFileSync(file, JSON.stringify(merged, null, 2) + "\n")
 }
 
+function display(value: SubmitDisplay | undefined) {
+  const out = Object.fromEntries(Object.entries(value ?? {}).filter(([, v]) => typeof v === "string" && v.trim()).map(([k, v]) => [k, (v as string).trim()]))
+  return Object.keys(out).length ? out : undefined
+}
+
+function applyDisplay(site: string, name: string, next: SubmitDisplay | undefined) {
+  const clean = display(next)
+  if (!clean) return
+  for (const path of [join(site, "eikons", name, "manifest.json"), join(site, "packages", "liftaris", name, "1.0.0.json")]) {
+    const man = JSON.parse(readFileSync(path, "utf8")) as Manifest
+    writeFileSync(path, JSON.stringify({ ...man, display: { ...man.display, ...clean } }, null, 2) + "\n")
+  }
+}
+
 export async function previewSubmitBundle(opts: BundleOpts): Promise<SubmitBundle> {
   const input = resolve(opts.path)
   const source = dirname(input)
@@ -161,6 +182,7 @@ export async function previewSubmitBundle(opts: BundleOpts): Promise<SubmitBundl
   }
   for (const rel of opts.extraFiles ?? []) copy(source, rel, root, opts)
   registryManifest({ root: join(site, "eikons"), encoding: "gzip" })
+  applyDisplay(site, name, opts.display)
   await registryIndex({ root: join(site, "eikons") })
   mergeIndex(site, name)
   const manifest = lintManifest(join(root, "manifest.json"), readFileSync(join(root, "manifest.json"), "utf8"))
