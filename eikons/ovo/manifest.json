@@ -1,0 +1,31 @@
+{
+  "kind": "eikon.package",
+  "schemaVersion": "1.0",
+  "id": "liftaris/ovo",
+  "name": "ovo",
+  "version": "1.0.0",
+  "display": {
+    "title": "ovo",
+    "author": "kaio",
+    "description": "Monochrome terminal avatar.",
+    "glyph": "◆"
+  },
+  "compatibility": {
+    "eikon": ">=1 <2"
+  },
+  "entrypoints": {
+    "default": "ovo.eikon"
+  },
+  "files": [
+    {
+      "path": "ovo.eikon",
+      "role": "runtime",
+      "mediaType": "application/vnd.eikon.stream+jsonl",
+      "size": 133601,
+      "digest": "sha256:7eea1d34fedcfd8fc13a828bf5349f73fe3a6e0073f1adb9ee021ec5c75c3b51",
+      "encoding": "gzip",
+      "decodedSize": 1376292,
+      "decodedDigest": "sha256:3f78134ff65148a6917da7adc33b6093cfa740c90fbc3c310a781d19f5ce7da5"
+    }
+  ]
+}
