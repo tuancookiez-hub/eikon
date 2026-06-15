@@ -1,0 +1,11 @@
+{
+  "kind": "eikon.package.index",
+  "id": "liftaris/ovo",
+  "name": "ovo",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "manifest": "1.0.0.json"
+    }
+  ]
+}
