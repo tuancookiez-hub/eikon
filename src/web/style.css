@@ -16,7 +16,7 @@
   --ok: #a8d5a8;
   --err: #ffb4b4;
   --terminal-font: var(--mono);
-  --terminal-line-height: 2.44ch;
+  --terminal-line-height: 2ch;
 }
 
 * { box-sizing: border-box; }
