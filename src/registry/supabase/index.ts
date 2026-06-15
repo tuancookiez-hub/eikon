@@ -1,0 +1,5 @@
+export { client, config, functionsUrl, type EikonSupabaseClient, type SupabaseConfig } from "./client"
+export { supabaseSubmitBackend, type SupabaseSubmitOptions } from "./submit"
+export { metadata, event, like, type PlatformStats } from "./platform"
+export { delist, type DelistResult } from "./auth"
+export type { Database, Json } from "./database.types"

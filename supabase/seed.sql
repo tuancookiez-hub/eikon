@@ -1,0 +1,3 @@
+-- Local seed intentionally leaves auth users empty. The smoke script creates
+-- disposable users through the local Auth API and imports checked-in registry
+-- artifacts through the same code paths used by production mirror jobs.

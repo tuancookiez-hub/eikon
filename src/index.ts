@@ -61,3 +61,4 @@ export { loadCatalogEntries, normalizeCatalogEntry, searchCatalogEntries, valida
          type Catalog, type CatalogInput, type CatalogIndexEntry, type CatalogOptions, type CatalogTrust, type PublicCatalogEntry } from "./catalog"
 export { previewSubmitBundle, submission, submit, githubSubmitBackend,
          type BundleFile, type BundleOpts, type SubmitBackend, type SubmitBundle, type SubmitFailure, type SubmitRequest, type SubmitResult } from "./publish"
+export { supabaseSubmitBackend, type SupabaseSubmitOptions } from "./registry/supabase"

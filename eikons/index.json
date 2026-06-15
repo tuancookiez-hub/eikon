@@ -100,7 +100,7 @@
       "available": true
     },
     "trust": {
-      "manifestDigest": "sha256:db66ee4bcb366db9a623c8654bca3496e4f4c474f508c8520b2999cac1dc96fc",
+      "manifestDigest": "sha256:8aa53fdd0fc920055ed1b711801cafae63a0f6e09c8de7717ef7549118f43a2c",
       "runtimeDigest": "sha256:7eea1d34fedcfd8fc13a828bf5349f73fe3a6e0073f1adb9ee021ec5c75c3b51",
       "runtimeSize": 133601,
       "runtimeEncoding": "gzip",

@@ -16,11 +16,20 @@ git cat-file -e "$base^{commit}" 2>/dev/null || exit 1
 # the preview should be built.
 git diff --quiet "$base" "$head" -- \
   vercel.json \
+  vite.config.ts \
+  tsconfig.web.json \
   package.json \
   bun.lock \
+  .env.example \
+  supabase \
   eikons \
   packages \
+  scripts/web-static.ts \
+  scripts/supabase-import-github.ts \
+  scripts/supabase-smoke.ts \
   src/web \
+  src/registry/supabase \
+  src/edge.ts \
   src/browser.ts \
   src/catalog.ts \
   src/contract \

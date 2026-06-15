@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "src/**"
+      - "tests/**"
+      - "supabase/**"
+      - "scripts/**"
+      - "docs/**"
+      - "eikons/**"
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+      - "vercel.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "src/**"
+      - "tests/**"
+      - "supabase/**"
+      - "scripts/**"
+      - "docs/**"
+      - "eikons/**"
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+      - "vercel.json"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.90.0
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run web:build
+      - run: bun run verify:artifacts
+      - run: supabase db start
+      - run: supabase db reset --local
+      - run: supabase db lint --local --fail-on error
+      - run: supabase test db supabase/tests/database --local

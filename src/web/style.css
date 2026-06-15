@@ -89,6 +89,24 @@ button, a {
   cursor: pointer;
 }
 button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var(--line-strong); outline: none; }
+.siteNav {
+  width: min(1440px, calc(100% - 32px));
+  margin: 16px auto 0;
+  display: flex;
+  gap: 8px;
+}
+.siteNav a.active { border-color: var(--line-strong); background: var(--panel-2); }
+.routePanel {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.facts { display: grid; gap: 8px; margin: 0; }
+.facts div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.command { display: block; padding: 10px; border: 1px solid var(--line); background: #020202; color: var(--text); overflow-wrap: anywhere; }
 .sponsor {
   position: fixed;
   left: 14px;

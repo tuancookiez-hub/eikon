@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 import { expect, test } from "bun:test"
 import { join, resolve } from "node:path"
+import { readdirSync } from "node:fs"
 import { renderToStaticMarkup } from "react-dom/server"
 import { App } from "../src/web/App"
 
@@ -22,6 +23,10 @@ test("web build publishes static assets", async () => {
   expect(await Bun.file(join(root, "eikons/ares/ares.eikon")).exists()).toBe(true)
   expect(await Bun.file(join(root, "index.html")).exists()).toBe(true)
   expect(await Bun.file(join(root, "favicon.svg")).exists()).toBe(true)
-  expect(await Bun.file(join(root, "assets/main.js")).exists()).toBe(true)
-  expect(await Bun.file(join(root, "assets/main.css")).exists()).toBe(true)
+  const assets = readdirSync(join(root, "assets"))
+  expect(assets.some(file => file.endsWith(".js"))).toBe(true)
+  expect(assets.some(file => file.endsWith(".css"))).toBe(true)
+  const html = await Bun.file(join(root, "index.html")).text()
+  expect(html).toMatch(/\/assets\/.*\.js/)
+  expect(html).toMatch(/\/assets\/.*\.css/)
 })

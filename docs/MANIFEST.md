@@ -148,7 +148,9 @@ Herm's normal marketplace flow resolves `id`/`version` through configured truste
 
 ## Platform metadata
 
-Platform metadata is mutable service state. Examples include canonical detail URL, source URL, likes, downloads, moderation, and account/auth data. It may appear beside catalog entries in a registry service, but it is not needed for package playback, must not be embedded as required rendering data, and must not reintroduce retired public metadata fields.
+Platform metadata is mutable service state. Examples include canonical detail URL, source URL, likes, downloads, shares, upload/session state, visibility or delist audit state, and account/auth data. Supabase stores this data for the hosted marketplace and may return it as sidecar API data beside catalog entries, but it is not needed for package playback, must not be embedded as required rendering data, and must not reintroduce retired public metadata fields.
+
+The Supabase registry implementation keeps package artifacts immutable and uses database visibility/delist state to decide which catalog rows and package-scoped artifact URLs are active. GitHub registry artifacts can be mirrored into Supabase, but mirror import must not clear Supabase delist state or overwrite Supabase-origin packages.
 
 ## Signal mappings and triggers
 

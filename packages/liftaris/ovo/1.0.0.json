@@ -7,8 +7,8 @@
   "display": {
     "title": "ovo",
     "author": "kaio",
-    "description": "Monochrome terminal avatar.",
-    "glyph": "◆"
+    "glyph": "◆",
+    "description": "Monochrome terminal avatar."
   },
   "compatibility": {
     "eikon": ">=1 <2"

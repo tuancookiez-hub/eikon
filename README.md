@@ -90,14 +90,14 @@ Studio tab.
 eikon publish mine.eikon
 ```
 
-This creates a normal GitHub PR contribution against `EIKON_REPO` or the default
-`liftaris/eikon` catalog. The helper uses `gh` authentication and repository
-mechanics; creators can also prepare and share single-package or multi-eikon GitHub
-repos directly with `pack`, `manifest`, and `index`. `eikon manifest --gzip`
-prepares gzip stored public package blobs after consumers are gzip-aware; the
-plain manifest path remains available for compatibility rollouts. There is no hosted
-marketplace account, upload API, dashboard, or moderation workflow in this v1
-path.
+The hosted registry path is Supabase-backed: `eikon.liftaris.dev` can serve the
+default catalog, package manifests, runtime blobs, platform stats, Auth-backed
+uploads, and author delists while keeping runtime/package/catalog contracts
+separate from mutable platform metadata. The lower-level GitHub PR contribution
+helper remains available through `EIKON_REPO`/`liftaris/eikon` for fallback,
+review, direct sharing, and mirror workflows. Creators can also prepare and
+share single-package or multi-eikon GitHub repos directly with `pack`,
+`manifest`, and `index`.
 
 The contribution bundle targets `eikons/<name>/`: the packed `.eikon`,
 `manifest.json` when present, referenced source files, and catalog metadata. The
@@ -133,12 +133,11 @@ The static catalog gallery builds with:
 bun run web:build
 ```
 
-The page is discovery-only: it reads the public catalog, filters by eikon name
-or author, previews selected `.eikon` files, and exposes copyable Herm install
-instructions. It has no browser-native publish, auth,
-install, or activation path. Install/use/publish happen in Herm or through the
-`eikon` CLI.
-
+The Vite/TanStack site reads the public catalog, filters by eikon name or
+author, previews selected `.eikon` files, exposes copyable Herm install
+instructions, and provides Supabase-backed auth/upload/account routes for local
+and hosted marketplace workflows. Herm still owns native install/use/activation
+inside the TUI.
 Before promoting `eikon.liftaris.dev`, verify:
 
 - the Vercel project is owned from this repo and serves `dist/web` from the
@@ -149,8 +148,9 @@ Before promoting `eikon.liftaris.dev`, verify:
   hosted by the eikon registry path with `Access-Control-Allow-Origin: *`
 - catalog JSON uses a short revalidation cache, while packed assets/posters can
   use long immutable cache headers
-- staging and production smoke both load the catalog, preview an eikon, and keep
-  the page limited to copy instructions
+- staging and production smoke both load the catalog, preview an eikon, verify
+  raw runtime blob headers, exercise Auth/upload/platform-event/delist flows, and
+  prove Herm can consume the catalog before production cutover
 
 Repo ownership is split deliberately: eikon owns the registry, gallery, catalog
 client, install resolver, publish preflight, and shared player primitives; Herm
