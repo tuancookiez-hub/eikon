@@ -166,7 +166,7 @@ async function existingSha(run: Gh, fork: string, branch: string, path: string) 
 export function githubSubmitBackend(repo = DEFAULT_SUBMIT_REPO, run: Gh = gh): SubmitBackend {
   return {
     async check() {
-      try { await run(["auth", "status"]); return { ok: true } }
+      try { await run(["api", "user", "-q", ".login"]); return { ok: true } }
       catch (err) { return { ok: false, reason: err instanceof Error ? err.message : String(err) } }
     },
     async create(req) {
@@ -181,10 +181,12 @@ export function githubSubmitBackend(repo = DEFAULT_SUBMIT_REPO, run: Gh = gh): S
         const dest = `eikons/${name}/${file.path}`
         const content = Buffer.from(await Bun.file(file.abs).arrayBuffer()).toString("base64")
         const sha = await existingSha(run, fork, branch, dest)
-        const args = ["api", "-X", "PUT", `repos/${fork}/contents/${dest}`,
-          "-f", `message=eikons: submit ${name}`, "-f", `branch=${branch}`, "-f", `content=${content}`]
-        if (sha) args.push("-f", `sha=${sha}`)
-        await run(args)
+        await run(["api", "-X", "PUT", `repos/${fork}/contents/${dest}`, "--input", "-"], JSON.stringify({
+          message: `eikons: submit ${name}`,
+          branch,
+          content,
+          ...(sha ? { sha } : {}),
+        }))
       }
       const url = await run(["pr", "create", "-R", repo, "-H", `${user}:${branch}`, "-B", "main", "-t", req.title, "-b", req.body])
       return { kind: "submitted", url, request: req }
