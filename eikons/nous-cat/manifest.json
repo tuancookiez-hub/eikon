@@ -1,0 +1,108 @@
+{
+  "kind": "eikon.package",
+  "schemaVersion": "1.0",
+  "id": "liftaris/nous-cat",
+  "name": "nous-cat",
+  "version": "1.0.0",
+  "display": {
+    "title": "nous-cat",
+    "author": "TunaDev",
+    "glyph": "🐱"
+  },
+  "compatibility": {
+    "eikon": ">=1 <2"
+  },
+  "entrypoints": {
+    "default": "nous-cat.eikon"
+  },
+  "files": [
+    {
+      "path": "nous-cat.eikon",
+      "role": "runtime",
+      "mediaType": "application/vnd.eikon.stream+jsonl",
+      "size": 109798,
+      "digest": "sha256:6d2c4599967a2c37ab611fe779fe6b7b3abfc40d70dda5fd822d6cd3dbc154f1",
+      "encoding": "gzip",
+      "decodedSize": 1500538,
+      "decodedDigest": "sha256:884b4f598be8022523d5893940aacfa8f9bc8b3bc99bf57549fe1b5b87cdc5dc"
+    },
+    {
+      "path": "base.png",
+      "role": "source.base",
+      "mediaType": "image/png",
+      "size": 957195,
+      "digest": "sha256:7e5e3771090dbb60fd7b17291b6b70e4c366411830b736725c408d666c8fc550"
+    },
+    {
+      "path": "states/idle/loop.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 877002,
+      "digest": "sha256:b1ddfe2f6af6fa7c36bfb564f0db97661c9b8f709482cdb6315961b8b21d1c05",
+      "signal": "state.idle"
+    },
+    {
+      "path": "states/listening/start.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 989846,
+      "digest": "sha256:643555fbc77df100f95dd1cb25336a7c195234d2d75ecf8d3727dd7b250d2754",
+      "signal": "state.listening"
+    },
+    {
+      "path": "states/thinking/start.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 1318681,
+      "digest": "sha256:87df27dbd8af3e7bb79a45bdfa53a1ddf9d5f8f37ef5e39f763d291df7a06adc",
+      "signal": "state.thinking"
+    },
+    {
+      "path": "states/speaking/loop.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 1223389,
+      "digest": "sha256:194602fe9eb495666ffc92364af5ee7af12a29dee97196effb4c867a16c70b4b",
+      "signal": "state.speaking"
+    },
+    {
+      "path": "states/working/loop.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 988172,
+      "digest": "sha256:db75970d873b448d3dd10d47eb53488930adcf313dbe046ec2e7113d1c172121",
+      "signal": "state.working"
+    },
+    {
+      "path": "states/error/start.mp4",
+      "role": "source.clip",
+      "mediaType": "video/mp4",
+      "size": 1203066,
+      "digest": "sha256:22e75d61f1c928c2b6cdb35cc3a3e35f0db3f4e1d3937ac2ae523c9a0686f208",
+      "signal": "state.error"
+    }
+  ],
+  "source": {
+    "base": "base.png",
+    "states": {
+      "idle": {
+        "file": "states/idle/loop.mp4"
+      },
+      "listening": {
+        "file": "states/listening/start.mp4"
+      },
+      "thinking": {
+        "file": "states/thinking/start.mp4"
+      },
+      "speaking": {
+        "file": "states/speaking/loop.mp4"
+      },
+      "working": {
+        "file": "states/working/loop.mp4"
+      },
+      "error": {
+        "file": "states/error/start.mp4"
+      }
+    }
+  }
+}
