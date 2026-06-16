@@ -120,7 +120,6 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
   border: 1px solid var(--line);
   container-type: inline-size;
 }
-.cardPoster,
 .ascii,
 .asciiArt {
   margin: 0;
@@ -134,12 +133,17 @@ button:hover, a:hover, button:focus-visible, a:focus-visible { border-color: var
 }
 .cardPoster {
   display: block;
-  width: max-content;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   color: #c8c8c8;
-  font-size: clamp(5px, 2.7cqw, 12px);
+}
+.cardPoster text {
+  fill: currentColor;
+  font-family: var(--terminal-font);
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  text-rendering: geometricPrecision;
 }
 .asciiArt {
   display: block;
@@ -216,7 +220,6 @@ code { display: inline-block; padding: 2px 5px; border: 1px solid var(--line); b
   .toolbar { align-items: stretch; }
   .catalogStatus { text-align: left; min-width: 0; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
-  .cardPoster { font-size: clamp(5px, 2.85cqw, 11.5px); }
   .detail {
     position: fixed;
     left: 10px;
