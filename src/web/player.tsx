@@ -65,11 +65,16 @@ export function AsciiPreview(props: { lines: string[] }) {
 
 export function EntryCard(props: { entry: CatalogEntry; selected: boolean; onPick: () => void; frame?: string[] }) {
   const title = props.entry.title || props.entry.name
-  const preview = props.frame?.length ? props.frame.join("\n") : props.entry.poster || ""
+  const rows = props.frame?.length ? props.frame : (props.entry.poster || "").split("\n")
+  const cols = Math.max(1, ...rows.map(row => Array.from(row).length))
   return (
     <button type="button" className={props.selected ? "card selected" : "card"} onClick={props.onPick}>
       <span className="cardPreview" aria-hidden="true">
-        <span className="cardPoster">{preview}</span>
+        <svg className="cardPoster" viewBox={`0 0 ${cols} ${Math.max(1, rows.length)}`} preserveAspectRatio="none">
+          {rows.map((row, i) => (
+            <text key={i} x="0" y={i} fontSize="1" textLength={cols} lengthAdjust="spacingAndGlyphs" dominantBaseline="hanging" xmlSpace="preserve">{row || " "}</text>
+          ))}
+        </svg>
       </span>
       <span className="name">{props.entry.glyph ?? "⬡"} {title}</span>
       <span className="meta">{props.entry.author ?? "unknown"}</span>
@@ -83,6 +88,18 @@ export function parsePreview(text: string): BrowserEikon {
 
 export function stateClip(eikon: BrowserEikon, state: string): BrowserClip | undefined {
   return eikon.clips.get(state) ?? eikon.clips.get("idle") ?? eikon.clips.values().next().value
+}
+
+export function defaultState(eikon: BrowserEikon): string {
+  const seen = new Set<string>()
+  let signal = eikon.header.defaultSignal
+  while (!seen.has(signal)) {
+    seen.add(signal)
+    const map = eikon.header.signals[signal]
+    if (map && eikon.clips.has(map.clip)) return map.clip
+    signal = map?.fallback ?? eikon.header.defaultSignal
+  }
+  return "idle"
 }
 
 export function webPlaybackFrame(eikon: BrowserEikon, state: string, tickMs: number, startedAtMs = 0): string[] {
@@ -255,6 +272,11 @@ export function createWebCatalog(opts: WebCatalogOptions = {}) {
     },
     fetchText,
     loadPreview,
+    cached(key: string) {
+      const entry = entryFor(key)
+      if (!entry) return undefined
+      return state.previews[cacheFor(entry)]
+    },
     async preview(key: string, signal?: AbortSignal): Promise<PreviewState> {
       const entry = entryFor(key)
       if (!entry) return { status: "error", error: "unknown entry" }

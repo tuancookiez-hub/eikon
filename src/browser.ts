@@ -62,4 +62,4 @@ export { decodeRuntimeBytes, parseRuntimeBytes, sha256Bytes } from "./stream/run
 export { DEFAULT_RUNTIME_MAX_BYTES, DEFAULT_RUNTIME_MAX_DECODED_BYTES, isGzipBytes, runtimeEncoding, type RuntimeDescriptor, type RuntimeOptions } from "./stream/runtime"
 
 export type BrowserClip = import("./stream/parse").ParsedClip
-export type BrowserEikon = Pick<import("./stream/parse").ParsedLaunchStream, "meta" | "clips">
+export type BrowserEikon = Pick<import("./stream/parse").ParsedLaunchStream, "header" | "meta" | "clips">

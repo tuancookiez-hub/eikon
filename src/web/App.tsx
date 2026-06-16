@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react"
 import type { CatalogEntry } from "../browser"
 import { CANONICAL_STATES } from "../browser"
-import { AsciiPreview, EntryCard, browserInstructions, createWebCatalog, webPlaybackFrame, type PreviewState } from "./player"
+import { AsciiPreview, EntryCard, browserInstructions, createWebCatalog, defaultState, webPlaybackFrame, type PreviewState } from "./player"
 
 const loc = typeof location === "undefined" ? undefined : location
 const catalogBase = new URLSearchParams(loc?.search ?? "").get("catalog") ?? "/eikons"
@@ -28,18 +28,16 @@ export function App() {
   const measureDetail = () => {
     const node = detailRef.current
     if (!node) return
-    const selectedPoster = document.querySelector<HTMLElement>(".card.selected .cardPoster")
-    const posterFont = selectedPoster ? window.getComputedStyle(selectedPoster).fontSize : ""
-    const posterFontPx = Number.parseFloat(posterFont)
-    const posterWidth = selectedPoster?.getBoundingClientRect().width ?? 0
-    if (Number.isFinite(posterFontPx) && posterFontPx > 0) {
-      node.style.setProperty("--selected-preview-font-size", `${posterFontPx * WEB_SELECTED_PREVIEW_SCALE}px`)
+    const poster = document.querySelector<SVGSVGElement>(".card.selected .cardPoster")
+    const box = poster?.getBoundingClientRect()
+    const cols = poster?.viewBox.baseVal.width ?? 0
+    if (box && box.width > 0 && cols > 0) {
+      node.style.setProperty("--selected-preview-font-size", `${(box.width * WEB_SELECTED_PREVIEW_SCALE) / (cols * 0.6)}px`)
     } else {
       node.style.removeProperty("--selected-preview-font-size")
     }
-    if (posterWidth > 0) {
-      const scaledWidth = posterWidth * WEB_SELECTED_PREVIEW_SCALE
-      node.style.setProperty("--selected-preview-width", `${scaledWidth}px`)
+    if (box && box.width > 0) {
+      node.style.setProperty("--selected-preview-width", `${box.width * WEB_SELECTED_PREVIEW_SCALE}px`)
     } else {
       node.style.removeProperty("--selected-preview-width")
     }
@@ -205,8 +203,8 @@ export function App() {
         <div className="grid" aria-label="Catalog entries">
           {matches.map(entry => {
             const key = catalog.keyFor(entry)
-            const cardPreview = catalog.state.previews[key]
-            const cardFrame = cardPreview?.status === "ready" ? webPlaybackFrame(cardPreview.eikon, "idle", tickMs, 0) : undefined
+            const cardPreview = catalog.cached(key)
+            const cardFrame = cardPreview?.status === "ready" ? webPlaybackFrame(cardPreview.eikon, defaultState(cardPreview.eikon), tickMs, 0) : undefined
             return <EntryCard key={key} entry={entry} frame={cardFrame} selected={key === selectedKey} onPick={() => void pick(entry)} />
           })}
         </div>

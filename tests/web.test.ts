@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { CatalogEntry } from "../src/browser"
-import { browserInstructions, createWebCatalog, parsePreview, webPlaybackFrame } from "../src/web/player"
+import { browserInstructions, createWebCatalog, defaultState, parsePreview, webPlaybackFrame } from "../src/web/player"
 import { runtimeDescriptor } from "../src"
 
 function body(bytes: Uint8Array): ArrayBuffer {
@@ -79,6 +79,22 @@ describe("web gallery model", () => {
     if (loaded.status !== "ready") throw new Error("preview not ready")
     expect(seen[0]).toBe(entry.runtimeUrl)
     expect(webPlaybackFrame(loaded.eikon, "idle", 1000, 0)).toEqual(["C"])
+  })
+
+  test("loads ambient card previews by catalog key", async () => {
+    const catalog = createWebCatalog({
+      fetch: (async () => new Response(launch)) as unknown as typeof fetch,
+      loadCatalog: async () => [entry],
+    })
+    await catalog.refresh()
+    expect(catalog.cached(entry.sourceKey)).toBeUndefined()
+
+    await catalog.loadPreview(entry.sourceKey)
+    const loaded = catalog.cached(entry.sourceKey)
+    expect(loaded?.status).toBe("ready")
+    if (loaded?.status !== "ready") throw new Error("preview not ready")
+    expect(defaultState(loaded.eikon)).toBe("idle")
+    expect(webPlaybackFrame(loaded.eikon, defaultState(loaded.eikon), 500, 0)).toEqual(["B"])
   })
 
   test("loads gzip runtime preview bytes and rejects content-encoded artifact responses", async () => {
