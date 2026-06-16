@@ -1,0 +1,31 @@
+{
+  "kind": "eikon.package",
+  "schemaVersion": "1.0",
+  "id": "liftaris/nous-cat",
+  "name": "nous-cat",
+  "version": "1.0.0",
+  "display": {
+    "title": "nous-cat",
+    "author": "unknown",
+    "description": "Monochrome terminal avatar.",
+    "glyph": "◆"
+  },
+  "compatibility": {
+    "eikon": ">=1 <2"
+  },
+  "entrypoints": {
+    "default": "nous-cat.eikon"
+  },
+  "files": [
+    {
+      "path": "nous-cat.eikon",
+      "role": "runtime",
+      "mediaType": "application/vnd.eikon.stream+jsonl",
+      "size": 211004,
+      "digest": "sha256:dadc418f9adb05c8a213935eef376aa865be662a354e010447154e3fcda52f81",
+      "encoding": "gzip",
+      "decodedSize": 2214451,
+      "decodedDigest": "sha256:3c6bb8b74a147f075aa3df13c1ec272ac4352332d816e3322fea5be2b3e1930e"
+    }
+  ]
+}
