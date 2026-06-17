@@ -189,8 +189,8 @@ function displayFrom(prior: Record<string, unknown>, launch: ParsedLaunchStream,
   return {
     title: typeof displayPrior.title === "string" ? displayPrior.title : launch.header.title ?? name,
     author: typeof displayPrior.author === "string" ? displayPrior.author : launch.header.author?.name,
-    glyph: typeof displayPrior.glyph === "string" ? displayPrior.glyph : undefined,
     description: typeof displayPrior.description === "string" ? displayPrior.description : launch.header.description,
+    glyph: typeof displayPrior.glyph === "string" ? displayPrior.glyph : undefined,
   }
 }
 

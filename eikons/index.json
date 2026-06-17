@@ -83,6 +83,33 @@
   {
     "kind": "eikon.catalog.entry",
     "schemaVersion": "1.0",
+    "id": "liftaris/nous-cat",
+    "version": "1.0.0",
+    "sourceKey": "registry:eikon.liftaris.dev:liftaris/nous-cat@1.0.0",
+    "name": "nous-cat",
+    "title": "nous-cat",
+    "author": "TunaDev",
+    "glyph": "🐱",
+    "poster": "                     ▄▅▅▅▅▄▄▂▁▁                 \n           ▁   ▂▅▆▆▇▇▆▅▃▔▀████▀▉                \n          ▐▜▆▆███████████▖ ▝▛▔ █▇▃              \n          ▝▝▜████████▀▜▂▅▟▋   ▐▉██▙             \n         ▅▅▄▄▄▟▄▄▙▄▙▅▆▆████▍ ▕███▛▔▝▖           \n        ▐████████▛██████████████▙▄▅▆▇▖          \n       ▕████▛██▀██▟█▀▀▀██████████████▙          \n        ▜███▇▃ ▄█████▎▗▃▟█▜███████████▌         \n         █████ ▐█████▏  ▐███▄▃▂▄███████         \n        ▕▀▜█▘▀  ▀▀▛▀▘   ▐████▙▐███▉████▍        \n        ▐    ▔          ▝██████████████▉   ▗▂   \n        █▋               ▝████████████▟█▍  ▐▟▙  \n  ▄▎   ▟██▙▂             ▐███████████▟▀███▆█▚█▙ \n ▖█▖  ▄██▀      ▄▄▖        ▟█████████▅▃▂▅▟▅▆██▐▏\n ▙▃▂▃▟█▛▔                 ▟███████████████████▛ \n ▝████▛                 ▗▛▀▀█████████████████▛▚ \n   ▔▛▔▖     ▖          ▝▔ ▄██████▛▀▃▅▆▇███████▛▍\n   ▞        ▅           ▃███████▘▗█████████████▋\n  ▐▙        ▘          ▔▗█████▛▎▁██████████████▋\n  ▐█▇▄                ▁▄██████▚▙█▟██████████▋██▘\n  ▐▏  ▝▗▂    ▅▗  ▗▄▄▅▇████████▞█████████████▚█▛ \n  ▐▖    ▜█▆▅▝      ▜██████████▙▝███▅▄▃▆████▇█▛  \n   ▝▘▘▗▅▅▞██▂      ▕████████████▄▞█████████▀▘   \n            ▔▘▀▘▝▘▀▝▀▀▀▝▀▀▘▔▔▔▔▔▔▔▔▔▀▀▀▔▔       ",
+    "runtimeUrl": "https://eikon.liftaris.dev/packages/liftaris/nous-cat/blobs/sha256/9bf79af4c7fbaf0534868dcc54e4d31eb15d36d2004346c179a98dc2f212a635",
+    "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous-cat/1.0.0.json",
+    "detailUrl": "https://eikon.liftaris.dev/eikons/nous-cat",
+    "compatibility": {
+      "eikon": ">=1 <2",
+      "available": true
+    },
+    "trust": {
+      "manifestDigest": "sha256:55b1dafc70d3d7081f5fae3b33b2f7b16ab387aafaeabda6631217dbf77b0939",
+      "runtimeDigest": "sha256:9bf79af4c7fbaf0534868dcc54e4d31eb15d36d2004346c179a98dc2f212a635",
+      "runtimeSize": 109798,
+      "runtimeEncoding": "gzip",
+      "runtimeDecodedSize": 1500538,
+      "runtimeDecodedDigest": "sha256:884b4f598be8022523d5893940aacfa8f9bc8b3bc99bf57549fe1b5b87cdc5dc"
+    }
+  },
+  {
+    "kind": "eikon.catalog.entry",
+    "schemaVersion": "1.0",
     "id": "liftaris/ovo",
     "version": "1.0.0",
     "sourceKey": "registry:eikon.liftaris.dev:liftaris/ovo@1.0.0",
@@ -106,33 +133,6 @@
       "runtimeEncoding": "gzip",
       "runtimeDecodedSize": 1376292,
       "runtimeDecodedDigest": "sha256:3f78134ff65148a6917da7adc33b6093cfa740c90fbc3c310a781d19f5ce7da5"
-    }
-  },
-  {
-    "kind": "eikon.catalog.entry",
-    "schemaVersion": "1.0",
-    "id": "liftaris/nous-cat",
-    "version": "1.0.0",
-    "sourceKey": "registry:eikon.liftaris.dev:liftaris/nous-cat@1.0.0",
-    "name": "nous-cat",
-    "title": "nous-cat",
-    "author": "TunaDev",
-    "glyph": "🐱",
-    "poster": "",
-    "runtimeUrl": "https://eikon.liftaris.dev/packages/liftaris/nous-cat/blobs/sha256/6d2c4599967a2c37ab611fe779fe6b7b3abfc40d70dda5fd822d6cd3dbc154f1",
-    "packageUrl": "https://eikon.liftaris.dev/packages/liftaris/nous-cat/1.0.0.json",
-    "detailUrl": "https://eikon.liftaris.dev/eikons/nous-cat",
-    "compatibility": {
-      "eikon": ">=1 <2",
-      "available": true
-    },
-    "trust": {
-      "manifestDigest": "sha256:60e16aa9eb6f7f5f2bbfea13112071c68e759b86f692e968fd17ee53d9c9db58",
-      "runtimeDigest": "sha256:6d2c4599967a2c37ab611fe779fe6b7b3abfc40d70dda5fd822d6cd3dbc154f1",
-      "runtimeSize": 109798,
-      "runtimeEncoding": "gzip",
-      "runtimeDecodedSize": 1500538,
-      "runtimeDecodedDigest": "sha256:884b4f598be8022523d5893940aacfa8f9bc8b3bc99bf57549fe1b5b87cdc5dc"
     }
   }
 ]

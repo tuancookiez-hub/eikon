@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, chmodSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createHash } from "node:crypto"
@@ -40,6 +40,22 @@ function pkg(dir: string, name: string) {
     ],
     source: { base: "source/base.png", states: { idle: { file: "source/idle.mp4" } } },
   }, null, 2))
+}
+
+function seedPublishFixture(parent: string) {
+  const root = join(parent, "publish-demo")
+  mkdirSync(root, { recursive: true })
+  const frame = ["........", "........", "........", "........"]
+  const runtime = [
+    JSON.stringify({ eikon: 1, name: "demo", author: "Kaio", glyph: "◆", width: 8, height: 4, states: ["idle", "listening", "thinking", "speaking", "working", "error"] }),
+    ...["idle", "listening", "thinking", "speaking", "working", "error"].flatMap(state => [
+      JSON.stringify({ state, fps: 1, frame_count: 1 }),
+      JSON.stringify({ f: 0, data: frame.join("\n") }),
+    ]),
+  ].join("\n")
+  const file = join(root, "demo.eikon")
+  writeFileSync(file, runtime)
+  return { root, file }
 }
 
 async function run(args: string[], env: Record<string, string>) {
@@ -185,12 +201,60 @@ describe("eikon CLI lifecycle", () => {
     }
   })
 
-  test("publish help frames GitHub contribution helper without hosted marketplace upload", async () => {
+  test("publish help frames generated GitHub registry bundle without hosted marketplace upload", async () => {
     const out = await run(["publish", "--help"], { HERM_CONFIG_DIR: mkdtempSync(join(tmpdir(), "eikon-cli-")) })
     expect(out.code).toBe(0)
     expect(out.stdout).toContain("GitHub PR contribution helper")
+    expect(out.stdout).toContain("generated registry bundle")
+    expect(out.stdout).toContain("packages/<namespace>/<name>")
     expect(out.stdout).toContain("EIKON_REPO")
     expect(out.stdout).not.toContain("marketplace account")
     expect(out.stdout).not.toContain("upload token")
+  })
+
+  test("publish creates generated registry bundle PR contents", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "eikon-cli-"))
+    const fx = seedPublishFixture(tmp)
+    const bin = join(tmp, "bin")
+    const log = join(tmp, "gh.log")
+    mkdirSync(bin, { recursive: true })
+    const gh = join(bin, "gh")
+    writeFileSync(gh, [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "printf '%s\\n' \"$*\" >> \"$GH_LOG\"",
+      "if [ \"$1\" = \"repo\" ]; then exit 0; fi",
+      "if [ \"$1\" = \"api\" ] && [ \"${2:-}\" = \"user\" ]; then echo tester; exit 0; fi",
+      "if [ \"$1\" = \"api\" ] && [ \"${2:-}\" = \"repos/liftaris/eikon/git/ref/heads/main\" ]; then echo main-sha; exit 0; fi",
+      "if [ \"$1\" = \"api\" ] && [ \"${3:-}\" = \"POST\" ]; then exit 0; fi",
+      "if [ \"$1\" = \"api\" ] && [ \"${3:-}\" = \"GET\" ]; then exit 1; fi",
+      "if [ \"$1\" = \"api\" ] && [ \"${3:-}\" = \"PUT\" ]; then cat >> \"$GH_LOG\"; printf '\\n' >> \"$GH_LOG\"; exit 0; fi",
+      "if [ \"$1\" = \"pr\" ]; then echo https://github.com/liftaris/eikon/pull/999; exit 0; fi",
+      "echo \"unexpected gh args: $*\" >&2",
+      "exit 1",
+      "",
+    ].join("\n"))
+    chmodSync(gh, 0o755)
+
+    const out = await run(["publish", fx.file, "--json"], {
+      HERM_CONFIG_DIR: join(tmp, "profile"),
+      PATH: `${bin}:${process.env.PATH}`,
+      GH_LOG: log,
+    })
+
+    expect(out.code).toBe(0)
+    const data = json(out.stdout) as { command?: string; name?: string; url?: string; files?: string[] }
+    expect(data).toMatchObject({ command: "publish", name: "demo", url: "https://github.com/liftaris/eikon/pull/999" })
+    expect(data.files).toEqual(expect.arrayContaining([
+      "eikons/demo/demo.eikon",
+      "eikons/demo/manifest.json",
+      "eikons/index.json",
+      "packages/liftaris/demo/1.0.0.json",
+      "packages/liftaris/demo/index.json",
+    ]))
+    expect(data.files?.some(path => path.startsWith("packages/liftaris/demo/blobs/sha256/"))).toBe(true)
+    const ghLog = readFileSync(log, "utf8")
+    expect(ghLog).toContain("repos/tester/eikon/contents/packages/liftaris/demo/1.0.0.json")
+    expect(ghLog).not.toContain("-f content=")
   })
 })

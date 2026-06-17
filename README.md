@@ -92,18 +92,27 @@ eikon publish mine.eikon
 
 This creates a normal GitHub PR contribution against `EIKON_REPO` or the default
 `liftaris/eikon` catalog. The helper uses `gh` authentication and repository
-mechanics; creators can also prepare and share single-package or multi-eikon GitHub
-repos directly with `pack`, `manifest`, and `index`. `eikon manifest --gzip`
-prepares gzip stored public package blobs after consumers are gzip-aware; the
-plain manifest path remains available for compatibility rollouts. There is no hosted
-marketplace account, upload API, dashboard, or moderation workflow in this v1
-path.
+mechanics, then submits the same generated registry bundle expected by CI:
 
-The contribution bundle targets `eikons/<name>/`: the packed `.eikon`,
-`manifest.json` when present, referenced source files, and catalog metadata. The
-CLI previews and allowlists bundle paths, skips hidden or secret-like extras by
-default, rejects path/symlink escapes, and reports setup or validation errors
-before creating the PR request.
+```text
+eikons/<name>/<name>.eikon
+eikons/<name>/manifest.json
+eikons/<name>/<source files, if referenced>
+eikons/index.json
+packages/liftaris/<name>/1.0.0.json
+packages/liftaris/<name>/index.json
+packages/liftaris/<name>/blobs/sha256/*
+```
+
+Creators can also prepare and share single-package or multi-eikon GitHub repos
+directly with `pack`, `manifest`, and `index`. There is no hosted marketplace
+account, upload API, dashboard, or moderation workflow in this v1 path.
+
+Do not hand-edit `eikons/index.json` as the source of truth. Run the registry
+generators and commit their output so catalog posters, runtime/package URLs,
+source descriptors, sizes, and digests all agree. The CLI allowlists bundle paths,
+skips hidden or secret-like extras by default, rejects path/symlink escapes, and
+reports setup or validation errors before creating the PR request.
 
 ## States
 

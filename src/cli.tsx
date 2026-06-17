@@ -18,6 +18,7 @@ import { validatePackageManifest } from "./package/manifest"
 import { loadCatalogEntries, searchCatalogEntries } from "./catalog"
 import { decodeRuntimeFile, writeRuntimeFile } from "./stream"
 import { summarizeLifecycle, updatePlan } from "./lifecycle"
+import { submit as submitBundle } from "./publish"
 
 const REPO = process.env.EIKON_REPO ?? "liftaris/eikon"
 const profileRoot = () => process.env.HERM_CONFIG_DIR ?? join(process.env.HERMES_HOME ?? join(homedir(), ".hermes"), "herm")
@@ -148,13 +149,6 @@ function inspectResult(src: string, r: Awaited<ReturnType<typeof resolveInstall>
   }
 }
 
-async function gh(args: string[], input?: string) {
-  const p = Bun.spawn(["gh", ...args], { stdin: input ? new TextEncoder().encode(input) : undefined, stdout: "pipe", stderr: "pipe" })
-  const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
-  if (code !== 0) die(`gh ${args[0]} failed: ${err.trim() || out.trim()}`)
-  return out.trim()
-}
-
 const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async lint(argv) {
     const path = argv[0] ?? die("usage: eikon lint <file.eikon|manifest.json>")
@@ -169,33 +163,23 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   },
 
   async publish(argv) {
+    const a = args(argv)
     if (argv.includes("--help")) {
-      console.log(`eikon publish <file.eikon>\n\nGitHub PR contribution helper for ${REPO}. Set EIKON_REPO=owner/repo to target a different catalog. This prepares a normal GitHub contribution with gh; no hosted upload/auth service, dashboard, or moderation product is involved.`)
+      console.log(`eikon publish <file.eikon> [--json]\n\nGitHub PR contribution helper for ${REPO}. Set EIKON_REPO=owner/repo to target a different catalog. This prepares a generated registry bundle with eikons/<name>/ plus packages/<namespace>/<name>/ artifacts through gh; no hosted upload/auth service, dashboard, or moderation product is involved.`)
       return
     }
-    const path = argv[0] ?? die("usage: eikon publish <file>")
-    const abs = resolve(path)
-    const raw = decodeRuntimeFile(abs)
-    const e = lint(raw)
-    const name = e.meta.name
-    const branch = `add/${name}`
-
-    await gh(["repo", "fork", REPO, "--clone=false"]).catch(() => {})
-    const user = await gh(["api", "user", "-q", ".login"])
-    const fork = `${user}/${REPO.split("/")[1]}`
-
-    // Create branch ref off upstream main, then PUT the file.
-    const main = await gh(["api", `repos/${REPO}/git/ref/heads/main`, "-q", ".object.sha"])
-    await gh(["api", "-X", "POST", `repos/${fork}/git/refs`, "-f", `ref=refs/heads/${branch}`, "-f", `sha=${main}`]).catch(() => {})
-    await gh(["api", "-X", "PUT", `repos/${fork}/contents/eikons/${name}/${name}.eikon`,
-      "-f", `message=eikons: add ${name}`,
-      "-f", `branch=${branch}`,
-      "-f", `content=${Buffer.from(await Bun.file(abs).arrayBuffer()).toString("base64")}`])
-
-    const url = await gh(["pr", "create", "-R", REPO, "-H", `${user}:${branch}`, "-B", "main",
-      "-t", `eikons: add ${name}`,
-      "-b", `Adds \`${name}\` by ${e.meta.author}. ${e.meta.width}×${e.meta.height}, ${e.clips.size} states.`])
-    console.log(url)
+    const path = a.pos[0] ?? die("usage: eikon publish <file> [--json]")
+    const res = await submitBundle({ path: resolve(path) })
+    if ("request" in res) {
+      out(a, {
+        command: "publish",
+        name: res.request.bundle.meta.name,
+        url: res.url,
+        files: res.request.bundle.files.map(f => f.dest),
+      }, () => `${res.url}\n  submitted generated registry bundle (${res.request.bundle.files.length} files)`)
+      return
+    }
+    die(res.failures.map(f => f.message).join("\n"))
   },
 
   async install(argv) {

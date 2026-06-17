@@ -21,6 +21,7 @@
     "index": "bun src/cli.tsx index",
     "manifest": "bun src/cli.tsx manifest",
     "verify:artifacts": "bun src/cli.tsx verify",
+    "verify:registry-pr": "bun scripts/registry-pr-check.ts",
     "web:build": "bun run src/web/build.ts",
     "typecheck": "bunx tsc --noEmit"
   },
