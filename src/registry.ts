@@ -109,9 +109,13 @@ function sourceMedia(man: Record<string, unknown>): PackageSourceMedia | undefin
 
 function sourceDescriptors(dir: string, source?: PackageSourceMedia): PackageFileDescriptor[] {
   const out: PackageFileDescriptor[] = []
-  if (source?.base && existsSync(join(dir, source.base))) out.push(fileInfo(dir, source.base, "source.base"))
+  if (source?.base) {
+    if (!existsSync(join(dir, source.base))) throw new Error(`${source.base}: referenced source file missing`)
+    out.push(fileInfo(dir, source.base, "source.base"))
+  }
   for (const [signal, value] of Object.entries(source?.states ?? {})) {
-    if (!value?.file || !existsSync(join(dir, value.file))) continue
+    if (!value?.file) continue
+    if (!existsSync(join(dir, value.file))) throw new Error(`${value.file}: referenced source file missing`)
     out.push(fileInfo(dir, value.file, "source.clip", (signal.startsWith("state.") ? signal : `state.${signal}`) as SignalName))
   }
   return out

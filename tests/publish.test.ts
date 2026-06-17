@@ -221,17 +221,28 @@ describe("githubSubmitBackend", () => {
     expect(calls).toEqual([["api", "user", "-q", ".login"]])
   })
 
-  test("updates existing files on rerun", async () => {
+  test("resets existing submit branches and uploads file bodies through stdin", async () => {
     const fx = seed()
     const bundle = await previewSubmitBundle({ path: fx.file })
     const puts: Array<{ args: string[]; body: Record<string, string> }> = []
+    const branchOps: string[] = []
     const existing = new Set<string>()
+    let postCount = 0
     const run = async (args: string[], input?: string) => {
       const path = args[3] ?? ""
       if (args[0] === "repo") return ""
       if (args[1] === "user") return "kaio"
       if (args[1] === "repos/liftaris/eikon/git/ref/heads/main") return "main-sha"
-      if (args[1] === "POST") return ""
+      if (args[2] === "POST") {
+        branchOps.push("create")
+        if (postCount++ === 0) return ""
+        throw new Error("already exists")
+      }
+      if (args[2] === "PATCH") {
+        branchOps.push(JSON.parse(input ?? "{}").force === true ? "reset" : "patch")
+        existing.clear()
+        return ""
+      }
       if (args[2] === "GET") {
         if (!existing.has(path)) throw new Error("not found")
         return JSON.stringify({ sha: "existing-sha" })
@@ -249,11 +260,12 @@ describe("githubSubmitBackend", () => {
     await backend.create(submission(bundle))
     await backend.create(submission(bundle))
 
+    expect(branchOps).toEqual(["create", "create", "reset"])
     expect(puts).toHaveLength(bundle.files.length * 2)
     expect(puts[0]?.args).toEqual(["api", "-X", "PUT", `repos/kaio/eikon/contents/${bundle.files[0]?.dest}`, "--input", "-"])
     expect(puts[0]?.args.some(a => a.startsWith("content="))).toBe(false)
     expect(puts[0]?.body.sha).toBeUndefined()
     expect(puts[0]?.body.content).toBeString()
-    expect(puts[bundle.files.length]?.body.sha).toBe("existing-sha")
+    expect(puts[bundle.files.length]?.body.sha).toBeUndefined()
   })
 })

@@ -17,7 +17,7 @@ If you prepare a PR manually, put the source Eikon under `eikons/<name>/` and ru
 ```sh
 bun src/cli.tsx lint eikons/<name>/<name>.eikon
 bun src/cli.tsx manifest --gzip
-EIKON_REGISTRY=1 bun src/cli.tsx index
+bun src/cli.tsx index
 bun run verify:artifacts
 ```
 

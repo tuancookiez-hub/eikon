@@ -251,6 +251,14 @@ async function existingSha(run: Gh, fork: string, branch: string, path: string) 
   }
 }
 
+async function resetBranch(run: Gh, fork: string, branch: string, sha: string) {
+  try {
+    await run(["api", "-X", "POST", `repos/${fork}/git/refs`, "-f", `ref=refs/heads/${branch}`, "-f", `sha=${sha}`])
+  } catch {
+    await run(["api", "-X", "PATCH", `repos/${fork}/git/refs/heads/${branch}`, "--input", "-"], JSON.stringify({ sha, force: true }))
+  }
+}
+
 export function githubSubmitBackend(repo = DEFAULT_SUBMIT_REPO, run: Gh = gh): SubmitBackend {
   return {
     async check() {
@@ -264,7 +272,7 @@ export function githubSubmitBackend(repo = DEFAULT_SUBMIT_REPO, run: Gh = gh): S
       const user = await run(["api", "user", "-q", ".login"])
       const fork = `${user}/${repo.split("/")[1]}`
       const main = await run(["api", `repos/${repo}/git/ref/heads/main`, "-q", ".object.sha"])
-      await run(["api", "-X", "POST", `repos/${fork}/git/refs`, "-f", `ref=refs/heads/${branch}`, "-f", `sha=${main}`]).catch(() => "")
+      await resetBranch(run, fork, branch, main)
       for (const file of req.bundle.files) {
         const content = Buffer.from(await Bun.file(file.abs).arrayBuffer()).toString("base64")
         const sha = await existingSha(run, fork, branch, file.dest)

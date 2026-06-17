@@ -1,10 +1,10 @@
 ## Eikon submission
 
-If this PR submits or updates an Eikon, complete this checklist.
+If this PR submits a new Eikon, complete this checklist.
 
 ### Source
 
-- [ ] This PR adds or updates exactly one Eikon: `<name>`
+- [ ] This PR adds exactly one Eikon: `<name>`
 - [ ] Editable source media is included when the Eikon should be editable in Studio
 - [ ] The bundle contains no secrets, private URLs, local paths, or token-shaped strings
 
@@ -15,7 +15,7 @@ Run before opening or updating the PR:
 ```sh
 bun src/cli.tsx lint eikons/<name>/<name>.eikon
 bun src/cli.tsx manifest --gzip
-EIKON_REGISTRY=1 bun src/cli.tsx index
+bun src/cli.tsx index
 bun run verify:artifacts
 ```
 

@@ -91,7 +91,7 @@ eikon publish mine.eikon
 ```
 
 This creates a normal GitHub PR contribution against `EIKON_REPO` or the default
-`liftaris/eikon` catalog. The helper uses `gh` authentication and repository
+`liftaris/eikon` repository. The helper uses `gh` authentication and repository
 mechanics, then submits the same generated registry bundle expected by CI:
 
 ```text

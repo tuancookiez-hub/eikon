@@ -165,7 +165,7 @@ const cmds: Record<string, (argv: string[]) => Promise<void>> = {
   async publish(argv) {
     const a = args(argv)
     if (argv.includes("--help")) {
-      console.log(`eikon publish <file.eikon> [--json]\n\nGitHub PR contribution helper for ${REPO}. Set EIKON_REPO=owner/repo to target a different catalog. This prepares a generated registry bundle with eikons/<name>/ plus packages/<namespace>/<name>/ artifacts through gh; no hosted upload/auth service, dashboard, or moderation product is involved.`)
+      console.log(`eikon publish <file.eikon> [--json]\n\nGitHub PR contribution helper for ${REPO}. Set EIKON_REPO=owner/repo to target a different GitHub repository for the same generated registry contribution shape. This prepares a generated registry bundle with eikons/<name>/ plus packages/<namespace>/<name>/ artifacts through gh; no hosted upload/auth service, dashboard, or moderation product is involved.`)
       return
     }
     const path = a.pos[0] ?? die("usage: eikon publish <file> [--json]")

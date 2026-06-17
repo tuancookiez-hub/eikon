@@ -19,8 +19,9 @@ function display(entry: Entry): string {
   return String(entry.name ?? entry.id ?? "<unknown>")
 }
 
-function isDelist(title?: string): boolean {
-  return /^eikons:\s*delist\s+[a-z0-9-]+\s*$/i.test(title ?? "")
+function delistName(title?: string): string | undefined {
+  const m = (title ?? "").match(/^eikons:\s*delist\s+([a-z0-9-]+)\s*$/i)
+  return m?.[1]
 }
 
 function packageParts(entry: Entry): { namespace: string; name: string } | undefined {
@@ -34,13 +35,26 @@ function packageParts(entry: Entry): { namespace: string; name: string } | undef
 }
 
 export function validate(plan: Plan): string[] {
-  if (isDelist(plan.title)) return []
-
-  const errors: string[] = []
   const base = parseIndex(plan.baseIndex, "base index")
   const current = parseIndex(plan.index, "current index")
   const currentKeys = new Set(current.map(key))
   const baseKeys = new Set(base.map(key))
+  const delist = delistName(plan.title)
+
+  if (delist) {
+    const errors: string[] = []
+    const removed = base.filter(entry => !currentKeys.has(key(entry)))
+    if (removed.length !== 1 || display(removed[0] ?? {}) !== delist) {
+      errors.push(`Delist PR must remove exactly '${delist}' from the catalog index.`)
+    }
+    for (const file of plan.files.filter(file => file.status.includes("D") || file.status.includes("R"))) {
+      const scoped = file.path === "eikons/index.json" || file.path.startsWith(`eikons/${delist}/`) || /^packages\/[^/]+\//.test(file.path) && file.path.split("/")[2] === delist
+      if (!scoped) errors.push(`Delist PR must not delete unrelated registry file: ${file.path}`)
+    }
+    return errors
+  }
+
+  const errors: string[] = []
 
   for (const entry of base) {
     if (!currentKeys.has(key(entry))) {
@@ -120,7 +134,7 @@ async function main() {
   if (errors.length || dirty.length) {
     for (const error of errors) console.error(`::error::${error}`)
     if (dirty.length) {
-      console.error("::error::Generated registry artifacts are stale or uncommitted. Run `bun src/cli.tsx manifest --gzip`, `EIKON_REGISTRY=1 bun src/cli.tsx index`, `bun run verify:artifacts`, then commit all eikons/ and packages/ changes.")
+      console.error("::error::Generated registry artifacts are stale or uncommitted. Run `bun src/cli.tsx manifest --gzip`, `bun src/cli.tsx index`, `bun run verify:artifacts`, then commit all eikons/ and packages/ changes.")
       console.error("Changed registry files:")
       for (const file of dirty) console.error(`${file.status}\t${file.path}`)
     }

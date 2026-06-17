@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { randomUUID, createHash } from "node:crypto"
 import { index, manifest, verifyArtifacts } from "../src/registry"
 
 const text = [
@@ -10,6 +10,8 @@ const text = [
   JSON.stringify({ type: "clip", name: "idle", fps: 1, frameCount: 1 }),
   JSON.stringify({ type: "frame", clip: "idle", index: 0, rows: ["F"] }),
 ].join("\n") + "\n"
+
+const digest = (value: string) => `sha256:${createHash("sha256").update(value).digest("hex")}`
 
 function fixture() {
   const root = join(tmpdir(), `eikon-fresh-src-${randomUUID()}`)
@@ -34,4 +36,22 @@ test("artifact freshness verifier detects stale generated catalog and package ar
   expect(result.ok).toBe(false)
   expect(result.diffs).toContain("eikons/index.json")
   expect(result.diffs).toContain("eikons/fresh/manifest.json")
+})
+
+test("registry manifest fails when source refs point at missing files", () => {
+  const dir = fixture()
+  writeFileSync(join(dir, "fresh", "manifest.json"), JSON.stringify({
+    kind: "eikon.package",
+    schemaVersion: "1.0",
+    id: "liftaris/fresh",
+    name: "fresh",
+    version: "1.0.0",
+    display: { title: "fresh", author: "kaio" },
+    compatibility: { eikon: ">=1 <2" },
+    source: { base: "missing.png" },
+    entrypoints: { default: "fresh.eikon" },
+    files: [{ path: "fresh.eikon", role: "runtime", mediaType: "application/vnd.eikon.stream+jsonl", size: text.length, digest: digest(text) }],
+  }))
+
+  expect(() => manifest({ root: dir, encoding: "gzip" })).toThrow(/missing\.png: referenced source file missing/)
 })
